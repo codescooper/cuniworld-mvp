@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CuniWorld — MVP Gestion Lapins</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">CW</div>
+      <div>
+        <div class="title">CuniWorld</div>
+        <div class="subtitle">MVP — Gestion élevage de lapins (offline)</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="btnNewRabbit" class="btn" data-testid="btn-new-rabbit">+ Nouveau lapin</button>
+      <button id="btnExport" class="btn secondary" data-testid="btn-export">Exporter</button>
+      <label class="btn secondary file" data-testid="btn-import">
+        Importer
+        <input id="fileImport" type="file" accept="application/json" data-testid="file-import" />
+      </label>
+      <button id="btnReset" class="btn danger" data-testid="btn-reset">Réinitialiser</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="grid">
+      <div class="card">
+        <h2>Dashboard</h2>
+        <div id="dash" class="dash" data-testid="dash"></div>
+      </div>
+
+      <div class="card">
+        <h2>Lapins</h2>
+        <div class="row">
+          <input id="q" class="input" placeholder="Rechercher (ID, nom, race, sexe, cage…)" data-testid="rabbit-search" />
+          <select id="sexFilter" class="input" data-testid="filter-sex">
+            <option value="">Sexe: Tous</option>
+            <option value="F">Femelle</option>
+            <option value="M">Mâle</option>
+            <option value="U">Inconnu</option>
+          </select>
+          <select id="statusFilter" class="input" data-testid="filter-status">
+            <option value="">Statut: Tous</option>
+            <option value="actif">Actif</option>
+            <option value="vendu">Vendu</option>
+            <option value="mort">Mort</option>
+          </select>
+        </div>
+
+        <div id="rabbitList" class="list" data-testid="rabbit-list"></div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Détails lapin</h2>
+        <div id="rabbitDetails" class="muted" data-testid="rabbit-details">
+          Sélectionne un lapin dans la liste.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Événements</h2>
+        <div id="eventsPanel" class="muted" data-testid="events-panel">
+          Sélectionne un lapin pour voir/ajouter des événements.
+        </div>
+      </div>
+    </section>
+    <section class="grid">
+        <div class="card">
+            <h2>Lots / Jeunes (depuis Sevrage)</h2>
+            <div class="row">
+              <input id="lotQ" class="input" placeholder="Rechercher (cage, mère, date…)" data-testid="lot-search" />
+            </div>
+            <div id="lotList" class="list" data-testid="lot-list"></div>
+        </div>
+
+        <div class="card">
+            <h2>Détails lot</h2>
+            <div id="lotDetails" class="muted" data-testid="lot-details">Sélectionne un lot.</div>
+        </div>
+    </section>
+
+  </main>
+
+  <!-- Modal simple -->
+  <div id="modal" class="modal hidden" aria-hidden="true" data-testid="modal">
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <h3 id="modalTitle">Modal</h3>
+        <button class="iconbtn" id="modalClose" title="Fermer">✕</button>
+      </div>
+      <div id="modalBody" class="modal-body" data-testid="modal-body"></div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

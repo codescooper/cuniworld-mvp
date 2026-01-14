@@ -1,0 +1,92 @@
+# 🐇 CuniWorld — MVP Gestion d’élevage de lapins
+
+CuniWorld est une application **web offline-first** destinée aux petits et moyens éleveurs de lapins.
+Ce dépôt contient le **MVP fonctionnel**, testé et prêt à évoluer.
+
+---
+
+## 🎯 Objectif du MVP
+
+- Gérer les lapins (fiche individuelle)
+- Suivre la reproduction
+- Gérer les événements (saillie, sevrage, vaccin, traitement…)
+- Générer automatiquement les lots de jeunes
+- Avoir des rappels sanitaires et reproductifs
+- Fonctionner **sans connexion Internet**
+
+---
+
+## 🧱 Stack technique
+
+- **HTML / CSS / JavaScript vanilla**
+- Stockage : `localStorage`
+- Tests unitaires : **Vitest**
+- Tests E2E : **Playwright**
+- Déploiement : **GitHub Pages**
+
+---
+
+## ✅ Fonctionnalités implémentées (V4.1)
+
+### Lapins
+- Création / modification / suppression
+- Sexe, statut (actif, vendu, mort)
+- Recherche + filtres
+- Détails complets par lapin
+
+### Événements
+- Saillie → calcul mise-bas estimée
+- Sevrage → création automatique de lots
+- Vaccin / traitement avec `nextDate`
+- Historique par lapin
+- Suppression d’événement
+
+### Lots / Jeunes
+- Création automatique depuis sevrage
+- Liste des lots
+- Détails (cage, nombre sevrés, mère)
+- Bouton “Voir la mère”
+
+### Dashboard
+- Statistiques globales
+- Mise-bas à venir (≤ 7 jours)
+- Rappels sanitaires (à venir / en retard)
+
+### Export / Import
+- Export JSON
+- Reset complet
+- Import avec restauration complète
+
+---
+
+## 🧪 Tests
+
+### Tests unitaires
+bash
+npm run test
+reproduction
+
+lots
+
+portées
+
+santé
+
+utilitaires
+
+Tests E2E
+npm run test:e2e
+
+
+Scénarios couverts :
+
+Parcours complet élevage
+
+Export / reset / import
+
+Rappels à venir
+
+Rappels en retard
+
+Tous les tests
+npm run test:all
