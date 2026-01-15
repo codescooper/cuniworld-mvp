@@ -54,6 +54,8 @@ export function addEvent(ctx, rabbitId, data) {
   ctx.state.events.unshift(ev);
   persist(ctx);
   ctx.render();
+
+  return ev;
 }
 
 export function deleteEvent(ctx, eventId) {

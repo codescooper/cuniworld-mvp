@@ -1,6 +1,8 @@
 import { openModal, closeModal } from "./modal.js";
 import { escapeHTML, escapeAttr, num } from "./utils.js";
 import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent } from "./actions.js";
+import { validateEvent, applyEventSideEffects } from "./rules.js";
+
 
 export function wireStatic(ctx) {
   const { el, Store } = ctx;
@@ -20,7 +22,8 @@ export function wireStatic(ctx) {
     a.href = URL.createObjectURL(blob);
     a.download = `cuniworld_backup_${new Date().toISOString().slice(0,10)}.json`;
     a.click();
-    URL.revokeObjectURL(a.href);
+    // laisser le temps au navigateur de démarrer le téléchargement
+    setTimeout(() => URL.revokeObjectURL(a.href), 1500);
   });
 
   el.fileImport.addEventListener("change", async (e) => {
@@ -235,10 +238,15 @@ function wireRabbitForm(ctx, existingRabbit) {
     data.status = (data.status || "actif").toString();
     data.birthDate = (data.birthDate || "").toString();
 
-    if (existingRabbit) updateRabbit(ctx, existingRabbit.id, data);
-    else addRabbit(ctx, data);
+    try {
+      if (existingRabbit) updateRabbit(ctx, existingRabbit.id, data);
+      else addRabbit(ctx, data);
 
-    closeModal(ctx.el);
+      closeModal(ctx.el);
+    } catch (err) {
+      alert(err?.message || String(err));
+    }
+
   });
 }
 
@@ -273,6 +281,8 @@ function eventFormHTML() {
         <div class="label">Notes</div>
         <textarea class="input" name="notes" placeholder="Détails (optionnel)"></textarea>
       </div>
+
+      <div id="eventError" class="error" style="display:none"></div>
 
       <div class="row" style="justify-content:flex-end">
         <button type="button" class="btn secondary" id="cancelEvent">Annuler</button>
@@ -380,7 +390,51 @@ function wireEventForm(ctx) {
     }
 
 
-    addEvent(ctx, ctx.selectedRabbitId, { type, date, notes, data: evData });
-    closeModal(ctx.el);
+    const draft = { type, date, notes, data: evData };
+
+    // 1) Validation métier avant ajout
+    const check = validateEvent(ctx.state, ctx.selectedRabbitId, draft);
+    if (!check.ok) {
+      alert(check.error);
+      return;
+    }
+
+    const ev = { type, date, notes, data: evData };
+
+    const err = validateEvent(ctx.state, ctx.selectedRabbitId, ev);
+    if (err) {
+      const box = document.getElementById("eventError");
+      if (box) {
+        box.textContent = err;
+        box.style.display = "block";
+      } else {
+        alert(err);
+      }
+      return; // on ne ferme pas
+    }
+
+    try {
+      addEvent(ctx, ctx.selectedRabbitId, { type, date, notes, data: evData });
+      closeModal(ctx.el);
+    } catch (err) {
+      const msg = err?.message || String(err);
+
+      // Affiche l'erreur dans le formulaire (sans fermer le modal)
+      let box = document.getElementById("formError");
+      if (!box) {
+        box = document.createElement("div");
+        box.id = "formError";
+        box.style.padding = "10px";
+        box.style.borderRadius = "10px";
+        box.style.marginBottom = "10px";
+        box.style.background = "rgba(255,0,0,.08)";
+        box.style.border = "1px solid rgba(255,0,0,.25)";
+        box.style.fontSize = "13px";
+      }
+      box.textContent = msg;
+
+      form.prepend(box);
+    }
+
   });
 }

@@ -122,7 +122,9 @@ body{
 
 .sep{height:1px;background:var(--line);margin:12px 0}
 
-.modal.hidden{display:none}
+.modal.hidden {
+  display: none;
+}
 .modal{
   position:fixed;inset:0;z-index:30;
   display:grid;place-items:center;
