@@ -1,7 +1,6 @@
 import { openModal, closeModal } from "./modal.js";
 import { escapeHTML, escapeAttr, num } from "./utils.js";
 import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent } from "./actions.js";
-import { validateEvent, applyEventSideEffects } from "./rules.js";
 
 
 export function wireStatic(ctx) {
@@ -282,7 +281,7 @@ function eventFormHTML() {
         <textarea class="input" name="notes" placeholder="Détails (optionnel)"></textarea>
       </div>
 
-      <div id="eventError" class="error" style="display:none"></div>
+      <div id="eventError" class="error" data-testid="modal-error" hidden></div>
 
       <div class="row" style="justify-content:flex-end">
         <button type="button" class="btn secondary" id="cancelEvent">Annuler</button>
@@ -352,19 +351,42 @@ function wireEventForm(ctx) {
   const cancel = document.getElementById("cancelEvent");
   const typeSel = document.getElementById("evType");
   const extra = document.getElementById("evExtra");
+  const submitBtn = form?.querySelector('[data-testid="event-form-submit"]');
+  const errorBox = document.getElementById("eventError");
+  let isSubmitting = false;
 
   cancel?.addEventListener("click", () => closeModal(ctx.el));
+
+  const showError = (message) => {
+    if (!errorBox) {
+      alert(message);
+      return;
+    }
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+  };
+
+  const clearError = () => {
+    if (!errorBox) return;
+    errorBox.textContent = "";
+    errorBox.hidden = true;
+  };
 
   if (typeSel && extra) {
     extra.innerHTML = renderEventExtra(typeSel.value);
     typeSel.addEventListener("change", () => {
       extra.innerHTML = renderEventExtra(typeSel.value);
+      clearError();
     });
   }
 
   form?.addEventListener("submit", (e) => {
     e.preventDefault();
     if (!ctx.selectedRabbitId) return;
+    if (isSubmitting) return;
+    isSubmitting = true;
+    if (submitBtn) submitBtn.disabled = true;
+    clearError();
 
     const fd = new FormData(form);
     const data = Object.fromEntries(fd.entries());
@@ -392,49 +414,15 @@ function wireEventForm(ctx) {
 
     const draft = { type, date, notes, data: evData };
 
-    // 1) Validation métier avant ajout
-    const check = validateEvent(ctx.state, ctx.selectedRabbitId, draft);
-    if (!check.ok) {
-      alert(check.error);
-      return;
-    }
-
-    const ev = { type, date, notes, data: evData };
-
-    const err = validateEvent(ctx.state, ctx.selectedRabbitId, ev);
-    if (err) {
-      const box = document.getElementById("eventError");
-      if (box) {
-        box.textContent = err;
-        box.style.display = "block";
-      } else {
-        alert(err);
-      }
-      return; // on ne ferme pas
-    }
-
     try {
-      addEvent(ctx, ctx.selectedRabbitId, { type, date, notes, data: evData });
+      addEvent(ctx, ctx.selectedRabbitId, draft);
       closeModal(ctx.el);
     } catch (err) {
       const msg = err?.message || String(err);
-
-      // Affiche l'erreur dans le formulaire (sans fermer le modal)
-      let box = document.getElementById("formError");
-      if (!box) {
-        box = document.createElement("div");
-        box.id = "formError";
-        box.style.padding = "10px";
-        box.style.borderRadius = "10px";
-        box.style.marginBottom = "10px";
-        box.style.background = "rgba(255,0,0,.08)";
-        box.style.border = "1px solid rgba(255,0,0,.25)";
-        box.style.fontSize = "13px";
-      }
-      box.textContent = msg;
-
-      form.prepend(box);
+      showError(msg);
+      isSubmitting = false;
+      if (submitBtn) submitBtn.disabled = false;
+      return;
     }
-
   });
 }

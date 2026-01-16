@@ -26,6 +26,15 @@ export async function closeModalHard(page) {
   await expect(modal).toBeHidden({ timeout: 5000 }).catch(() => {});
 }
 
+export async function waitForModalCloseOrError(page) {
+  const modal = page.getByTestId("modal");
+  const error = page.getByTestId("modal-error");
+  await Promise.race([
+    modal.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {}),
+    error.waitFor({ state: "visible", timeout: 5000 }).catch(() => {}),
+  ]);
+}
+
 export async function createRabbit(page, { code = "CW-F001", name = "Naya", sex = "F" } = {}) {
   await closeModalHard(page);
 
@@ -56,18 +65,35 @@ export async function openAddEvent(page) {
   await closeModalHard(page);
 
   const b1 = page.getByTestId("btn-add-event");
-  if (await b1.count()) return b1.first().click();
+  if (await b1.count()) {
+    await b1.first().click();
+    await page.getByTestId("modal").waitFor({ state: "visible" });
+    return;
+  }
 
   const b2 = page.getByTestId("btn-add-event-2");
-  if (await b2.count()) return b2.first().click();
+  if (await b2.count()) {
+    await b2.first().click();
+    await page.getByTestId("modal").waitFor({ state: "visible" });
+    return;
+  }
 
   const b3 = page.locator("#btnAddEvent");
-  if (await b3.count()) return b3.first().click();
+  if (await b3.count()) {
+    await b3.first().click();
+    await page.getByTestId("modal").waitFor({ state: "visible" });
+    return;
+  }
 
   const b4 = page.locator("#btnAddEvent2");
-  if (await b4.count()) return b4.first().click();
+  if (await b4.count()) {
+    await b4.first().click();
+    await page.getByTestId("modal").waitFor({ state: "visible" });
+    return;
+  }
 
-  return page.locator("#eventsPanel").getByRole("button", { name: "+ Ajouter un événement" }).first().click();
+  await page.locator("#eventsPanel").getByRole("button", { name: "+ Ajouter un événement" }).first().click();
+  await page.getByTestId("modal").waitFor({ state: "visible" });
 }
 
 export async function submitEventForm(page) {
@@ -75,9 +101,7 @@ export async function submitEventForm(page) {
   if (await submit.count()) await submit.click();
   else await page.locator('#eventForm button[type="submit"]').click();
 
-  // si validation refuse, le modal reste ouvert (c’est OK),
-  // sinon il se ferme. On laisse un mini délai.
-  await page.waitForTimeout(100);
+  await waitForModalCloseOrError(page);
 }
 
 export async function addSaillie(page, { date = "2026-01-01" } = {}) {
