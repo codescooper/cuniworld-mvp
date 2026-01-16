@@ -219,7 +219,7 @@ export function renderEventsPanel(ctx) {
       `).join("")}
     </div>
     <div class="sep"></div>
-    <button class="btn" id="btnAddEvent2">+ Ajouter un événement</button>
+    <button class="btn" id="btnAddEvent2" data-testid="btn-add-event-2">+ Ajouter un événement</button>
   `;
 }
 
@@ -302,4 +302,3 @@ export function renderLots(ctx) {
     `;
   }
 }
-

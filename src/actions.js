@@ -1,3 +1,5 @@
+import { validateEvent, applyEventSideEffects } from "./rules.js";
+
 export function persist(ctx) {
   ctx.state = ctx.Store.save(ctx.state);
 }
@@ -51,7 +53,14 @@ export function addEvent(ctx, rabbitId, data) {
     data: data.data || {},
     createdAt: nowISO(),
   };
+  const check = validateEvent(ctx.state, rabbitId, ev);
+  if (!check.ok) {
+    const error = new Error(check.error);
+    error.code = "EVENT_VALIDATION";
+    throw error;
+  }
   ctx.state.events.unshift(ev);
+  applyEventSideEffects(ctx.state, ev);
   persist(ctx);
   ctx.render();
 
