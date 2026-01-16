@@ -373,12 +373,17 @@ function wireEventForm(ctx) {
   };
 
   if (typeSel && extra) {
+    refreshAllowedTypes();
     extra.innerHTML = renderEventExtra(typeSel.value);
     typeSel.addEventListener("change", () => {
       extra.innerHTML = renderEventExtra(typeSel.value);
       clearError();
     });
   }
+  dateInput?.addEventListener("change", () => {
+    refreshAllowedTypes();
+    clearError();
+  });
 
   form?.addEventListener("submit", (e) => {
     e.preventDefault();
