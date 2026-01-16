@@ -1,7 +1,6 @@
 import { openModal, closeModal } from "./modal.js";
 import { escapeHTML, escapeAttr, num } from "./utils.js";
 import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent } from "./actions.js";
-import { getAllowedEventTypes } from "./rules.js";
 
 
 export function wireStatic(ctx) {
@@ -352,7 +351,6 @@ function wireEventForm(ctx) {
   const cancel = document.getElementById("cancelEvent");
   const typeSel = document.getElementById("evType");
   const extra = document.getElementById("evExtra");
-  const dateInput = form?.querySelector('input[name="date"]');
   const submitBtn = form?.querySelector('[data-testid="event-form-submit"]');
   const errorBox = document.getElementById("eventError");
   let isSubmitting = false;
@@ -372,18 +370,6 @@ function wireEventForm(ctx) {
     if (!errorBox) return;
     errorBox.textContent = "";
     errorBox.hidden = true;
-  };
-
-  const refreshAllowedTypes = () => {
-    if (!typeSel || !ctx.selectedRabbitId) return;
-    const allowed = getAllowedEventTypes(ctx.state, ctx.selectedRabbitId);
-    Array.from(typeSel.options).forEach(option => {
-      option.disabled = !allowed.has(option.value);
-    });
-    if (typeSel.selectedOptions[0]?.disabled) {
-      const firstAllowed = Array.from(typeSel.options).find(opt => !opt.disabled);
-      if (firstAllowed) typeSel.value = firstAllowed.value;
-    }
   };
 
   if (typeSel && extra) {
