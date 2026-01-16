@@ -15,6 +15,35 @@ function mustBeActiveRabbit(r) {
   return null;
 }
 
+function latestEventOfType(state, rabbitId, type, beforeDate) {
+  return state.events
+    .filter(e => e.rabbitId === rabbitId && e.type === type)
+    .filter(e => !beforeDate || (e.date || "") <= beforeDate)
+    .sort((a,b) => (b.date || "").localeCompare(a.date || ""))[0] || null;
+}
+
+export function getReproContext(state, rabbitId) {
+  const rabbit = state.rabbits.find(x => x.id === rabbitId);
+  const lastMating = latestEventOfType(state, rabbitId, "saillie");
+  const lastBirth = latestEventOfType(state, rabbitId, "mise_bas");
+  const lastWeaning = latestEventOfType(state, rabbitId, "sevrage");
+  const pregnant = !!lastMating && (!lastBirth || (lastBirth.date || "") < (lastMating.date || ""));
+  return { rabbit, lastMating, lastBirth, lastWeaning, pregnant };
+}
+
+export function getAllowedEventTypes(state, rabbitId) {
+  const { rabbit, pregnant, lastBirth } = getReproContext(state, rabbitId);
+  if (!rabbit || rabbit.status !== "actif") return new Set();
+
+  const allowed = new Set(["vaccin", "traitement", "pesée", "vente", "décès", "autre"]);
+  if (rabbit.sex === "F") {
+    if (!pregnant) allowed.add("saillie");
+    if (lastBirth || getReproInfo(state, rabbit)?.lastMating) allowed.add("mise_bas");
+    if (lastBirth) allowed.add("sevrage");
+  }
+  return allowed;
+}
+
 /**
  * Valide un événement AVANT insertion.
  * @returns { ok: true } ou { ok:false, error: string }
@@ -36,13 +65,9 @@ export function validateEvent(state, rabbitId, draft, opts = {}) {
     if (r.sex !== "F") return { ok: false, error: "Saillie : seulement pour une femelle." };
 
     // Option: bloquer si déjà gestante (une saillie récente sans mise-bas)
-    const repro = getReproInfo(state, r);
-    if (repro?.lastMating?.date && repro?.dueDate) {
-      // si on détecte une gestation active
-      const alreadyPregnant = !!repro.lastMating && !repro.lastBirth; // selon ton repro.js
-      if (alreadyPregnant) {
-        return { ok: false, error: "Impossible : une gestation est déjà en cours pour cette femelle." };
-      }
+    const { pregnant } = getReproContext(state, rabbitId);
+    if (pregnant) {
+      return { ok: false, error: "Impossible : une gestation est déjà en cours pour cette femelle." };
     }
     return { ok: true };
   }
@@ -51,8 +76,8 @@ export function validateEvent(state, rabbitId, draft, opts = {}) {
   if (type === "mise_bas") {
     if (r.sex !== "F") return { ok: false, error: "Mise-bas : seulement pour une femelle." };
 
-    const repro = getReproInfo(state, r);
-    const matingDate = repro?.lastMating?.date;
+    const lastMating = latestEventOfType(state, rabbitId, "saillie", date);
+    const matingDate = lastMating?.date;
     if (!matingDate) {
       return { ok: false, error: "Impossible : aucune saillie trouvée avant cette mise-bas." };
     }
@@ -71,8 +96,8 @@ export function validateEvent(state, rabbitId, draft, opts = {}) {
 
   // Sevrage : doit suivre une mise-bas et respecter délai
   if (type === "sevrage") {
-    const repro = getReproInfo(state, r);
-    const birthDate = repro?.lastBirth?.date; // adapte si ton repro.js nomme autrement
+    const lastBirth = latestEventOfType(state, rabbitId, "mise_bas", date);
+    const birthDate = lastBirth?.date;
     if (!birthDate) {
       return { ok: false, error: "Impossible : sevrage sans mise-bas enregistrée." };
     }
