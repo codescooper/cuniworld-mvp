@@ -8,7 +8,11 @@ export function getEvents(state, rabbitId, type) {
 
 export function getLitterStatsForDoe(state, rabbitId) {
   const litters = getEvents(state, rabbitId, "mise_bas");
-  const born = sum(litters.map(e => num(e.data?.born)));
+  const born = sum(litters.map((e) => {
+    const declared = e.data?.born;
+    if (declared !== null && declared !== undefined && declared !== "") return num(declared);
+    return num(e.data?.alive) + num(e.data?.dead);
+  }));
   const alive = sum(litters.map(e => num(e.data?.alive)));
   const dead = sum(litters.map(e => num(e.data?.dead)));
   const count = litters.length;
@@ -19,7 +23,7 @@ export function getLitterStatsForDoe(state, rabbitId) {
 export function formatEventDetails(e) {
   const parts = [];
   if (e.type === "mise_bas") {
-    const b = num(e.data?.born);
+    const b = (e.data?.born ?? "") === "" ? num(e.data?.alive) + num(e.data?.dead) : num(e.data?.born);
     const a = num(e.data?.alive);
     const d = num(e.data?.dead);
     if (b || a || d) parts.push(`Nés: ${b} · Vivants: ${a} · Morts: ${d}`);

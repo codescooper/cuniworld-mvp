@@ -2,8 +2,9 @@ import { test, expect } from "@playwright/test";
 import {
   gotoClean,
   createRabbit,
+  createBuck,
   selectRabbitByCode,
-  addSaillie,
+  addSaillieWithMale,
   addMiseBas,
   addSevrage,
 } from "./_helpers.js";

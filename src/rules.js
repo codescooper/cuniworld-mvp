@@ -65,6 +65,16 @@ export function validateEvent(state, rabbitId, draft, opts = {}) {
       return { ok: false, error: "Impossible : aucune saillie trouvée avant cette mise-bas." };
     }
 
+    const born = Number(draft?.data?.born ?? 0);
+    const alive = Number(draft?.data?.alive ?? 0);
+    const dead = Number(draft?.data?.dead ?? 0);
+    if (born < 0 || alive < 0 || dead < 0) {
+      return { ok: false, error: "Mise-bas : valeurs négatives interdites." };
+    }
+    if (born > 0 && alive + dead > born) {
+      return { ok: false, error: "Mise-bas : vivants + morts ne peut pas dépasser nés." };
+    }
+
     const days = daysBetween(matingDate, date);
     if (days < rules.MIN_GESTATION_DAYS) {
       const minISO = addDaysISO(matingDate, rules.MIN_GESTATION_DAYS);
@@ -144,7 +154,7 @@ export function applyEventSideEffects(ctx, event) {
         const n = String(startIndex + i - 1).padStart(2, "0");
         const kit = {
           id: uid("rb"),
-          code: `${(r.code || "CW").trim()}-K${n}`,
+          code: `CW-KIT-${dateStamp}-${n}`,
           name: `Laperau ${n}`,
           sex: "U",
           breed: r.breed || "",
@@ -164,6 +174,21 @@ export function applyEventSideEffects(ctx, event) {
 
       event.data.kitsCreated = true;
       event.data.kitsCount = alive;
+    }
+  }
+
+  if (event.type === "sevrage") {
+    const repro = getReproInfo(state, r);
+    const litterEvent = repro?.lastBirth;
+    if (litterEvent) {
+      const destCage = (event.data?.destCage || "").trim();
+      state.rabbits.forEach((kit) => {
+        if (kit.litterId !== litterEvent.id) return;
+        if (kit.status !== "actif") return;
+        kit.stage = "jeune";
+        if (destCage) kit.cage = destCage;
+        kit.updatedAt = nowISO();
+      });
     }
   }
 

@@ -26,7 +26,7 @@ export async function closeModalHard(page) {
   await waitForModalHidden(page);
 }
 
-export async function waitForModalCloseOrError(page) {
+export async function waitModalClosedOrError(page) {
   const modal = page.getByTestId("modal");
   const error = page.getByTestId("modal-error");
   await Promise.race([
@@ -69,6 +69,10 @@ export async function createRabbit(page, { code = "CW-F001", name = "Naya", sex 
 
   // le modal devrait se fermer tout seul — sinon on force
   await closeModalHard(page);
+}
+
+export async function createBuck(page, { code = "CW-M001", name = "Orion" } = {}) {
+  await createRabbit(page, { code, name, sex: "M" });
 }
 
 export async function selectRabbitByCode(page, code = "CW-F001") {
@@ -117,7 +121,7 @@ export async function submitEventForm(page) {
   if (await submit.count()) await submit.click();
   else await page.locator('#eventForm button[type="submit"]').click();
 
-  await waitForModalCloseOrError(page);
+  await waitModalClosedOrError(page);
 }
 
 export async function addSaillie(page, { date = "2026-01-01", maleCode = "CW-M001" } = {}) {

@@ -38,6 +38,12 @@ export function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+export function numOrNull(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function sum(arr) {
   return arr.reduce((a,b)=>a+b,0);
 }
@@ -53,4 +59,20 @@ export function rabbitStatusBadge(status) {
   if (status === "vendu") return `<span class="badge warn">Vendu</span>`;
   if (status === "mort") return `<span class="badge danger">Mort</span>`;
   return `<span class="badge">Inconnu</span>`;
+}
+
+export function getRabbitStage(rabbit, { minWeanDays = 28, maturityDays = 120 } = {}) {
+  if (rabbit?.stage) return rabbit.stage;
+  const birthDate = rabbit?.birthDate;
+  if (!birthDate) return "adulte";
+  const ageDays = daysBetween(birthDate, new Date().toISOString().slice(0, 10));
+  if (ageDays < minWeanDays) return "kit";
+  if (ageDays < maturityDays) return "jeune";
+  return "adulte";
+}
+
+export function stageBadge(stage) {
+  const label = stage === "kit" ? "Kit" : stage === "jeune" ? "Jeune" : "Adulte";
+  const klass = stage === "kit" ? "accent" : stage === "jeune" ? "warn" : "ok";
+  return `<span class="badge ${klass}">Stage: ${label}</span>`;
 }

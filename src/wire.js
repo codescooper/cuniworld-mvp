@@ -1,5 +1,5 @@
 import { openModal, closeModal } from "./modal.js";
-import { escapeHTML, escapeAttr, num } from "./utils.js";
+import { escapeHTML, escapeAttr, num, numOrNull } from "./utils.js";
 import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent } from "./actions.js";
 
 
@@ -51,6 +51,7 @@ export function wireStatic(ctx) {
   el.q.addEventListener("input", () => ctx.render());
   el.sexFilter.addEventListener("change", () => ctx.render());
   el.statusFilter.addEventListener("change", () => ctx.render());
+  el.geneQ?.addEventListener("input", () => ctx.render());
 
   // modal
   el.modalClose.addEventListener("click", () => closeModal(el));
@@ -91,6 +92,27 @@ export function wireDynamic(ctx) {
   el.rabbitList.querySelectorAll("[data-rabbit]").forEach(node => {
     node.addEventListener("click", () => {
       ctx.selectedRabbitId = node.dataset.rabbit;
+      ctx.selectedGeneRabbitId = node.dataset.rabbit;
+      ctx.render();
+    });
+  });
+
+  document.querySelectorAll("[data-open-rabbit]").forEach(node => {
+    node.addEventListener("click", () => {
+      const id = node.dataset.openRabbit;
+      if (!id) return;
+      ctx.selectedRabbitId = id;
+      ctx.selectedGeneRabbitId = id;
+      ctx.render();
+    });
+  });
+
+  document.querySelectorAll("[data-gene-focus]").forEach(node => {
+    node.addEventListener("click", () => {
+      const id = node.dataset.geneFocus;
+      if (!id) return;
+      ctx.selectedGeneRabbitId = id;
+      ctx.selectedRabbitId = id;
       ctx.render();
     });
   });
@@ -421,7 +443,7 @@ function wireEventForm(ctx) {
 
     const evData = {};
     if (type === "mise_bas") {
-      evData.born = num(data.born);
+      evData.born = numOrNull(data.born);
       evData.alive = num(data.alive);
       evData.dead = num(data.dead);
     }

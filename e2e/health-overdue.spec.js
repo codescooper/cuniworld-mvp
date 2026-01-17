@@ -16,10 +16,10 @@ test("traitement avec nextDate passé => compteur 'Rappels en retard' > 0", asyn
   await createRabbit(page, { code: "CW-F001", name: "Naya", sex: "F" });
   await selectRabbitByCode(page, "CW-F001");
 
-  const twoDaysAgo = isoDaysFromToday(-2);
   const yesterday = isoDaysFromToday(-1);
+  const sevenDaysAgo = isoDaysFromToday(-7);
 
-  await addHealthEvent(page, { type: "traitement", date: twoDaysAgo, nextDate: yesterday });
+  await addHealthEvent(page, { type: "traitement", date: sevenDaysAgo, nextDate: yesterday });
 
   await expect(page.locator("#dash")).toContainText("Rappels en retard");
 

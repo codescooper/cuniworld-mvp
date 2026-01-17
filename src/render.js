@@ -1,4 +1,4 @@
-import { escapeHTML, formatDate, rabbitStatusBadge, sexLabel, daysBetween } from "./utils.js";
+import { escapeHTML, formatDate, rabbitStatusBadge, sexLabel, daysBetween, getRabbitStage, stageBadge } from "./utils.js";
 import { getReproInfo } from "./repro.js";
 import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
 import { buildLots, lotBadge } from "./lots.js";
@@ -78,10 +78,11 @@ export function renderRabbitList(ctx) {
 
   el.rabbitList.innerHTML = rabbits.map(r => {
     const active = r.id === ctx.selectedRabbitId ? "active" : "";
+    const stage = getRabbitStage(r);
     return `
       <div class="item ${active}" data-testid="rabbit-item" data-rabbit="${r.id}">
         <div>
-          <div><strong>${escapeHTML(r.code)}</strong> — ${escapeHTML(r.name)} <span class="badge">${sexLabel(r.sex)}</span></div>
+          <div><strong>${escapeHTML(r.code)}</strong> — ${escapeHTML(r.name)} <span class="badge">${sexLabel(r.sex)}</span> ${stageBadge(stage)}</div>
           <div class="small">Race: ${escapeHTML(r.breed || "—")} · Cage: ${escapeHTML(r.cage || "—")} · Naissance: ${escapeHTML(formatDate(r.birthDate))}</div>
         </div>
         <div>${rabbitStatusBadge(r.status)}</div>
@@ -102,6 +103,7 @@ export function renderRabbitDetails(ctx) {
     el.rabbitDetails.innerHTML = `<div class="muted">Lapin introuvable.</div>`;
     return;
   }
+  const stage = getRabbitStage(r);
 
   const repro = getReproInfo(state, r);
   const reproHTML = (repro && repro.dueDate)
@@ -123,13 +125,34 @@ export function renderRabbitDetails(ctx) {
           <div>Portées</div><div><strong>${st.count}</strong></div>
           <div>Total nés</div><div>${st.born}</div>
           <div>Total vivants</div><div>${st.alive}</div>
+          <div>Total morts-nés</div><div>${st.dead}</div>
           <div>Taux survie</div><div><strong>${st.survival}%</strong></div>
-          <div>Mère</div><div>${escapeHTML((state.rabbits.find(x => x.id === r.motherId)?.code) || "—")}</div>
-          <div>Père</div><div>${escapeHTML((state.rabbits.find(x => x.id === r.fatherId)?.code) || "—")}</div>
         </div>
       `;
     }
   }
+
+  const motherId = r.doeId || r.motherId;
+  const fatherId = r.buckId || r.fatherId;
+  const mother = motherId ? state.rabbits.find(x => x.id === motherId) : null;
+  const father = fatherId ? state.rabbits.find(x => x.id === fatherId) : null;
+  const siblingsCount = r.litterId
+    ? state.rabbits.filter(x => x.litterId === r.litterId && x.id !== r.id).length
+    : 0;
+
+  const genealogyHTML = (mother || father || r.litterId)
+    ? `
+      <div class="sep"></div>
+      <div style="font-weight:700;margin-bottom:6px">Généalogie</div>
+      <div class="kv">
+        <div>Mère</div>
+        <div>${mother ? `<button class="linkbtn" data-open-rabbit="${mother.id}">${escapeHTML(mother.name)} (${escapeHTML(mother.code)})</button>` : "—"}</div>
+        <div>Père</div>
+        <div>${father ? `<button class="linkbtn" data-open-rabbit="${father.id}">${escapeHTML(father.name)} (${escapeHTML(father.code)})</button>` : "—"}</div>
+        <div>Fratrie</div>
+        <div>${r.litterId ? `${siblingsCount} frère(s)/soeur(s)` : "—"}</div>
+      </div>
+    ` : "";
 
   el.rabbitDetails.innerHTML = `
     <div class="row" style="justify-content:space-between">
@@ -148,6 +171,7 @@ export function renderRabbitDetails(ctx) {
     <div class="kv">
       <div>Race</div><div>${escapeHTML(r.breed || "—")}</div>
       <div>Date naissance</div><div>${escapeHTML(formatDate(r.birthDate))}</div>
+      <div>Stage</div><div>${stageBadge(stage)}</div>
       <div>Cage</div><div>${escapeHTML(r.cage || "—")}</div>
       <div>Notes</div><div>${escapeHTML(r.notes || "—")}</div>
       <div>Créé</div><div>${escapeHTML(formatDate(r.createdAt))}</div>
@@ -156,6 +180,7 @@ export function renderRabbitDetails(ctx) {
 
     ${reproHTML}
     ${litterHTML}
+    ${genealogyHTML}
 
     <div class="sep"></div>
 
@@ -231,6 +256,7 @@ export function renderAll(ctx) {
   renderRabbitDetails(ctx);
   renderEventsPanel(ctx);
   renderLots(ctx);
+  renderGenealogy(ctx);
 }
 
 function getFilteredRabbits(ctx) {
@@ -243,7 +269,7 @@ function getFilteredRabbits(ctx) {
     if (sex && r.sex !== sex) return false;
     if (status && r.status !== status) return false;
     if (!q) return true;
-    const hay = [r.code, r.name, r.breed, r.sex, r.cage, r.status, r.notes].join(" ").toLowerCase();
+    const hay = [r.code, r.name, r.breed, r.sex, r.cage, r.status, r.notes, r.stage].join(" ").toLowerCase();
     return hay.includes(q);
   });
 }
@@ -303,4 +329,65 @@ export function renderLots(ctx) {
       </div>
     `;
   }
+}
+
+export function renderGenealogy(ctx) {
+  const { el, state } = ctx;
+  if (!el.geneGraph || !el.geneQ || !el.geneList) return;
+  if (!state.rabbits.length) {
+    el.geneGraph.innerHTML = `<div class="muted">Aucun lapin pour afficher la généalogie.</div>`;
+    el.geneList.innerHTML = `<div class="muted">Ajoute un lapin pour commencer.</div>`;
+    return;
+  }
+
+  const q = (el.geneQ.value || "").toLowerCase().trim();
+  const matches = state.rabbits.filter(r => {
+    if (!q) return true;
+    const hay = [r.code, r.name, r.breed].join(" ").toLowerCase();
+    return hay.includes(q);
+  }).slice(0, 6);
+
+  el.geneList.innerHTML = matches.map(r => `
+    <button class="item linkbtn" data-gene-focus="${r.id}">
+      <strong>${escapeHTML(r.code)}</strong> — ${escapeHTML(r.name)}
+    </button>
+  `).join("") || `<div class="muted">Aucun résultat.</div>`;
+
+  const focusId = ctx.selectedGeneRabbitId || ctx.selectedRabbitId || state.rabbits[0].id;
+  const focus = state.rabbits.find(r => r.id === focusId) || state.rabbits[0];
+  const motherId = focus.doeId || focus.motherId;
+  const fatherId = focus.buckId || focus.fatherId;
+  const mother = motherId ? state.rabbits.find(r => r.id === motherId) : null;
+  const father = fatherId ? state.rabbits.find(r => r.id === fatherId) : null;
+  const kids = state.rabbits.filter(r => (r.doeId || r.motherId) === focus.id).slice(0, 4);
+
+  const nodes = [
+    { id: mother?.id, label: mother ? `${mother.name} (${mother.code})` : "Mère inconnue", x: 110, y: 20, muted: !mother },
+    { id: father?.id, label: father ? `${father.name} (${father.code})` : "Père inconnu", x: 430, y: 20, muted: !father },
+    { id: focus.id, label: `${focus.name} (${focus.code})`, x: 270, y: 140, focus: true },
+  ];
+
+  const kidNodes = kids.map((k, idx) => ({
+    id: k.id,
+    label: `${k.name} (${k.code})`,
+    x: 80 + idx * 180,
+    y: 260,
+  }));
+
+  const width = 620;
+  const height = 340;
+
+  el.geneGraph.innerHTML = `
+    <svg class="gene-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Généalogie">
+      ${mother ? `<line class="gene-line" x1="200" y1="80" x2="310" y2="140"></line>` : ""}
+      ${father ? `<line class="gene-line" x1="520" y1="80" x2="330" y2="140"></line>` : ""}
+      ${kidNodes.map((k) => `<line class="gene-line" x1="310" y1="200" x2="${k.x + 70}" y2="${k.y}"></line>`).join("")}
+      ${[...nodes, ...kidNodes].map((n) => `
+        <g class="gene-node ${n.focus ? "focus" : ""} ${n.muted ? "muted" : ""}" data-gene-focus="${n.id || ""}">
+          <rect x="${n.x}" y="${n.y}" rx="10" ry="10" width="140" height="50"></rect>
+          <text x="${n.x + 70}" y="${n.y + 30}" text-anchor="middle">${escapeHTML(n.label)}</text>
+        </g>
+      `).join("")}
+    </svg>
+  `;
 }
