@@ -15,11 +15,11 @@ test.beforeEach(async ({ page }) => {
 
 test("parcours: créer femelle -> saillie -> mise-bas -> sevrage -> lot visible -> voir la mère", async ({ page }) => {
   await createRabbit(page, { code: "CW-F001", name: "Naya", sex: "F" });
-  await createBuck(page, { code: "CW-M001", name: "Orion" });
+  await createRabbit(page, { code: "CW-M001", name: "Orion", sex: "M" });
   await selectRabbitByCode(page, "CW-F001");
 
   // Logique V4.1: saillie -> mise-bas (>=28j) -> sevrage (>=28j)
-  await addSaillieWithMale(page, { date: "2026-01-01", maleCode: "CW-M001" });
+  await addSaillie(page, { date: "2026-01-01", maleCode: "CW-M001" });
   await addMiseBas(page, { date: "2026-01-30", born: "8", alive: "7" });
   await addSevrage(page, { date: "2026-02-28", weaned: "6", destCage: "C-04" });
 

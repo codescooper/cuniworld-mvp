@@ -148,8 +148,7 @@ export function applyEventSideEffects(ctx, event) {
 
       const repro = getReproInfo(state, r);
       const fatherId = repro?.lastMating?.data?.maleId || null;
-      const dateStamp = toDateStamp(event.date);
-      const startIndex = getNextKitIndex(state, dateStamp);
+      const startIndex = getNextKitIndex(state, r);
 
       for (let i = 1; i <= alive; i++) {
         const n = String(startIndex + i - 1).padStart(2, "0");
@@ -163,10 +162,10 @@ export function applyEventSideEffects(ctx, event) {
           cage: r.cage || "",
           status: "actif",
           stage: "kit",
-          notes: `Né le ${event.date} (portée ${r.code || r.name || "inconnue"})`,
-          doeId: r.id,
-          buckId: fatherId,
-          litterId: event.id,
+          notes: `Né le ${event.date} (mise-bas)`,
+          motherId: r.id,
+          fatherId,
+          litterEventId: event.id,
           createdAt: nowISO(),
           updatedAt: nowISO(),
         };
@@ -202,8 +201,8 @@ function addDaysISO(iso, days) {
   return d.toISOString().slice(0, 10);
 }
 
-function getNextKitIndex(state, dateStamp) {
-  const prefix = `CW-KIT-${dateStamp}-`;
+function getNextKitIndex(state, mother) {
+  const prefix = `${(mother.code || "CW").trim()}-K`;
   const existing = state.rabbits
     .map((r) => r.code || "")
     .filter((code) => code.startsWith(prefix))
@@ -212,9 +211,4 @@ function getNextKitIndex(state, dateStamp) {
 
   const max = existing.length ? Math.max(...existing) : 0;
   return max + 1;
-}
-
-function toDateStamp(iso) {
-  const cleaned = (iso || "").replaceAll("-", "");
-  return cleaned.length >= 6 ? cleaned.slice(2, 8) : cleaned;
 }

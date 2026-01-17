@@ -414,10 +414,10 @@ function wireEventForm(ctx) {
   if (typeSel && extra) {
     refreshAllowedTypes();
     extra.innerHTML = renderEventExtra(ctx, typeSel.value);
-    bindExtraHandlers(typeSel.value, submitBtn, showError);
+    bindExtraHandlers(typeSel.value);
     typeSel.addEventListener("change", () => {
       extra.innerHTML = renderEventExtra(ctx, typeSel.value);
-      bindExtraHandlers(typeSel.value, submitBtn, showError);
+      bindExtraHandlers(typeSel.value);
       clearError();
     });
   }
@@ -476,41 +476,25 @@ function wireEventForm(ctx) {
   });
 }
 
-function bindExtraHandlers(type, submitBtn, showError) {
-  if (submitBtn && type !== "saillie") {
-    submitBtn.disabled = false;
-  }
-  if (type === "mise_bas") {
-    const aliveInput = document.querySelector('input[name="alive"]');
-    const hint = document.getElementById("kitHint");
-    if (!aliveInput || !hint) return;
+function bindExtraHandlers(type) {
+  if (type !== "mise_bas") return;
+  const aliveInput = document.querySelector('input[name="alive"]');
+  const hint = document.getElementById("kitHint");
+  if (!aliveInput || !hint) return;
 
-    const updateHint = () => {
-      const alive = num(aliveInput.value);
-      if (alive > 0) {
-        hint.textContent = `${alive} lapereaux seront créés.`;
-        hint.hidden = false;
-      } else {
-        hint.textContent = "";
-        hint.hidden = true;
-      }
-    };
-
-    aliveInput.addEventListener("input", updateHint);
-    updateHint();
-  }
-
-  if (type === "saillie") {
-    const maleSelect = document.querySelector('select[name="maleId"]');
-    if (!maleSelect) return;
-    const hasMales = maleSelect.querySelectorAll("option").length > 1;
-    if (!hasMales) {
-      if (submitBtn) submitBtn.disabled = true;
-      showError?.("Saillie : aucun mâle actif disponible.");
-    } else if (submitBtn) {
-      submitBtn.disabled = false;
+  const updateHint = () => {
+    const alive = num(aliveInput.value);
+    if (alive > 0) {
+      hint.textContent = `${alive} lapereaux seront créés.`;
+      hint.hidden = false;
+    } else {
+      hint.textContent = "";
+      hint.hidden = true;
     }
-  }
+  };
+
+  aliveInput.addEventListener("input", updateHint);
+  updateHint();
 }
 
 function refreshAllowedTypes() {

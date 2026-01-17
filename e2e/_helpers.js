@@ -35,8 +35,6 @@ export async function waitModalClosedOrError(page) {
   ]);
 }
 
-export const waitForModalCloseOrError = waitModalClosedOrError;
-
 export async function waitForModalHidden(page) {
   await page.waitForFunction(() => {
     const modal = document.getElementById("modal");
@@ -126,7 +124,7 @@ export async function submitEventForm(page) {
   await waitModalClosedOrError(page);
 }
 
-export async function addSaillieWithMale(page, { date = "2026-01-01", maleCode = "CW-M001" } = {}) {
+export async function addSaillie(page, { date = "2026-01-01", maleCode = "CW-M001" } = {}) {
   await openAddEvent(page);
   await page.locator("#evType").selectOption("saillie");
   await page.locator('select[name="maleId"]').selectOption({ label: maleCode });
