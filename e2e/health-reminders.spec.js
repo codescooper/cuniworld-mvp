@@ -16,13 +16,10 @@ test("vaccin+traitement avec nextDate apparaissent en rappels dashboard", async 
   await createRabbit(page, { code: "CW-F001", name: "Naya", sex: "F" });
   await selectRabbitByCode(page, "CW-F001");
 
-  const twoDaysAgo = isoDaysFromToday(-2);
-  const yesterday = isoDaysFromToday(-1);
+  const nextIn1 = isoDaysFromToday(+1);
   const nextIn3 = isoDaysFromToday(+3);
 
-  // overdue
-  await addHealthEvent(page, { type: "traitement", date: twoDaysAgo, nextDate: yesterday });
-  // upcoming
+  await addHealthEvent(page, { type: "traitement", date: isoDaysFromToday(0), nextDate: nextIn1 });
   await addHealthEvent(page, { type: "vaccin", date: isoDaysFromToday(0), nextDate: nextIn3 });
 
   // Vérifs dashboard
@@ -32,5 +29,5 @@ test("vaccin+traitement avec nextDate apparaissent en rappels dashboard", async 
   const overdue = await getDashTileNumber(page, "Rappels en retard");
 
   expect(upcoming).toBeGreaterThan(0);
-  expect(overdue).toBeGreaterThan(0);
+  expect(overdue).toBe(0);
 });

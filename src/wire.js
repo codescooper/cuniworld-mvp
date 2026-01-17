@@ -291,7 +291,7 @@ function eventFormHTML() {
   `;
 }
 
-function renderEventExtra(type, ctx) {
+function renderEventExtra(ctx, type) {
   if (type === "saillie") {
     const males = (ctx.state?.rabbits || []).filter(r => r.sex === "M" && r.status === "actif");
     const options = males
@@ -299,12 +299,12 @@ function renderEventExtra(type, ctx) {
       .join("");
     return `
       <label>Mâle (obligatoire)
-        <select name="maleId" required>
+        <select class="input" name="maleId" required>
           <option value="">— Choisir —</option>
           ${options}
         </select>
       </label>
-      ${males.length ? "" : "<div class='hint'>Aucun mâle actif. Crée un mâle d'abord.</div>"}
+      ${males.length ? "" : "<div class='small'>Aucun mâle actif. Crée un mâle d'abord.</div>"}
     `;
   }
   if (type === "vaccin" || type === "traitement") {
@@ -342,6 +342,7 @@ function renderEventExtra(type, ctx) {
         <div class="label">Morts (optionnel)</div>
         <input class="input" name="dead" type="number" min="0" placeholder="ex: 1">
       </div>
+      <div id="kitHint" class="small" hidden></div>
     `;
   }
   if (type === "sevrage") {
@@ -366,6 +367,7 @@ function wireEventForm(ctx) {
   const cancel = document.getElementById("cancelEvent");
   const typeSel = document.getElementById("evType");
   const extra = document.getElementById("evExtra");
+  const dateInput = form?.querySelector('input[name="date"]');
   const submitBtn = form?.querySelector('[data-testid="event-form-submit"]');
   const errorBox = document.getElementById("eventError");
   let isSubmitting = false;
@@ -389,9 +391,11 @@ function wireEventForm(ctx) {
 
   if (typeSel && extra) {
     refreshAllowedTypes();
-    extra.innerHTML = renderEventExtra(typeSel.value, ctx);
+    extra.innerHTML = renderEventExtra(ctx, typeSel.value);
+    bindExtraHandlers(typeSel.value);
     typeSel.addEventListener("change", () => {
-      extra.innerHTML = renderEventExtra(typeSel.value, ctx);
+      extra.innerHTML = renderEventExtra(ctx, typeSel.value);
+      bindExtraHandlers(typeSel.value);
       clearError();
     });
   }
@@ -448,4 +452,29 @@ function wireEventForm(ctx) {
       return;
     }
   });
+}
+
+function bindExtraHandlers(type) {
+  if (type !== "mise_bas") return;
+  const aliveInput = document.querySelector('input[name="alive"]');
+  const hint = document.getElementById("kitHint");
+  if (!aliveInput || !hint) return;
+
+  const updateHint = () => {
+    const alive = num(aliveInput.value);
+    if (alive > 0) {
+      hint.textContent = `${alive} lapereaux seront créés.`;
+      hint.hidden = false;
+    } else {
+      hint.textContent = "";
+      hint.hidden = true;
+    }
+  };
+
+  aliveInput.addEventListener("input", updateHint);
+  updateHint();
+}
+
+function refreshAllowedTypes() {
+  // Placeholder: ancienne logique supprimée, on garde le hook pour éviter les erreurs.
 }
