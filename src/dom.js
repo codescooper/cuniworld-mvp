@@ -23,6 +23,9 @@ export function getEls() {
     lotQ: $("lotQ"),
     lotList: $("lotList"),
     lotDetails: $("lotDetails"),
+    geneQ: $("geneQ"),
+    geneGraph: $("geneGraph"),
+    geneList: $("geneList"),
 
   };
 }

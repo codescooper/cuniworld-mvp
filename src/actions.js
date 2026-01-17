@@ -1,4 +1,5 @@
 import { validateEvent, applyEventSideEffects } from "./rules.js";
+import { getRabbitStage, num, numOrNull } from "./utils.js";
 
 export function persist(ctx) {
   ctx.state = ctx.Store.save(ctx.state);
@@ -17,6 +18,7 @@ export function addRabbit(ctx, data) {
     birthDate: data.birthDate || "",
     cage: (data.cage || "").trim(),
     status: data.status || "actif",
+    stage: data.stage || getRabbitStage({ birthDate: data.birthDate, stage: data.stage }),
     notes: (data.notes || "").trim(),
     createdAt: nowISO(),
     updatedAt: nowISO(),
@@ -46,13 +48,22 @@ export function deleteRabbit(ctx, id) {
 
 export function addEvent(ctx, rabbitId, data) {
   const { uid, nowISO } = ctx.Store.helpers;
+  const evData = { ...(data.data || {}) };
+  if (data.type === "mise_bas") {
+    const born = numOrNull(evData.born);
+    const alive = num(evData.alive);
+    const dead = num(evData.dead);
+    if (born === null) {
+      evData.born = alive + dead;
+    }
+  }
   const ev = {
     id: uid("ev"),
     rabbitId,
     type: data.type || "autre",
     date: data.date || new Date().toISOString().slice(0, 10),
     notes: (data.notes || "").trim(),
-    data: data.data || {},
+    data: evData,
     createdAt: nowISO(),
   };
 

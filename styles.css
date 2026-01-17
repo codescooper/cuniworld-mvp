@@ -156,6 +156,16 @@ body{
 
 .muted{color:var(--color-muted);line-height:1.4}
 .small{font-size:var(--font-size-sm);color:var(--color-muted)}
+.linkbtn{
+  background:none;
+  border:none;
+  padding:0;
+  color:var(--color-accent);
+  cursor:pointer;
+  font:inherit;
+  text-align:left;
+}
+.linkbtn:hover{text-decoration:underline}
 .error{
   padding:var(--space-3);
   border-radius:var(--radius-md);
@@ -223,3 +233,22 @@ textarea.input{min-height:90px;resize:vertical}
 }
 .tile .n{font-size:22px;font-weight:var(--font-weight-medium)}
 .tile .t{font-size:var(--font-size-sm);color:var(--color-muted)}
+
+.gene-graph{
+  margin-top:var(--space-3);
+  border:1px dashed var(--color-border);
+  border-radius:var(--radius-md);
+  padding:var(--space-2);
+}
+.gene-svg{width:100%;height:auto}
+.gene-line{stroke:var(--color-border);stroke-width:2}
+.gene-node rect{
+  fill:var(--color-surface);
+  stroke:var(--color-border);
+}
+.gene-node text{
+  font-size:12px;
+  fill:var(--color-text);
+}
+.gene-node.focus rect{stroke:var(--color-accent);stroke-width:2}
+.gene-node.muted rect{fill:rgba(120,120,120,0.08)}

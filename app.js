@@ -12,6 +12,7 @@ const ctx = {
   state: Store.load(),
   selectedRabbitId: null,
   selectedLotId: null,
+  selectedGeneRabbitId: null,
 
   render: () => {
     renderAll(ctx);

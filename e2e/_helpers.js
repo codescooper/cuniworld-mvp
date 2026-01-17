@@ -23,16 +23,34 @@ export async function closeModalHard(page) {
   }
 
   // Attendre qu'il soit vraiment caché
-  await expect(modal).toBeHidden({ timeout: 5000 }).catch(() => {});
+  await waitForModalHidden(page);
 }
 
-export async function waitForModalCloseOrError(page) {
+export async function waitModalClosedOrError(page) {
   const modal = page.getByTestId("modal");
   const error = page.getByTestId("modal-error");
   await Promise.race([
-    modal.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {}),
+    waitForModalHidden(page),
     error.waitFor({ state: "visible", timeout: 5000 }).catch(() => {}),
   ]);
+}
+
+export const waitForModalCloseOrError = waitModalClosedOrError;
+
+export async function waitForModalHidden(page) {
+  await page.waitForFunction(() => {
+    const modal = document.getElementById("modal");
+    if (!modal) return true;
+    return modal.classList.contains("hidden") || modal.getAttribute("aria-hidden") === "true";
+  }, { timeout: 5000 }).catch(() => {});
+}
+
+export async function waitForModalVisible(page) {
+  await page.waitForFunction(() => {
+    const modal = document.getElementById("modal");
+    if (!modal) return false;
+    return !modal.classList.contains("hidden") && modal.getAttribute("aria-hidden") === "false";
+  }, { timeout: 5000 });
 }
 
 export async function createRabbit(page, { code = "CW-F001", name = "Naya", sex = "F" } = {}) {
@@ -55,6 +73,10 @@ export async function createRabbit(page, { code = "CW-F001", name = "Naya", sex 
   await closeModalHard(page);
 }
 
+export async function createBuck(page, { code = "CW-M001", name = "Orion" } = {}) {
+  await createRabbit(page, { code, name, sex: "M" });
+}
+
 export async function selectRabbitByCode(page, code = "CW-F001") {
   await closeModalHard(page);
   await page.getByText(code).first().click();
@@ -67,33 +89,33 @@ export async function openAddEvent(page) {
   const b1 = page.getByTestId("btn-add-event");
   if (await b1.count()) {
     await b1.first().click();
-    await page.getByTestId("modal").waitFor({ state: "visible" });
+    await waitForModalVisible(page);
     return;
   }
 
   const b2 = page.getByTestId("btn-add-event-2");
   if (await b2.count()) {
     await b2.first().click();
-    await page.getByTestId("modal").waitFor({ state: "visible" });
+    await waitForModalVisible(page);
     return;
   }
 
   const b3 = page.locator("#btnAddEvent");
   if (await b3.count()) {
     await b3.first().click();
-    await page.getByTestId("modal").waitFor({ state: "visible" });
+    await waitForModalVisible(page);
     return;
   }
 
   const b4 = page.locator("#btnAddEvent2");
   if (await b4.count()) {
     await b4.first().click();
-    await page.getByTestId("modal").waitFor({ state: "visible" });
+    await waitForModalVisible(page);
     return;
   }
 
   await page.locator("#eventsPanel").getByRole("button", { name: "+ Ajouter un événement" }).first().click();
-  await page.getByTestId("modal").waitFor({ state: "visible" });
+  await waitForModalVisible(page);
 }
 
 export async function submitEventForm(page) {
@@ -101,12 +123,13 @@ export async function submitEventForm(page) {
   if (await submit.count()) await submit.click();
   else await page.locator('#eventForm button[type="submit"]').click();
 
-  await waitForModalCloseOrError(page);
+  await waitModalClosedOrError(page);
 }
 
-export async function addSaillie(page, { date = "2026-01-01" } = {}) {
+export async function addSaillieWithMale(page, { date = "2026-01-01", maleCode = "CW-M001" } = {}) {
   await openAddEvent(page);
   await page.locator("#evType").selectOption("saillie");
+  await page.locator('select[name="maleId"]').selectOption({ label: maleCode });
   await page.locator('input[name="date"]').fill(date);
   await submitEventForm(page);
   await closeModalHard(page);

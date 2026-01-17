@@ -1,5 +1,5 @@
 import { openModal, closeModal } from "./modal.js";
-import { escapeHTML, escapeAttr, num } from "./utils.js";
+import { escapeHTML, escapeAttr, num, numOrNull } from "./utils.js";
 import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent } from "./actions.js";
 
 
@@ -51,6 +51,7 @@ export function wireStatic(ctx) {
   el.q.addEventListener("input", () => ctx.render());
   el.sexFilter.addEventListener("change", () => ctx.render());
   el.statusFilter.addEventListener("change", () => ctx.render());
+  el.geneQ?.addEventListener("input", () => ctx.render());
 
   // modal
   el.modalClose.addEventListener("click", () => closeModal(el));
@@ -91,6 +92,27 @@ export function wireDynamic(ctx) {
   el.rabbitList.querySelectorAll("[data-rabbit]").forEach(node => {
     node.addEventListener("click", () => {
       ctx.selectedRabbitId = node.dataset.rabbit;
+      ctx.selectedGeneRabbitId = node.dataset.rabbit;
+      ctx.render();
+    });
+  });
+
+  document.querySelectorAll("[data-open-rabbit]").forEach(node => {
+    node.addEventListener("click", () => {
+      const id = node.dataset.openRabbit;
+      if (!id) return;
+      ctx.selectedRabbitId = id;
+      ctx.selectedGeneRabbitId = id;
+      ctx.render();
+    });
+  });
+
+  document.querySelectorAll("[data-gene-focus]").forEach(node => {
+    node.addEventListener("click", () => {
+      const id = node.dataset.geneFocus;
+      if (!id) return;
+      ctx.selectedGeneRabbitId = id;
+      ctx.selectedRabbitId = id;
       ctx.render();
     });
   });
@@ -291,7 +313,7 @@ function eventFormHTML() {
   `;
 }
 
-function renderEventExtra(type, ctx) {
+function renderEventExtra(ctx, type) {
   if (type === "saillie") {
     const males = (ctx.state?.rabbits || []).filter(r => r.sex === "M" && r.status === "actif");
     const options = males
@@ -299,12 +321,12 @@ function renderEventExtra(type, ctx) {
       .join("");
     return `
       <label>Mâle (obligatoire)
-        <select name="maleId" required>
+        <select class="input" name="maleId" required>
           <option value="">— Choisir —</option>
           ${options}
         </select>
       </label>
-      ${males.length ? "" : "<div class='hint'>Aucun mâle actif. Crée un mâle d'abord.</div>"}
+      ${males.length ? "" : "<div class='small'>Aucun mâle actif. Crée un mâle d'abord.</div>"}
     `;
   }
   if (type === "vaccin" || type === "traitement") {
@@ -342,6 +364,7 @@ function renderEventExtra(type, ctx) {
         <div class="label">Morts (optionnel)</div>
         <input class="input" name="dead" type="number" min="0" placeholder="ex: 1">
       </div>
+      <div id="kitHint" class="small" hidden></div>
     `;
   }
   if (type === "sevrage") {
@@ -366,6 +389,7 @@ function wireEventForm(ctx) {
   const cancel = document.getElementById("cancelEvent");
   const typeSel = document.getElementById("evType");
   const extra = document.getElementById("evExtra");
+  const dateInput = form?.querySelector('input[name="date"]');
   const submitBtn = form?.querySelector('[data-testid="event-form-submit"]');
   const errorBox = document.getElementById("eventError");
   let isSubmitting = false;
@@ -389,9 +413,11 @@ function wireEventForm(ctx) {
 
   if (typeSel && extra) {
     refreshAllowedTypes();
-    extra.innerHTML = renderEventExtra(typeSel.value, ctx);
+    extra.innerHTML = renderEventExtra(ctx, typeSel.value);
+    bindExtraHandlers(typeSel.value, submitBtn, showError);
     typeSel.addEventListener("change", () => {
-      extra.innerHTML = renderEventExtra(typeSel.value, ctx);
+      extra.innerHTML = renderEventExtra(ctx, typeSel.value);
+      bindExtraHandlers(typeSel.value, submitBtn, showError);
       clearError();
     });
   }
@@ -417,7 +443,7 @@ function wireEventForm(ctx) {
 
     const evData = {};
     if (type === "mise_bas") {
-      evData.born = num(data.born);
+      evData.born = numOrNull(data.born);
       evData.alive = num(data.alive);
       evData.dead = num(data.dead);
     }
@@ -448,4 +474,45 @@ function wireEventForm(ctx) {
       return;
     }
   });
+}
+
+function bindExtraHandlers(type, submitBtn, showError) {
+  if (submitBtn && type !== "saillie") {
+    submitBtn.disabled = false;
+  }
+  if (type === "mise_bas") {
+    const aliveInput = document.querySelector('input[name="alive"]');
+    const hint = document.getElementById("kitHint");
+    if (!aliveInput || !hint) return;
+
+    const updateHint = () => {
+      const alive = num(aliveInput.value);
+      if (alive > 0) {
+        hint.textContent = `${alive} lapereaux seront créés.`;
+        hint.hidden = false;
+      } else {
+        hint.textContent = "";
+        hint.hidden = true;
+      }
+    };
+
+    aliveInput.addEventListener("input", updateHint);
+    updateHint();
+  }
+
+  if (type === "saillie") {
+    const maleSelect = document.querySelector('select[name="maleId"]');
+    if (!maleSelect) return;
+    const hasMales = maleSelect.querySelectorAll("option").length > 1;
+    if (!hasMales) {
+      if (submitBtn) submitBtn.disabled = true;
+      showError?.("Saillie : aucun mâle actif disponible.");
+    } else if (submitBtn) {
+      submitBtn.disabled = false;
+    }
+  }
+}
+
+function refreshAllowedTypes() {
+  // Placeholder: ancienne logique supprimée, on garde le hook pour éviter les erreurs.
 }
