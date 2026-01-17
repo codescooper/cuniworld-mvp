@@ -124,6 +124,8 @@ export function renderRabbitDetails(ctx) {
           <div>Total nés</div><div>${st.born}</div>
           <div>Total vivants</div><div>${st.alive}</div>
           <div>Taux survie</div><div><strong>${st.survival}%</strong></div>
+          <div>Mère</div><div>${escapeHTML((state.rabbits.find(x => x.id === r.motherId)?.code) || "—")}</div>
+          <div>Père</div><div>${escapeHTML((state.rabbits.find(x => x.id === r.fatherId)?.code) || "—")}</div>
         </div>
       `;
     }

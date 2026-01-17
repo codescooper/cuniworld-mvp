@@ -291,7 +291,22 @@ function eventFormHTML() {
   `;
 }
 
-function renderEventExtra(type) {
+function renderEventExtra(type, ctx) {
+  if (type === "saillie") {
+    const males = (ctx.state?.rabbits || []).filter(r => r.sex === "M" && r.status === "actif");
+    const options = males
+      .map(m => `<option value="${escapeAttr(m.id)}">${escapeHTML((m.code || m.name || m.id).toString())}</option>`)
+      .join("");
+    return `
+      <label>Mâle (obligatoire)
+        <select name="maleId" required>
+          <option value="">— Choisir —</option>
+          ${options}
+        </select>
+      </label>
+      ${males.length ? "" : "<div class='hint'>Aucun mâle actif. Crée un mâle d'abord.</div>"}
+    `;
+  }
   if (type === "vaccin" || type === "traitement") {
     return `
       <div class="row2">
@@ -374,9 +389,9 @@ function wireEventForm(ctx) {
 
   if (typeSel && extra) {
     refreshAllowedTypes();
-    extra.innerHTML = renderEventExtra(typeSel.value);
+    extra.innerHTML = renderEventExtra(typeSel.value, ctx);
     typeSel.addEventListener("change", () => {
-      extra.innerHTML = renderEventExtra(typeSel.value);
+      extra.innerHTML = renderEventExtra(typeSel.value, ctx);
       clearError();
     });
   }
@@ -411,9 +426,12 @@ function wireEventForm(ctx) {
       evData.destCage = (data.destCage || "").toString().trim();
     }
     if (type === "vaccin" || type === "traitement") {
-      evData.product = (data.product || "").toString().trim();
-      evData.dose = (data.dose || "").toString().trim();
-      evData.nextDate = (data.nextDate || "").toString();
+          evData.product = (data.product || "").toString().trim();
+          evData.dose = (data.dose || "").toString().trim();
+          evData.nextDate = (data.nextDate || "").toString();
+        }
+        if (type === "saillie") {
+      evData.maleId = (data.maleId || "").toString().trim();
     }
 
 
