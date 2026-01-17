@@ -3,7 +3,7 @@ import { getReproInfo } from "./repro.js";
 
 export const RULES = {
   MIN_GESTATION_DAYS: 28,
-  MAX_GESTATION_DAYS: 35,
+  MAX_GESTATION_DAYS: null,
   MIN_WEAN_DAYS: 28,
 };
 
@@ -79,6 +79,7 @@ export function validateEvent(state, rabbitId, draft, opts = {}) {
 
   // Sevrage : doit suivre une mise-bas et respecter délai
   if (type === "sevrage") {
+    if (r.sex !== "F") return { ok: false, error: "Sevrage : seulement pour une femelle." };
     const repro = getReproInfo(state, r);
     const birthDate = repro?.lastBirth?.date;
     if (!birthDate) {
@@ -117,28 +118,30 @@ export function applyEventSideEffects(ctx, event) {
   const state = ctx.state;
   const r = state.rabbits.find((x) => x.id === event.rabbitId);
   if (!r) return state;
+  const { nowISO } = ctx.Store.helpers;
 
   if (event.type === "décès" || event.type === "deces") {
     r.status = "mort";
-    r.updatedAt = new Date().toISOString().slice(0, 10);
+    r.updatedAt = nowISO();
   }
 
   if (event.type === "vente") {
     r.status = "vendu";
-    r.updatedAt = new Date().toISOString().slice(0, 10);
+    r.updatedAt = nowISO();
   }
 
   // Mise-bas -> création des petits
   if (event.type === "mise_bas") {
     const alive = Number(event?.data?.alive ?? 0);
     if (alive > 0 && !event.data.kitsCreated) {
-      const { uid, nowISO } = ctx.Store.helpers;
+      const { uid } = ctx.Store.helpers;
 
       const repro = getReproInfo(state, r);
       const fatherId = repro?.lastMating?.data?.maleId || null;
+      const startIndex = getNextKitIndex(state, r);
 
       for (let i = 1; i <= alive; i++) {
-        const n = String(i).padStart(2, "0");
+        const n = String(startIndex + i - 1).padStart(2, "0");
         const kit = {
           id: uid("rb"),
           code: `${(r.code || "CW").trim()}-K${n}`,
@@ -148,6 +151,7 @@ export function applyEventSideEffects(ctx, event) {
           birthDate: event.date,
           cage: r.cage || "",
           status: "actif",
+          stage: "kit",
           notes: `Né le ${event.date} (mise-bas)`,
           motherId: r.id,
           fatherId,
@@ -170,4 +174,16 @@ function addDaysISO(iso, days) {
   const d = new Date(iso + "T00:00:00");
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+function getNextKitIndex(state, mother) {
+  const prefix = `${(mother.code || "CW").trim()}-K`;
+  const existing = state.rabbits
+    .map((r) => r.code || "")
+    .filter((code) => code.startsWith(prefix))
+    .map((code) => Number(code.slice(prefix.length)))
+    .filter((n) => Number.isFinite(n));
+
+  const max = existing.length ? Math.max(...existing) : 0;
+  return max + 1;
 }
