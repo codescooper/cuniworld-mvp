@@ -76,3 +76,18 @@ export function stageBadge(stage) {
   const klass = stage === "kit" ? "accent" : stage === "jeune" ? "warn" : "ok";
   return `<span class="badge ${klass}">Stage: ${label}</span>`;
 }
+
+export function generateRabbitCode(state, sex) {
+  const normalized = sex === "F" || sex === "M" ? sex : "U";
+  const prefix = `CW-${normalized}`;
+  const matcher = new RegExp(`^${prefix}(\\d+)$`);
+  const max = (state?.rabbits || [])
+    .map((r) => (r.code || "").trim())
+    .map((code) => code.match(matcher))
+    .filter(Boolean)
+    .map((m) => Number(m[1]))
+    .filter((n) => Number.isFinite(n))
+    .reduce((acc, n) => Math.max(acc, n), 0);
+
+  return `${prefix}${String(max + 1).padStart(3, "0")}`;
+}

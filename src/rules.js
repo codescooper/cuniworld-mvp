@@ -10,7 +10,6 @@ export const RULES = {
 function mustBeActiveRabbit(r) {
   if (!r) return "Lapin introuvable.";
   if (r.status === "mort") return "Impossible : ce lapin est déclaré mort.";
-  if (r.status === "vendu") return "Impossible : ce lapin est déclaré vendu.";
   return null;
 }
 
@@ -65,11 +64,21 @@ export function validateEvent(state, rabbitId, draft, opts = {}) {
       return { ok: false, error: "Impossible : aucune saillie trouvée avant cette mise-bas." };
     }
 
+    const existingSameDate = state.events.some(
+      (e) => e.rabbitId === rabbitId && e.type === "mise_bas" && e.date === date
+    );
+    if (existingSameDate) {
+      return { ok: false, error: "Impossible : une mise-bas existe déjà à cette date." };
+    }
+
     const born = Number(draft?.data?.born ?? 0);
     const alive = Number(draft?.data?.alive ?? 0);
     const dead = Number(draft?.data?.dead ?? 0);
     if (born < 0 || alive < 0 || dead < 0) {
       return { ok: false, error: "Mise-bas : valeurs négatives interdites." };
+    }
+    if (born > 0 && alive > born) {
+      return { ok: false, error: "Mise-bas : vivants ne peut pas dépasser nés." };
     }
     if (born > 0 && alive + dead > born) {
       return { ok: false, error: "Mise-bas : vivants + morts ne peut pas dépasser nés." };
@@ -118,6 +127,14 @@ export function validateEvent(state, rabbitId, draft, opts = {}) {
     return { ok: true };
   }
 
+  if (type === "pesée") {
+    const weight = Number(draft?.data?.weight ?? 0);
+    if (!Number.isFinite(weight) || weight <= 0) {
+      return { ok: false, error: "Pesée : poids obligatoire et supérieur à 0." };
+    }
+    return { ok: true };
+  }
+
   return { ok: true };
 }
 
@@ -135,13 +152,9 @@ export function applyEventSideEffects(ctx, event) {
     r.updatedAt = nowISO();
   }
 
-  if (event.type === "vente") {
-    r.status = "vendu";
-    r.updatedAt = nowISO();
-  }
-
   // Mise-bas -> création des petits
   if (event.type === "mise_bas") {
+    const dateStamp = (event.date || nowISO().slice(0, 10)).replaceAll("-", "");
     const alive = Number(event?.data?.alive ?? 0);
     if (alive > 0 && !event.data.kitsCreated) {
       const { uid } = ctx.Store.helpers;

@@ -40,7 +40,6 @@ export function renderDashboard(ctx) {
     <div class="tile"><div class="n">${dueSoon.length}</div><div class="t">Mise-bas bientôt (≤7j)</div></div>
     <div class="tile"><div class="n">${upcoming.length}</div><div class="t">Rappels (≤7j)</div></div>
     <div class="tile"><div class="n">${overdue.length}</div><div class="t">Rappels en retard</div></div>
-    <div class="tile"><div class="n">${state.rabbits.filter(r=>r.status==="vendu").length}</div><div class="t">Vendus</div></div>
     <div class="tile"><div class="n">${state.rabbits.filter(r=>r.status==="mort").length}</div><div class="t">Morts</div></div>
   `;
 
