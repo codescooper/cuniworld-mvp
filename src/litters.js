@@ -34,6 +34,10 @@ export function formatEventDetails(e) {
     if (w) parts.push(`Sevrés: ${w}`);
     if (c) parts.push(`Cage: ${c}`);
   }
+  if (e.type === "pesée") {
+    const weight = num(e.data?.weight);
+    if (weight) parts.push(`Poids: ${weight} kg`);
+  }
   if (e.notes) parts.push(e.notes);
   return parts.length ? parts.join(" — ") : "—";
 }

@@ -1,5 +1,5 @@
 import { validateEvent, applyEventSideEffects } from "./rules.js";
-import { getRabbitStage, num, numOrNull } from "./utils.js";
+import { generateRabbitCode, getRabbitStage, num, numOrNull } from "./utils.js";
 
 export function persist(ctx) {
   ctx.state = ctx.Store.save(ctx.state);
@@ -7,11 +7,12 @@ export function persist(ctx) {
 
 export function addRabbit(ctx, data) {
   const { uid, nowISO } = ctx.Store.helpers;
+  const nextCode = generateRabbitCode(ctx.state, data.sex || "U");
   const rabbit = {
     id: uid("rb"),
     code:
       (data.code || "").trim() ||
-      `CW-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+      nextCode,
     name: (data.name || "").trim() || "Sans nom",
     sex: data.sex || "U",
     breed: (data.breed || "").trim(),
@@ -55,6 +56,8 @@ export function addEvent(ctx, rabbitId, data) {
     const dead = num(evData.dead);
     if (born === null) {
       evData.born = alive + dead;
+    } else {
+      evData.dead = Math.max(born - alive, 0);
     }
   }
   const ev = {

@@ -1,5 +1,5 @@
 import { openModal, closeModal } from "./modal.js";
-import { escapeHTML, escapeAttr, num, numOrNull } from "./utils.js";
+import { escapeHTML, escapeAttr, generateRabbitCode, num, numOrNull } from "./utils.js";
 import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent } from "./actions.js";
 
 
@@ -137,14 +137,13 @@ export function wireDynamic(ctx) {
     });
   }
 
-  const btnAddEvent = document.getElementById("btnAddEvent") || document.getElementById("btnAddEvent2");
-  if (btnAddEvent) {
+  document.querySelectorAll("#btnAddEvent, #btnAddEvent2").forEach((btnAddEvent) => {
     btnAddEvent.addEventListener("click", () => {
       if (!ctx.selectedRabbitId) return;
       openModal(el, "Ajouter un événement", eventFormHTML());
       wireEventForm(ctx);
     });
-  }
+  });
 
   el.eventsPanel.querySelectorAll("[data-del-event]").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -228,7 +227,6 @@ function rabbitFormHTML(rabbit=null) {
         <div class="label">Statut</div>
         <select class="input" name="status">
           <option value="actif" ${r.status==="actif"?"selected":""}>Actif</option>
-          <option value="vendu" ${r.status==="vendu"?"selected":""}>Vendu</option>
           <option value="mort" ${r.status==="mort"?"selected":""}>Mort</option>
         </select>
       </div>
@@ -249,7 +247,26 @@ function rabbitFormHTML(rabbit=null) {
 function wireRabbitForm(ctx, existingRabbit) {
   const form = document.getElementById("rabbitForm");
   const cancel = document.getElementById("cancelRabbit");
+  const codeInput = form?.querySelector('input[name="code"]');
+  const sexSelect = form?.querySelector('select[name="sex"]');
   cancel?.addEventListener("click", () => closeModal(ctx.el));
+
+  if (codeInput && sexSelect && !existingRabbit) {
+    const markManual = () => {
+      codeInput.dataset.manual = "1";
+    };
+    const maybeGenerate = () => {
+      if (codeInput.dataset.manual === "1" && codeInput.value.trim() !== "") return;
+      const nextCode = generateRabbitCode(ctx.state, sexSelect.value || "U");
+      codeInput.value = nextCode;
+      codeInput.dataset.manual = "";
+    };
+    codeInput.addEventListener("input", markManual);
+    sexSelect.addEventListener("change", maybeGenerate);
+    if (!codeInput.value.trim()) {
+      maybeGenerate();
+    }
+  }
 
   form?.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -353,16 +370,16 @@ function renderEventExtra(ctx, type) {
       <div class="row2">
         <div class="field">
           <div class="label">Nés (total)</div>
-          <input class="input" name="born" type="number" min="0" placeholder="ex: 8">
+          <input class="input" name="born" type="number" min="0" placeholder="ex: 8" required>
         </div>
         <div class="field">
           <div class="label">Vivants</div>
-          <input class="input" name="alive" type="number" min="0" placeholder="ex: 7">
+          <input class="input" name="alive" type="number" min="0" placeholder="ex: 7" required>
         </div>
       </div>
       <div class="field">
-        <div class="label">Morts (optionnel)</div>
-        <input class="input" name="dead" type="number" min="0" placeholder="ex: 1">
+        <div class="label">Morts (calculé)</div>
+        <input class="input" name="dead" type="number" min="0" placeholder="ex: 1" readonly>
       </div>
       <div id="kitHint" class="small" hidden></div>
     `;
@@ -378,6 +395,14 @@ function renderEventExtra(ctx, type) {
           <div class="label">Cage destination (optionnel)</div>
           <input class="input" name="destCage" placeholder="ex: C-04">
         </div>
+      </div>
+    `;
+  }
+  if (type === "pesée") {
+    return `
+      <div class="field">
+        <div class="label">Poids (kg)</div>
+        <input class="input" name="weight" type="number" min="0" step="0.01" placeholder="ex: 2.35" required>
       </div>
     `;
   }
@@ -447,6 +472,9 @@ function wireEventForm(ctx) {
       evData.alive = num(data.alive);
       evData.dead = num(data.dead);
     }
+    if (type === "pesée") {
+      evData.weight = num(data.weight);
+    }
     if (type === "sevrage") {
       evData.weaned = num(data.weaned);
       evData.destCage = (data.destCage || "").toString().trim();
@@ -479,11 +507,22 @@ function wireEventForm(ctx) {
 function bindExtraHandlers(type) {
   if (type !== "mise_bas") return;
   const aliveInput = document.querySelector('input[name="alive"]');
+  const bornInput = document.querySelector('input[name="born"]');
+  const deadInput = document.querySelector('input[name="dead"]');
   const hint = document.getElementById("kitHint");
-  if (!aliveInput || !hint) return;
+  if (!aliveInput || !bornInput || !deadInput || !hint) return;
 
-  const updateHint = () => {
+  const updateDead = () => {
+    const born = num(bornInput.value);
     const alive = num(aliveInput.value);
+    if (!bornInput.value && !aliveInput.value) {
+      deadInput.value = "";
+      hint.textContent = "";
+      hint.hidden = true;
+      return;
+    }
+    const computed = Math.max(born - alive, 0);
+    deadInput.value = Number.isFinite(computed) ? computed : "";
     if (alive > 0) {
       hint.textContent = `${alive} lapereaux seront créés.`;
       hint.hidden = false;
@@ -493,8 +532,9 @@ function bindExtraHandlers(type) {
     }
   };
 
-  aliveInput.addEventListener("input", updateHint);
-  updateHint();
+  aliveInput.addEventListener("input", updateDead);
+  bornInput.addEventListener("input", updateDead);
+  updateDead();
 }
 
 function refreshAllowedTypes() {
