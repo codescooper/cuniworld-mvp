@@ -109,12 +109,30 @@ export function validateEvent(state, rabbitId, draft, opts = {}) {
       const minISO = addDaysISO(birthDate, rules.MIN_WEAN_DAYS);
       return { ok: false, error: `Sevrage trop tôt : minimum le ${minISO} (mise-bas le ${birthDate}).` };
     }
+
+    // Vérifier qu'il y a des lapereaux actifs à sevrer
+    const litterEventId = repro.lastBirth.id;
+    const activeKits = state.rabbits.filter(kit =>
+      kit.litterId === litterEventId &&
+      kit.status === "actif" &&
+      kit.stage === "kit"
+    );
+    if (activeKits.length === 0) {
+      return { ok: false, error: "Aucun lapereau actif trouvé pour ce sevrage." };
+    }
+
     return { ok: true };
   }
 
   // Décès / Vente
   if (type === "décès" || type === "deces") return { ok: true };
-  if (type === "vente") return { ok: true };
+  if (type === "vente") {
+    const price = Number(draft?.data?.price ?? 0);
+    if (!Number.isFinite(price) || price <= 0) {
+      return { ok: false, error: "Vente : prix obligatoire et supérieur à 0." };
+    }
+    return { ok: true };
+  }
 
   // vaccin/traitement : nextDate si présent doit être >= date
   if (type === "vaccin" || type === "traitement") {
@@ -152,6 +170,11 @@ export function applyEventSideEffects(ctx, event) {
     r.updatedAt = nowISO();
   }
 
+  if (event.type === "vente") {
+    r.status = "vendu";
+    r.updatedAt = nowISO();
+  }
+
   // Mise-bas -> création des petits
   if (event.type === "mise_bas") {
     const dateStamp = (event.date || nowISO().slice(0, 10)).replaceAll("-", "");
@@ -176,9 +199,9 @@ export function applyEventSideEffects(ctx, event) {
           status: "actif",
           stage: "kit",
           notes: `Né le ${event.date} (mise-bas)`,
-          motherId: r.id,
-          fatherId,
-          litterEventId: event.id,
+          doeId: r.id,
+          buckId: fatherId,
+          litterId: event.id,
           createdAt: nowISO(),
           updatedAt: nowISO(),
         };
@@ -195,9 +218,35 @@ export function applyEventSideEffects(ctx, event) {
     const litterEvent = repro?.lastBirth;
     if (litterEvent) {
       const destCage = (event.data?.destCage || "").trim();
-      state.rabbits.forEach((kit) => {
-        if (kit.litterId !== litterEvent.id) return;
-        if (kit.status !== "actif") return;
+      const activeKits = state.rabbits.filter(kit =>
+        kit.litterId === litterEvent.id &&
+        kit.status === "actif" &&
+        kit.stage === "kit"
+      );
+
+      // Créer ou mettre à jour le lot
+      const { uid } = ctx.Store.helpers;
+      const lotId = uid("lot");
+      const lot = {
+        id: lotId,
+        eventId: event.id,
+        doeId: r.id,
+        doeName: r.name,
+        doeCode: r.code,
+        date: event.date,
+        rabbitIds: activeKits.map(kit => kit.id),
+        cage: destCage || r.cage,
+        notes: event.notes || ""
+      };
+
+      // Stocker les données dans l'événement
+      event.data.litterId = litterEvent.id;
+      event.data.rabbitIds = activeKits.map(kit => kit.id);
+      event.data.weanedCount = activeKits.length;
+      event.data.destCage = destCage;
+
+      // Mettre à jour les lapereaux
+      activeKits.forEach(kit => {
         kit.stage = "jeune";
         if (destCage) kit.cage = destCage;
         kit.updatedAt = nowISO();

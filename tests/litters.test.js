@@ -32,4 +32,29 @@ describe("litters", () => {
     expect(st.alive).toBe(5);
     expect(st.dead).toBe(2);
   });
+
+  it("counts kits created automatically", () => {
+    const state = {
+      rabbits: [
+        { id: "k1", doeId: "F1", status: "actif" },
+        { id: "k2", doeId: "F1", status: "actif" },
+        { id: "k3", doeId: "F1", status: "mort" }
+      ],
+      events: [
+        {
+          rabbitId: "F1",
+          type: "mise_bas",
+          date: "2026-01-10",
+          data: { born: 8, alive: 7, dead: 1, kitsCreated: true, kitsCount: 7 }
+        }
+      ]
+    };
+
+    const st = getLitterStatsForDoe(state, "F1");
+    expect(st.count).toBe(1);
+    expect(st.born).toBe(8);
+    expect(st.alive).toBe(7);
+    expect(st.dead).toBe(1);
+    expect(st.activeKits).toBe(2); // 2 kits encore actifs
+  });
 });

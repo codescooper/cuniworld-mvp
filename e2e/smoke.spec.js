@@ -4,7 +4,7 @@ import {
   createRabbit,
   createBuck,
   selectRabbitByCode,
-  addSaillieWithMale,
+  addSaillieWithMale as addSaillie,
   addMiseBas,
   addSevrage,
 } from "./_helpers.js";
@@ -13,23 +13,67 @@ test.beforeEach(async ({ page }) => {
   await gotoClean(page);
 });
 
-test("parcours: créer femelle -> saillie -> mise-bas -> sevrage -> lot visible -> voir la mère", async ({ page }) => {
+test("flux complet de reproduction: femelle -> saillie -> mise-bas -> sevrage -> lot", async ({ page }) => {
+  // Créer femelle et mâle
   await createRabbit(page, { code: "CW-F001", name: "Naya", sex: "F" });
-  await createRabbit(page, { code: "CW-M001", name: "Orion", sex: "M" });
+  await createBuck(page, { code: "CW-M001", name: "Orion", sex: "M" });
+
+  // Sélectionner la femelle
   await selectRabbitByCode(page, "CW-F001");
 
-  // Logique V4.1: saillie -> mise-bas (>=28j) -> sevrage (>=28j)
+  // Vérifier qu'aucune gestation n'est affichée initialement
+  await expect(page.locator("#rabbitDetails")).not.toContainText("Gestation en cours");
+
+  // Ajouter saillie avec mâle obligatoire
   await addSaillie(page, { date: "2026-01-01", maleCode: "CW-M001" });
+
+  // Vérifier que la gestation est maintenant affichée
+  await expect(page.locator("#rabbitDetails")).toContainText("Gestation en cours");
+  await expect(page.locator("#rabbitDetails")).toContainText("Mâle: Orion (CW-M001)");
+  await expect(page.locator("#rabbitDetails")).toContainText("Terme prévu: 2026-01-29");
+
+  // Vérifier que la femelle apparaît comme "enceinte" dans la liste
+  await page.locator("#btnBack").click(); // Retour à la liste
+  await expect(page.locator("#rabbitList")).toContainText("🤰"); // Badge enceinte
+
+  // Re-sélectionner la femelle
+  await selectRabbitByCode(page, "CW-F001");
+
+  // Ajouter mise-bas
   await addMiseBas(page, { date: "2026-01-30", born: "8", alive: "7" });
-  await addSevrage(page, { date: "2026-02-28", weaned: "6", destCage: "C-04" });
 
+  // Vérifier que 7 lapereaux ont été créés
+  await expect(page.locator("#rabbitList")).toContainText("CW-KIT-20260130-01");
+  await expect(page.locator("#rabbitList")).toContainText("CW-KIT-20260130-07");
+
+  // Vérifier la généalogie dans les détails de la femelle
+  await expect(page.locator("#rabbitDetails")).toContainText("Descendance");
+  await expect(page.locator("#rabbitDetails")).toContainText("7 lapereaux actifs");
+
+  // Sélectionner un lapereau et vérifier sa généalogie
+  await selectRabbitByCode(page, "CW-KIT-20260130-01");
+  await expect(page.locator("#rabbitDetails")).toContainText("Mère: Naya (CW-F001)");
+  await expect(page.locator("#rabbitDetails")).toContainText("Père: Orion (CW-M001)");
+
+  // Retour à la femelle
+  await page.locator("#btnBack").click();
+  await selectRabbitByCode(page, "CW-F001");
+
+  // Ajouter sevrage - doit automatiquement sevrer tous les lapereaux actifs
+  await addSevrage(page, { date: "2026-02-28", destCage: "C-04" });
+
+  // Vérifier que le lot a été créé
   await expect(page.locator("#lotList")).toContainText("C-04");
-  await expect(page.locator("#lotList")).toContainText("6 sevrés");
+  await expect(page.locator("#lotList")).toContainText("7 sevrés");
 
-  // Ouvrir lot puis "Voir la mère"
+  // Ouvrir le lot et vérifier les détails
   await page.locator("#lotList").getByText("C-04").first().click();
-  await page.getByRole("button", { name: "Voir la mère" }).click();
+  await expect(page.locator("#lotDetails")).toContainText("Mère: Naya (CW-F001)");
+  await expect(page.locator("#lotDetails")).toContainText("7 lapereaux");
 
-  await expect(page.locator("#rabbitDetails")).toContainText("CW-F001");
-  await expect(page.locator("#rabbitDetails")).toContainText("Naya");
+  // Vérifier que les lapereaux ont changé de cage
+  await page.locator("#btnBack").click();
+  await selectRabbitByCode(page, "CW-KIT-20260130-01");
+  await expect(page.locator("#rabbitDetails")).toContainText("Cage: C-04");
+  await expect(page.locator("#rabbitDetails")).toContainText("Stade: jeune");
 });

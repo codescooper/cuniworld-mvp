@@ -2,103 +2,286 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>CuniWorld — MVP Gestion Lapins</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#1a7a47" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>CuniWorld — Gestion Élevage Lapins</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+
+  <!-- ===== TOPBAR ===== -->
   <header class="topbar">
     <div class="brand">
-      <div class="logo">CW</div>
+      <div class="logo">🐇</div>
       <div>
         <div class="title">CuniWorld</div>
-        <div class="subtitle">MVP — Gestion élevage de lapins (offline)</div>
+        <div class="subtitle">Gestion élevage · hors-ligne</div>
       </div>
     </div>
 
     <div class="actions">
       <button id="btnNewRabbit" class="btn" data-testid="btn-new-rabbit">+ Nouveau lapin</button>
-      <button id="btnExport" class="btn secondary" data-testid="btn-export">Exporter</button>
+      <button id="btnExport" class="btn secondary" data-testid="btn-export">⬇ Exporter</button>
       <label class="btn secondary file" data-testid="btn-import">
-        Importer
+        ⬆ Importer
         <input id="fileImport" type="file" accept="application/json" data-testid="file-import" />
       </label>
       <button id="btnReset" class="btn danger" data-testid="btn-reset">Réinitialiser</button>
+      <div class="guide-switch">
+        <label class="switch-label">
+          <input id="guideToggle" type="checkbox" class="switch-input" data-testid="guide-toggle" />
+          <span class="switch-slider"></span>
+          <span class="switch-text">Guide</span>
+        </label>
+      </div>
     </div>
   </header>
 
+  <!-- ===== CONTENU PRINCIPAL ===== -->
   <main class="container">
-    <section class="grid">
-      <div class="card">
-        <h2>Dashboard</h2>
-        <div id="dash" class="dash" data-testid="dash"></div>
-      </div>
 
-      <div class="card">
-        <h2>Lapins</h2>
-        <div class="row">
-          <input id="q" class="input" placeholder="Rechercher (ID, nom, race, sexe, cage…)" data-testid="rabbit-search" />
-          <select id="sexFilter" class="input" data-testid="filter-sex">
-            <option value="">Sexe: Tous</option>
-            <option value="F">Femelle</option>
-            <option value="M">Mâle</option>
-            <option value="U">Inconnu</option>
-          </select>
-          <select id="statusFilter" class="input" data-testid="filter-status">
-            <option value="">Statut: Tous</option>
-            <option value="actif">Actif</option>
-            <option value="mort">Mort</option>
-          </select>
+    <!-- ─── MENU PRINCIPAL (icônes) ─── -->
+    <div class="app-menu" id="appMenu">
+      <div class="menu-grid">
+
+        <button class="menu-card" data-panel="dashboard" aria-label="Tableau de bord">
+          <span class="menu-card-ripple"></span>
+          <span class="menu-card-icon">📊</span>
+          <span class="menu-card-label">Tableau de bord</span>
+          <span class="menu-card-dot"></span>
+        </button>
+
+        <button class="menu-card" data-panel="rabbits" aria-label="Mes Lapins">
+          <span class="menu-card-ripple"></span>
+          <span class="menu-card-icon">🐇</span>
+          <span class="menu-card-label">Mes Lapins</span>
+          <span class="menu-card-dot"></span>
+        </button>
+
+        <button class="menu-card" data-panel="lots" aria-label="Lots">
+          <span class="menu-card-ripple"></span>
+          <span class="menu-card-icon">📦</span>
+          <span class="menu-card-label">Lots / Jeunes</span>
+          <span class="menu-card-dot"></span>
+        </button>
+
+        <button class="menu-card" data-panel="genealogy" aria-label="Généalogie">
+          <span class="menu-card-ripple"></span>
+          <span class="menu-card-icon">🌳</span>
+          <span class="menu-card-label">Généalogie</span>
+          <span class="menu-card-dot"></span>
+        </button>
+
+        <button class="menu-card" data-panel="actions" aria-label="Actions">
+          <span class="menu-card-ripple"></span>
+          <span class="menu-card-icon">⚙️</span>
+          <span class="menu-card-label">Actions</span>
+          <span class="menu-card-dot"></span>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- ─── ÉTAT VIDE ─── -->
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🐇</div>
+      <div class="empty-title">Bienvenue dans CuniWorld</div>
+      <div class="empty-sub">Choisissez une section dans le menu ci-dessus pour commencer.</div>
+    </div>
+
+    <!-- ─── PANNEAUX OUVERTS ─── -->
+    <div class="panels-container" id="panelsContainer">
+
+      <!-- Panneau : Tableau de bord -->
+      <div class="section-panel" id="panel-dashboard" data-panel="dashboard" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-icon">📊</span>
+            <span class="panel-title">Tableau de bord</span>
+          </div>
+          <button class="panel-close" data-close-panel="dashboard" aria-label="Fermer">✕</button>
         </div>
-
-        <div id="rabbitList" class="list" data-testid="rabbit-list"></div>
-      </div>
-    </section>
-
-    <section class="grid">
-      <div class="card">
-        <h2>Détails lapin</h2>
-        <div id="rabbitDetails" class="muted" data-testid="rabbit-details">
-          Sélectionne un lapin dans la liste.
+        <div class="panel-body">
+          <div id="dash" class="dash" data-testid="dash"></div>
         </div>
       </div>
 
-      <div class="card">
-        <h2>Événements</h2>
-        <div id="eventsPanel" class="muted" data-testid="events-panel">
-          Sélectionne un lapin pour voir/ajouter des événements.
+      <!-- Panneau : Lapins (liste + détails + événements) -->
+      <div class="section-panel" id="panel-rabbits" data-panel="rabbits" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-icon">🐇</span>
+            <span class="panel-title">Mes Lapins</span>
+          </div>
+          <button class="panel-close" data-close-panel="rabbits" aria-label="Fermer">✕</button>
         </div>
-      </div>
-    </section>
-    <section class="grid">
-        <div class="card">
-            <h2>Lots / Jeunes (depuis Sevrage)</h2>
-            <div class="row">
-              <input id="lotQ" class="input" placeholder="Rechercher (cage, mère, date…)" data-testid="lot-search" />
+        <div class="panel-body">
+          <!-- Recherche & filtres -->
+          <div class="row">
+            <input id="q" class="input" placeholder="Rechercher (code, nom, race, cage…)" data-testid="rabbit-search" />
+            <select id="sexFilter" class="input" data-testid="filter-sex">
+              <option value="">Sexe: Tous</option>
+              <option value="F">Femelle</option>
+              <option value="M">Mâle</option>
+              <option value="U">Inconnu</option>
+            </select>
+            <select id="statusFilter" class="input" data-testid="filter-status">
+              <option value="">Statut: Tous</option>
+              <option value="actif">Actif</option>
+              <option value="mort">Mort</option>
+            </select>
+          </div>
+          <div id="rabbitList" class="list" data-testid="rabbit-list"></div>
+
+          <!-- Détails + événements (sous la liste) -->
+          <div id="rabbitDetailsSection">
+            <div class="sep" style="margin:var(--space-4) 0"></div>
+            <div class="two-col">
+              <div class="col">
+                <h3>Fiche lapin</h3>
+                <div id="rabbitDetails" class="muted" data-testid="rabbit-details">
+                  Sélectionnez un lapin dans la liste.
+                </div>
+              </div>
+              <div class="col">
+                <h3>Historique</h3>
+                <div id="eventsPanel" class="muted" data-testid="events-panel">
+                  Sélectionnez un lapin pour voir ses événements.
+                </div>
+              </div>
             </div>
-            <div id="lotList" class="list" data-testid="lot-list"></div>
+          </div>
         </div>
-
-        <div class="card">
-            <h2>Détails lot</h2>
-            <div id="lotDetails" class="muted" data-testid="lot-details">Sélectionne un lot.</div>
-        </div>
-    </section>
-    <section class="grid">
-      <div class="card">
-        <h2>Généalogie cheptel</h2>
-        <p class="small muted">La généalogie est générée automatiquement à partir des saillies et des mises-bas (pas de saisie manuelle pour l’instant).</p>
-        <div class="row">
-          <input id="geneQ" class="input" placeholder="Rechercher un lapin (code, nom…)" data-testid="gene-search" />
-        </div>
-        <div id="geneList" class="list" data-testid="gene-list"></div>
-        <div id="geneGraph" class="gene-graph" data-testid="gene-graph"></div>
       </div>
-    </section>
 
+      <!-- Panneau : Lots -->
+      <div class="section-panel" id="panel-lots" data-panel="lots" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-icon">📦</span>
+            <span class="panel-title">Lots / Jeunes</span>
+          </div>
+          <button class="panel-close" data-close-panel="lots" aria-label="Fermer">✕</button>
+        </div>
+        <div class="panel-body">
+          <div class="row">
+            <input id="lotQ" class="input" placeholder="Rechercher (cage, mère, date…)" data-testid="lot-search" />
+          </div>
+          <div id="lotList" class="list" data-testid="lot-list"></div>
+          <div id="lotDetails" class="muted" data-testid="lot-details">Sélectionnez un lot.</div>
+        </div>
+      </div>
+
+      <!-- Panneau : Généalogie -->
+      <div class="section-panel" id="panel-genealogy" data-panel="genealogy" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-icon">🌳</span>
+            <span class="panel-title">Généalogie</span>
+          </div>
+          <button class="panel-close" data-close-panel="genealogy" aria-label="Fermer">✕</button>
+        </div>
+        <div class="panel-body">
+          <div class="row">
+            <input id="geneQ" class="input" placeholder="Rechercher un lapin (code, nom…)" data-testid="gene-search" />
+          </div>
+          <div id="geneList" class="list" data-testid="gene-list"></div>
+          <div id="geneGraph" class="gene-graph" data-testid="gene-graph"></div>
+        </div>
+      </div>
+
+      <!-- Panneau : Actions -->
+      <div class="section-panel" id="panel-actions" data-panel="actions" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-icon">⚙️</span>
+            <span class="panel-title">Actions & Paramètres</span>
+          </div>
+          <button class="panel-close" data-close-panel="actions" aria-label="Fermer">✕</button>
+        </div>
+        <div class="panel-body">
+          <div class="more-actions">
+
+            <button id="moreNewRabbit" class="more-action-tile" type="button">
+              <span class="tile-icon">🐇</span>
+              <span class="tile-body">
+                <span class="tile-title">Nouveau lapin</span>
+                <span class="tile-sub">Enregistrer un nouvel animal</span>
+              </span>
+            </button>
+
+            <button id="moreExport" class="more-action-tile" type="button">
+              <span class="tile-icon">⬇</span>
+              <span class="tile-body">
+                <span class="tile-title">Exporter les données</span>
+                <span class="tile-sub">Sauvegarde JSON de votre élevage</span>
+              </span>
+            </button>
+
+            <label class="more-action-tile file-tile" style="cursor:pointer">
+              <span class="tile-icon">⬆</span>
+              <span class="tile-body">
+                <span class="tile-title">Importer des données</span>
+                <span class="tile-sub">Restaurer depuis un fichier JSON</span>
+              </span>
+              <input id="moreFileImport" type="file" accept="application/json" />
+            </label>
+
+            <div class="more-guide-row">
+              <label class="more-guide-label" for="moreGuideToggle">
+                <span class="tile-icon">📖</span>
+                <span class="tile-body">
+                  <span class="guide-label-text">Mode Guide interactif</span>
+                  <span class="guide-label-sub">Apprendre à utiliser l'application</span>
+                </span>
+              </label>
+              <div>
+                <input id="moreGuideToggle" type="checkbox" class="switch-dark-input" />
+                <span class="switch-dark-slider"></span>
+              </div>
+            </div>
+
+            <button id="moreReset" class="more-action-tile danger-tile" type="button">
+              <span class="tile-icon">⚠️</span>
+              <span class="tile-body">
+                <span class="tile-title">Réinitialiser les données</span>
+                <span class="tile-sub">Supprime tous les lapins et événements</span>
+              </span>
+            </button>
+
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /panelsContainer -->
   </main>
 
-  <!-- Modal simple -->
+  <!-- ===== FAB (mobile only) ===== -->
+  <button id="fabNewRabbit" class="fab" aria-label="Nouveau lapin" data-testid="fab-new-rabbit">+</button>
+
+  <!-- ===== GUIDE OVERLAY ===== -->
+  <div id="guideOverlay" class="guide-overlay hidden" data-testid="guide-overlay">
+    <div class="guide-content">
+      <div class="guide-header">
+        <button id="guideClose" class="iconbtn">✕</button>
+        <h2 id="guideTitle">Guide</h2>
+      </div>
+      <div class="guide-body">
+        <div id="guideStepNumber" class="guide-step-number">Étape 1/14</div>
+        <div id="guideDescription" class="guide-description"></div>
+      </div>
+      <div class="guide-footer">
+        <button id="guidePrev" class="btn secondary">← Précédent</button>
+        <div id="guideProgress" class="guide-progress"></div>
+        <button id="guideNext" class="btn">Suivant →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL ===== -->
   <div id="modal" class="modal hidden" aria-hidden="true" data-testid="modal">
     <div class="modal-backdrop" data-close="1"></div>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">

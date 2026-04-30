@@ -7,7 +7,8 @@ export function buildLots(state) {
     .filter(e => e.type === "sevrage")
     .map(e => {
       const doe = rabbitsById.get(e.rabbitId);
-      const weaned = Number(e.data?.weaned || 0) || 0;
+      const rabbitIds = e.data?.rabbitIds || [];
+      const weaned = rabbitIds.length;
       const cage = (e.data?.destCage || "").trim() || "—";
       return {
         id: `lot_${e.id}`,
@@ -17,6 +18,7 @@ export function buildLots(state) {
         doeCode: doe?.code || "—",
         date: e.date || "—",
         weaned,
+        rabbitIds,
         cage,
         notes: e.notes || ""
       };

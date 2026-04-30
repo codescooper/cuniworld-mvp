@@ -19,7 +19,7 @@ test("export -> reset -> import restaure les données", async ({ page }, testInf
   await createRabbit(page, { code: "CW-M001", name: "Orion", sex: "M" });
   await selectRabbitByCode(page, "CW-F001");
 
-  await addSaillie(page, { date: "2026-01-01", maleCode: "CW-M001" });
+  await addSaillieWithMale(page, { date: "2026-01-01", maleCode: "CW-M001" });
   await addMiseBas(page, { date: "2026-01-30", born: "8", alive: "2" });
   await addSevrage(page, { date: "2026-02-28", weaned: "6", destCage: "C-04" });
   await addHealthEvent(page, { type: "vaccin", date: "2026-03-01", nextDate: "2026-03-10" });

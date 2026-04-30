@@ -98,12 +98,26 @@ export function wireDynamic(ctx) {
   });
 
   document.querySelectorAll("[data-open-rabbit]").forEach(node => {
-    node.addEventListener("click", () => {
+    node.addEventListener("click", (e) => {
+      e.stopPropagation();
       const id = node.dataset.openRabbit;
       if (!id) return;
       ctx.selectedRabbitId = id;
       ctx.selectedGeneRabbitId = id;
       ctx.render();
+    });
+  });
+
+  document.querySelectorAll("[data-add-event]").forEach(node => {
+    node.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = node.dataset.addEvent;
+      if (!id) return;
+      ctx.selectedRabbitId = id;
+      ctx.selectedGeneRabbitId = id;
+      ctx.render();
+      openModal(el, "Ajouter un événement", eventFormHTML());
+      wireEventForm(ctx);
     });
   });
 
@@ -406,6 +420,20 @@ function renderEventExtra(ctx, type) {
       </div>
     `;
   }
+  if (type === "vente") {
+    return `
+      <div class="row2">
+        <div class="field">
+          <div class="label">Prix (€)</div>
+          <input class="input" name="price" type="number" min="0.01" step="0.01" placeholder="ex: 25.50" required>
+        </div>
+        <div class="field">
+          <div class="label">Client (optionnel)</div>
+          <input class="input" name="client" placeholder="ex: Jean Dupont">
+        </div>
+      </div>
+    `;
+  }
   return "";
 }
 
@@ -486,6 +514,10 @@ function wireEventForm(ctx) {
         }
         if (type === "saillie") {
       evData.maleId = (data.maleId || "").toString().trim();
+    }
+    if (type === "vente") {
+      evData.price = num(data.price);
+      evData.client = (data.client || "").toString().trim();
     }
 
 

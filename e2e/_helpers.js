@@ -133,6 +133,9 @@ export async function addSaillie(page, { date = "2026-01-01", maleCode = "CW-M00
   await closeModalHard(page);
 }
 
+// Alias for backward compatibility
+export const addSaillieWithMale = addSaillie;
+
 export async function addMiseBas(page, { date = "2026-01-30", born = "8", alive = "7", dead = "" } = {}) {
   await openAddEvent(page);
   await page.locator("#evType").selectOption("mise_bas");

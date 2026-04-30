@@ -78,11 +78,17 @@ export function renderRabbitList(ctx) {
   el.rabbitList.innerHTML = rabbits.map(r => {
     const active = r.id === ctx.selectedRabbitId ? "active" : "";
     const stage = getRabbitStage(r);
+    const repro = getReproInfo(ctx.state, r);
+    const pregnantBadge = (repro?.isPregnant) ? `<span class="badge accent">GESTANTE</span>` : "";
     return `
       <div class="item ${active}" data-testid="rabbit-item" data-rabbit="${r.id}">
         <div>
-          <div><strong>${escapeHTML(r.code)}</strong> — ${escapeHTML(r.name)} <span class="badge">${sexLabel(r.sex)}</span> ${stageBadge(stage)}</div>
+          <div><strong>${escapeHTML(r.code)}</strong> — ${escapeHTML(r.name)} <span class="badge">${sexLabel(r.sex)}</span> ${stageBadge(stage)} ${pregnantBadge}</div>
           <div class="small">Race: ${escapeHTML(r.breed || "—")} · Cage: ${escapeHTML(r.cage || "—")} · Naissance: ${escapeHTML(formatDate(r.birthDate))}</div>
+          <div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap">
+            <button class="btn ghost" type="button" data-open-rabbit="${r.id}">Voir</button>
+            <button class="btn ghost" type="button" data-add-event="${r.id}">Nouvel événement</button>
+          </div>
         </div>
         <div>${rabbitStatusBadge(r.status)}</div>
       </div>
@@ -111,6 +117,20 @@ export function renderRabbitDetails(ctx) {
       <div class="kv">
         <div>Dernière saillie</div><div>${escapeHTML(repro.lastMating?.date || "—")}</div>
         <div>Mise-bas estimée</div><div><strong>${escapeHTML(repro.dueDate)}</strong></div>
+      </div>
+    ` : "";
+
+  // Nouveau bloc gestation visible
+  const gestationHTML = (repro?.isPregnant)
+    ? `
+      <div class="sep"></div>
+      <div style="background: rgba(201, 164, 76, 0.08); border: 1px solid rgba(201, 164, 76, 0.3); border-radius: 8px; padding: 12px; margin: 12px 0;">
+        <div style="font-weight: 700; color: var(--color-accent); margin-bottom: 8px;">🤰 GESTATION EN COURS</div>
+        <div class="kv" style="margin: 0;">
+          <div>Date saillie</div><div><strong>${escapeHTML(repro.lastMating?.date || "—")}</strong></div>
+          <div>Mise-bas estimée</div><div><strong>${escapeHTML(repro.dueDate)}</strong> ${repro.dueDate ? `(J-${daysBetween(new Date().toISOString().slice(0,10), repro.dueDate)})` : ''}</div>
+          <div>Mâle</div><div>${repro.maleId ? `<button class="linkbtn" data-open-rabbit="${repro.maleId}">${escapeHTML(state.rabbits.find(m => m.id === repro.maleId)?.name || "—")} (${escapeHTML(state.rabbits.find(m => m.id === repro.maleId)?.code || "—")})</button>` : "—"}</div>
+        </div>
       </div>
     ` : "";
 
@@ -178,13 +198,17 @@ export function renderRabbitDetails(ctx) {
     </div>
 
     ${reproHTML}
+    ${gestationHTML}
     ${litterHTML}
     ${genealogyHTML}
 
     <div class="sep"></div>
 
     <div class="row">
-      <button class="btn" id="btnAddEvent" data-testid="btn-add-event">+ Ajouter un événement</button>
+      ${r.status === "mort" || r.status === "vendu"
+        ? `<div class="error">Impossible d'ajouter un événement : animal ${r.status === "mort" ? "décédé" : "vendu"}.</div>`
+        : `<button class="btn" id="btnAddEvent" data-testid="btn-add-event">+ Ajouter un événement</button>`
+      }
     </div>
   `;
 }
@@ -223,7 +247,10 @@ export function renderEventsPanel(ctx) {
     el.eventsPanel.innerHTML = `
       <div class="muted">Aucun événement pour <strong>${escapeHTML(r.name)}</strong>.</div>
       <div class="sep"></div>
-      <button class="btn" id="btnAddEvent2" data-testid="btn-add-event-2">+ Ajouter un événement</button>
+      ${r.status === "mort" || r.status === "vendu"
+        ? `<div class="error">Impossible d'ajouter un événement : animal ${r.status === "mort" ? "décédé" : "vendu"}.</div>`
+        : `<button class="btn" id="btnAddEvent2" data-testid="btn-add-event-2">+ Ajouter un événement</button>`
+      }
     `;
     return;
   }
@@ -245,7 +272,10 @@ export function renderEventsPanel(ctx) {
       `).join("")}
     </div>
     <div class="sep"></div>
-    <button class="btn" id="btnAddEvent2" data-testid="btn-add-event-2">+ Ajouter un événement</button>
+    ${r.status === "mort" || r.status === "vendu"
+      ? `<div class="error">Impossible d'ajouter un événement : animal ${r.status === "mort" ? "décédé" : "vendu"}.</div>`
+      : `<button class="btn" id="btnAddEvent2" data-testid="btn-add-event-2">+ Ajouter un événement</button>`
+    }
   `;
 }
 
@@ -314,6 +344,23 @@ export function renderLots(ctx) {
   if (!selected) {
     el.lotDetails.innerHTML = `<div class="muted">Sélectionne un lot.</div>`;
   } else {
+    const rabbits = selected.rabbitIds?.map(id => state.rabbits.find(r => r.id === id)).filter(Boolean) || [];
+    const rabbitsList = rabbits.length > 0
+      ? `<div class="list" style="margin-top: 12px;">
+          ${rabbits.map(r => `
+            <div class="item">
+              <div>
+                <div><strong>${escapeHTML(r.code)}</strong> — ${escapeHTML(r.name)}</div>
+                <div class="small">Sexe: ${sexLabel(r.sex)} · Stage: ${stageBadge(getRabbitStage(r))}</div>
+              </div>
+              <div>
+                <button class="btn ghost" data-open-rabbit="${r.id}">Voir</button>
+              </div>
+            </div>
+          `).join("")}
+        </div>`
+      : `<div class="small muted">Aucun lapereau trouvé dans ce lot.</div>`;
+
     el.lotDetails.innerHTML = `
       <div style="font-size:18px;font-weight:900">${escapeHTML(selected.cage)} <span class="badge">${escapeHTML(selected.date)}</span></div>
       <div class="sep"></div>
@@ -322,6 +369,9 @@ export function renderLots(ctx) {
         <div>Mère</div><div>${escapeHTML(selected.doeName)} (${escapeHTML(selected.doeCode)})</div>
         <div>Notes</div><div>${escapeHTML(selected.notes || "—")}</div>
       </div>
+      <div class="sep"></div>
+      <div style="font-weight:700;margin-bottom:6px">Lapereaux du lot</div>
+      ${rabbitsList}
       <div class="sep"></div>
       <div class="row">
         <button class="btn secondary" id="btnOpenDoe">Voir la mère</button>
