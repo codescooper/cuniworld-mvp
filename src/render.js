@@ -79,7 +79,7 @@ export function renderRabbitList(ctx) {
     const active = r.id === ctx.selectedRabbitId ? "active" : "";
     const stage = getRabbitStage(r);
     const repro = getReproInfo(ctx.state, r);
-    const pregnantBadge = (repro?.isPregnant) ? `<span class="badge accent">GESTANTE</span>` : "";
+    const pregnantBadge = (repro?.isPregnant) ? `<span class="badge accent">🤰 Gestante</span>` : "";
     return `
       <div class="item ${active}" data-testid="rabbit-item" data-rabbit="${r.id}">
         <div>
@@ -121,18 +121,25 @@ export function renderRabbitDetails(ctx) {
     ` : "";
 
   // Nouveau bloc gestation visible
-  const gestationHTML = (repro?.isPregnant)
-    ? `
+  const gestationHTML = (() => {
+    if (!repro?.isPregnant) return "";
+    const male = repro.maleId ? state.rabbits.find(m => m.id === repro.maleId) : null;
+    const maleTxt = male ? `${escapeHTML(male.name)} (${escapeHTML(male.code)})` : "—";
+    const maleContent = male
+      ? `<button class="linkbtn" data-open-rabbit="${repro.maleId}">${maleTxt}</button>`
+      : "—";
+    const jours = repro.dueDate
+      ? `(J-${daysBetween(new Date().toISOString().slice(0,10), repro.dueDate)})`
+      : "";
+    return `
       <div class="sep"></div>
       <div style="background: rgba(201, 164, 76, 0.08); border: 1px solid rgba(201, 164, 76, 0.3); border-radius: 8px; padding: 12px; margin: 12px 0;">
-        <div style="font-weight: 700; color: var(--color-accent); margin-bottom: 8px;">🤰 GESTATION EN COURS</div>
-        <div class="kv" style="margin: 0;">
-          <div>Date saillie</div><div><strong>${escapeHTML(repro.lastMating?.date || "—")}</strong></div>
-          <div>Mise-bas estimée</div><div><strong>${escapeHTML(repro.dueDate)}</strong> ${repro.dueDate ? `(J-${daysBetween(new Date().toISOString().slice(0,10), repro.dueDate)})` : ''}</div>
-          <div>Mâle</div><div>${repro.maleId ? `<button class="linkbtn" data-open-rabbit="${repro.maleId}">${escapeHTML(state.rabbits.find(m => m.id === repro.maleId)?.name || "—")} (${escapeHTML(state.rabbits.find(m => m.id === repro.maleId)?.code || "—")})</button>` : "—"}</div>
-        </div>
+        <div style="font-weight: 700; color: var(--color-accent); margin-bottom: 8px;">🤰 Gestation en cours</div>
+        <div class="small">Terme prévu: <strong>${escapeHTML(repro.dueDate || "—")}</strong> ${jours}</div>
+        <div class="small">Mâle: ${maleContent}</div>
       </div>
-    ` : "";
+    `;
+  })();
 
   let litterHTML = "";
   if (r.sex === "F") {
@@ -140,13 +147,14 @@ export function renderRabbitDetails(ctx) {
     if (st.count > 0) {
       litterHTML = `
         <div class="sep"></div>
+        <div style="font-weight:700;margin-bottom:6px">Descendance</div>
         <div class="kv">
-          <div>Portées</div><div><strong>${st.count}</strong></div>
-          <div>Total nés</div><div>${st.born}</div>
-          <div>Total vivants</div><div>${st.alive}</div>
-          <div>Total morts-nés</div><div>${st.dead}</div>
-          <div>Taux survie</div><div><strong>${st.survival}%</strong></div>
+          <div>Portées:</div><div><strong>${st.count}</strong></div>
+          <div>Total nés:</div><div>${st.born}</div>
+          <div>Total vivants:</div><div>${st.alive}</div>
+          <div>Taux survie:</div><div><strong>${st.survival}%</strong></div>
         </div>
+        <div class="small" style="margin-top:4px">${st.activeKits} lapereaux actifs</div>
       `;
     }
   }
@@ -164,37 +172,36 @@ export function renderRabbitDetails(ctx) {
       <div class="sep"></div>
       <div style="font-weight:700;margin-bottom:6px">Généalogie</div>
       <div class="kv">
-        <div>Mère</div>
+        <div>Mère: </div>
         <div>${mother ? `<button class="linkbtn" data-open-rabbit="${mother.id}">${escapeHTML(mother.name)} (${escapeHTML(mother.code)})</button>` : "—"}</div>
-        <div>Père</div>
+        <div>Père: </div>
         <div>${father ? `<button class="linkbtn" data-open-rabbit="${father.id}">${escapeHTML(father.name)} (${escapeHTML(father.code)})</button>` : "—"}</div>
-        <div>Fratrie</div>
-        <div>${r.litterId ? `${siblingsCount} frère(s)/soeur(s)` : "—"}</div>
+        <div>Fratrie: </div>
+        <div>${r.litterId ? `${siblingsCount} frère(s)/sœur(s)` : "—"}</div>
       </div>
     ` : "";
 
   el.rabbitDetails.innerHTML = `
-    <div class="row" style="justify-content:space-between">
-      <div>
-        <div style="font-size:18px;font-weight:900">${escapeHTML(r.name)} <span class="badge">${escapeHTML(r.code)}</span></div>
-        <div class="small">${rabbitStatusBadge(r.status)} <span class="badge">${sexLabel(r.sex)}</span></div>
-      </div>
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <button class="btn secondary" id="btnBack" data-testid="btn-back">← Retour</button>
       <div class="row">
         <button class="btn secondary" id="btnEditRabbit">Modifier</button>
         <button class="btn danger" id="btnDeleteRabbit">Supprimer</button>
       </div>
     </div>
 
+    <div style="font-size:18px;font-weight:900">${escapeHTML(r.name)} <span class="badge">${escapeHTML(r.code)}</span></div>
+    <div class="small" style="margin-bottom:4px">${rabbitStatusBadge(r.status)} <span class="badge">${sexLabel(r.sex)}</span></div>
+
     <div class="sep"></div>
 
     <div class="kv">
-      <div>Race</div><div>${escapeHTML(r.breed || "—")}</div>
-      <div>Date naissance</div><div>${escapeHTML(formatDate(r.birthDate))}</div>
-      <div>Stage</div><div>${stageBadge(stage)}</div>
-      <div>Cage</div><div>${escapeHTML(r.cage || "—")}</div>
-      <div>Notes</div><div>${escapeHTML(r.notes || "—")}</div>
-      <div>Créé</div><div>${escapeHTML(formatDate(r.createdAt))}</div>
-      <div>Modifié</div><div>${escapeHTML(formatDate(r.updatedAt))}</div>
+      <div>Race: </div><div>${escapeHTML(r.breed || "—")}</div>
+      <div>Naissance: </div><div>${escapeHTML(formatDate(r.birthDate))}</div>
+      <div>Stade: </div><div>${escapeHTML(stage)}</div>
+      <div>Cage: </div><div>${escapeHTML(r.cage || "—")}</div>
+      <div>Statut: </div><div>${escapeHTML(r.status)}</div>
+      <div>Notes: </div><div>${escapeHTML(r.notes || "—")}</div>
     </div>
 
     ${reproHTML}
@@ -205,10 +212,7 @@ export function renderRabbitDetails(ctx) {
     <div class="sep"></div>
 
     <div class="row">
-      ${r.status === "mort" || r.status === "vendu"
-        ? `<div class="error">Impossible d'ajouter un événement : animal ${r.status === "mort" ? "décédé" : "vendu"}.</div>`
-        : `<button class="btn" id="btnAddEvent" data-testid="btn-add-event">+ Ajouter un événement</button>`
-      }
+      <button class="btn" id="btnAddEvent" data-testid="btn-add-event">+ Ajouter un événement</button>
     </div>
   `;
 }
@@ -247,10 +251,7 @@ export function renderEventsPanel(ctx) {
     el.eventsPanel.innerHTML = `
       <div class="muted">Aucun événement pour <strong>${escapeHTML(r.name)}</strong>.</div>
       <div class="sep"></div>
-      ${r.status === "mort" || r.status === "vendu"
-        ? `<div class="error">Impossible d'ajouter un événement : animal ${r.status === "mort" ? "décédé" : "vendu"}.</div>`
-        : `<button class="btn" id="btnAddEvent2" data-testid="btn-add-event-2">+ Ajouter un événement</button>`
-      }
+      <button class="btn" id="btnAddEvent2" data-testid="btn-add-event-2">+ Ajouter un événement</button>
     `;
     return;
   }
@@ -272,10 +273,7 @@ export function renderEventsPanel(ctx) {
       `).join("")}
     </div>
     <div class="sep"></div>
-    ${r.status === "mort" || r.status === "vendu"
-      ? `<div class="error">Impossible d'ajouter un événement : animal ${r.status === "mort" ? "décédé" : "vendu"}.</div>`
-      : `<button class="btn" id="btnAddEvent2" data-testid="btn-add-event-2">+ Ajouter un événement</button>`
-    }
+    <button class="btn" id="btnAddEvent2" data-testid="btn-add-event-2">+ Ajouter un événement</button>
   `;
 }
 
@@ -365,12 +363,12 @@ export function renderLots(ctx) {
       <div style="font-size:18px;font-weight:900">${escapeHTML(selected.cage)} <span class="badge">${escapeHTML(selected.date)}</span></div>
       <div class="sep"></div>
       <div class="kv">
-        <div>Sevrés</div><div><strong>${escapeHTML(String(selected.weaned))}</strong></div>
-        <div>Mère</div><div>${escapeHTML(selected.doeName)} (${escapeHTML(selected.doeCode)})</div>
-        <div>Notes</div><div>${escapeHTML(selected.notes || "—")}</div>
+        <div>Sevrés: </div><div><strong>${escapeHTML(String(selected.weaned))}</strong></div>
+        <div>Mère: </div><div>${escapeHTML(selected.doeName)} (${escapeHTML(selected.doeCode)})</div>
+        <div>Notes: </div><div>${escapeHTML(selected.notes || "—")}</div>
       </div>
       <div class="sep"></div>
-      <div style="font-weight:700;margin-bottom:6px">Lapereaux du lot</div>
+      <div style="font-weight:700;margin-bottom:6px">${rabbits.length} lapereaux du lot</div>
       ${rabbitsList}
       <div class="sep"></div>
       <div class="row">

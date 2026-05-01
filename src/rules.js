@@ -9,7 +9,8 @@ export const RULES = {
 
 function mustBeActiveRabbit(r) {
   if (!r) return "Lapin introuvable.";
-  if (r.status === "mort") return "Impossible : ce lapin est déclaré mort.";
+  if (r.status === "mort") return "Impossible d'ajouter des événements : statut mort.";
+  if (r.status === "vendu") return "Impossible d'ajouter des événements : statut vendu.";
   return null;
 }
 
@@ -190,8 +191,8 @@ export function applyEventSideEffects(ctx, event) {
         const n = String(startIndex + i - 1).padStart(2, "0");
         const kit = {
           id: uid("rb"),
-          code: `CW-KIT-${dateStamp}-${n}`,
-          name: `Laperau ${n}`,
+          code: `${r.code}-K${n}`,
+          name: `Lapereau ${n}`,
           sex: "U",
           breed: r.breed || "",
           birthDate: event.date,

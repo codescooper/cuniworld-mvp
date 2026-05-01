@@ -17,7 +17,8 @@ export function getLitterStatsForDoe(state, rabbitId) {
   const dead = sum(litters.map(e => num(e.data?.dead)));
   const count = litters.length;
   const survival = born > 0 ? Math.round((alive / born) * 100) : 0;
-  return { count, born, alive, dead, survival };
+  const activeKits = state.rabbits.filter(r => r.doeId === rabbitId && r.status === "actif").length;
+  return { count, born, alive, dead, survival, activeKits };
 }
 
 export function formatEventDetails(e) {

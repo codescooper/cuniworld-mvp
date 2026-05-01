@@ -55,7 +55,7 @@ test("export -> reset -> import restaure les données", async ({ page }, testInf
   else await page.locator("#fileImport").setInputFiles(exportPath);
 
   // Re-sélectionner
-  await page.getByText("CW-F001").first().click();
+  await page.getByText("CW-F001", { exact: true }).first().click();
 
   await expect(page.locator("#rabbitDetails")).toContainText("CW-F001");
   await expect(page.locator("#rabbitDetails")).toContainText("Naya");

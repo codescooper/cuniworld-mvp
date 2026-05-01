@@ -43,15 +43,15 @@ test("flux complet de reproduction: femelle -> saillie -> mise-bas -> sevrage ->
   await addMiseBas(page, { date: "2026-01-30", born: "8", alive: "7" });
 
   // Vérifier que 7 lapereaux ont été créés
-  await expect(page.locator("#rabbitList")).toContainText("CW-KIT-20260130-01");
-  await expect(page.locator("#rabbitList")).toContainText("CW-KIT-20260130-07");
+  await expect(page.locator("#rabbitList")).toContainText("CW-F001-K01");
+  await expect(page.locator("#rabbitList")).toContainText("CW-F001-K07");
 
   // Vérifier la généalogie dans les détails de la femelle
   await expect(page.locator("#rabbitDetails")).toContainText("Descendance");
   await expect(page.locator("#rabbitDetails")).toContainText("7 lapereaux actifs");
 
   // Sélectionner un lapereau et vérifier sa généalogie
-  await selectRabbitByCode(page, "CW-KIT-20260130-01");
+  await selectRabbitByCode(page, "CW-F001-K01");
   await expect(page.locator("#rabbitDetails")).toContainText("Mère: Naya (CW-F001)");
   await expect(page.locator("#rabbitDetails")).toContainText("Père: Orion (CW-M001)");
 
@@ -73,7 +73,7 @@ test("flux complet de reproduction: femelle -> saillie -> mise-bas -> sevrage ->
 
   // Vérifier que les lapereaux ont changé de cage
   await page.locator("#btnBack").click();
-  await selectRabbitByCode(page, "CW-KIT-20260130-01");
+  await selectRabbitByCode(page, "CW-F001-K01");
   await expect(page.locator("#rabbitDetails")).toContainText("Cage: C-04");
   await expect(page.locator("#rabbitDetails")).toContainText("Stade: jeune");
 });

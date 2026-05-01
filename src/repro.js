@@ -18,7 +18,7 @@ export function getReproInfo(state, rabbit) {
     return { lastMating: null, lastBirth, dueDate: null, isPregnant: false, maleId: null };
   }
 
-  const dueDate = addDays(lastMating.date, 31);
+  const dueDate = addDays(lastMating.date, 28);
   const isPregnant = !lastBirth || lastBirth.date < lastMating.date;
   const maleId = lastMating.data?.maleId || null;
 

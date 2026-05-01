@@ -3,7 +3,8 @@
     "allow": [
       "Bash(node --input-type=module)",
       "Bash(npx vitest *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(npx playwright *)"
     ]
   }
 }

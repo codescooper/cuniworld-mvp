@@ -35,7 +35,7 @@ describe("repro", () => {
     const info = getReproInfo(state, rabbit);
     expect(info.isPregnant).toBe(true);
     expect(info.maleId).toBe("M1");
-    expect(info.dueDate).toBe("2026-02-01"); // 31 jours après
+    expect(info.dueDate).toBe("2026-01-29"); // 28 jours après
     expect(info.lastMating.date).toBe("2026-01-01");
   });
 
@@ -91,6 +91,6 @@ describe("repro", () => {
     const info = getReproInfo(state, rabbit);
     expect(info.isPregnant).toBe(true);
     expect(info.maleId).toBe("M2"); // Dernière saillie
-    expect(info.dueDate).toBe("2026-03-18"); // 31 jours après 2026-02-15
+    expect(info.dueDate).toBe("2026-03-15"); // 28 jours après 2026-02-15
   });
 });

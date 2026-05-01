@@ -77,7 +77,7 @@ export async function createBuck(page, { code = "CW-M001", name = "Orion" } = {}
 
 export async function selectRabbitByCode(page, code = "CW-F001") {
   await closeModalHard(page);
-  await page.getByText(code).first().click();
+  await page.getByText(code, { exact: true }).first().click();
 }
 
 export async function openAddEvent(page) {

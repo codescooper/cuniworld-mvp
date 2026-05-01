@@ -302,7 +302,7 @@ if (!isE2E) {
   seedIfEmpty();
 } else {
   // Mode E2E : ouvre les panneaux clés pour que les tests accèdent au contenu
-  ["dashboard", "rabbits"].forEach(openPanel);
+  ["dashboard", "rabbits", "lots"].forEach(openPanel);
 }
 
 ctx.render();

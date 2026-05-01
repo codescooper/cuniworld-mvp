@@ -1,4 +1,4 @@
-import { escapeHTML } from "./utils.js";
+import { escapeHTML, num } from "./utils.js";
 
 export function buildLots(state) {
   // 1 lot = 1 événement sevrage
@@ -8,7 +8,7 @@ export function buildLots(state) {
     .map(e => {
       const doe = rabbitsById.get(e.rabbitId);
       const rabbitIds = e.data?.rabbitIds || [];
-      const weaned = rabbitIds.length;
+      const weaned = Math.max(num(e.data?.weanedCount), rabbitIds.length, num(e.data?.weaned)) || 0;
       const cage = (e.data?.destCage || "").trim() || "—";
       return {
         id: `lot_${e.id}`,

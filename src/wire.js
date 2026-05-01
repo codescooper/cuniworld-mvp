@@ -131,6 +131,14 @@ export function wireDynamic(ctx) {
     });
   });
 
+  const btnBack = document.getElementById("btnBack");
+  if (btnBack) {
+    btnBack.addEventListener("click", () => {
+      ctx.selectedRabbitId = null;
+      ctx.render();
+    });
+  }
+
   const btnEdit = document.getElementById("btnEditRabbit");
   if (btnEdit) {
     btnEdit.addEventListener("click", () => {
