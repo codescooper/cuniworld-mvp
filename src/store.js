@@ -1,6 +1,6 @@
 const KEY = "cuniworld_mvp_state";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 function nowISO() {
   return new Date().toISOString();
@@ -16,16 +16,18 @@ function defaultState() {
     version: SCHEMA_VERSION,
     meta: { createdAt: nowISO(), updatedAt: nowISO() },
     rabbits: [],   // [{id, code, name, sex, breed, birthDate, cage, status, notes, createdAt, updatedAt}]
-    events: []     // [{id, rabbitId, type, date, notes, createdAt}]
+    events: [],    // [{id, rabbitId, type, date, notes, data, createdAt}]
+    photos: []     // [{id, rabbitId, dataUrl, date, source, eventId, createdAt}]
   };
 }
 
 function migrate(state) {
-  // Pour l’instant version 1 seulement.
-  // Quand on passera à V2/V3, on ajoutera:
-  // if (state.version === 1) { ... state.version=2 }
   if (!state || typeof state !== "object") return defaultState();
   if (!state.version) return { ...defaultState(), ...state, version: SCHEMA_VERSION };
+  // v1 → v2 : ajout du tableau photos
+  if (state.version === 1) {
+    return { ...state, photos: [], version: 2 };
+  }
   return state;
 }
 
@@ -45,7 +47,14 @@ export const Store = {
       ...state,
       meta: { ...(state.meta || {}), updatedAt: nowISO() }
     };
-    localStorage.setItem(KEY, JSON.stringify(next));
+    try {
+      localStorage.setItem(KEY, JSON.stringify(next));
+    } catch (e) {
+      if (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED") {
+        throw new Error("Stockage local plein. Supprimez des photos ou exportez/réinitialisez vos données.");
+      }
+      throw e;
+    }
     return next;
   },
   reset() {

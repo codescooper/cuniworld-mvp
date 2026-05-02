@@ -42,6 +42,9 @@ export function updateRabbit(ctx, id, patch) {
 export function deleteRabbit(ctx, id) {
   ctx.state.rabbits = ctx.state.rabbits.filter((r) => r.id !== id);
   ctx.state.events = ctx.state.events.filter((e) => e.rabbitId !== id);
+  if (ctx.state.photos) {
+    ctx.state.photos = ctx.state.photos.filter((p) => p.rabbitId !== id);
+  }
   if (ctx.selectedRabbitId === id) ctx.selectedRabbitId = null;
   persist(ctx);
   ctx.render();
@@ -86,6 +89,34 @@ export function addEvent(ctx, rabbitId, data) {
 
 export function deleteEvent(ctx, eventId) {
   ctx.state.events = ctx.state.events.filter((e) => e.id !== eventId);
+  if (ctx.state.photos) {
+    ctx.state.photos = ctx.state.photos.filter((p) => p.eventId !== eventId);
+  }
+  persist(ctx);
+  ctx.render();
+}
+
+export function addPhoto(ctx, rabbitId, { dataUrl, date, source = "profile", eventId = null }) {
+  const { uid, nowISO } = ctx.Store.helpers;
+  if (!ctx.state.photos) ctx.state.photos = [];
+  const photo = {
+    id: uid("ph"),
+    rabbitId,
+    dataUrl,
+    date: date || new Date().toISOString().slice(0, 10),
+    source,
+    eventId,
+    createdAt: nowISO(),
+  };
+  ctx.state.photos.unshift(photo);
+  persist(ctx);
+  ctx.render();
+  return photo;
+}
+
+export function deletePhoto(ctx, photoId) {
+  if (!ctx.state.photos) return;
+  ctx.state.photos = ctx.state.photos.filter((p) => p.id !== photoId);
   persist(ctx);
   ctx.render();
 }

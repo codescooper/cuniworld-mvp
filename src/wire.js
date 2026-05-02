@@ -1,6 +1,7 @@
 import { openModal, closeModal } from "./modal.js";
 import { escapeHTML, escapeAttr, generateRabbitCode, num, numOrNull } from "./utils.js";
-import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent } from "./actions.js";
+import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent, addPhoto, deletePhoto } from "./actions.js";
+import { compressImage } from "./photos.js";
 
 
 export function wireStatic(ctx) {
@@ -199,6 +200,36 @@ export function wireDynamic(ctx) {
     });
     }
 
+  // Photo de profil depuis la fiche lapin
+  const inputProfilePhoto = document.getElementById("inputProfilePhoto");
+  if (inputProfilePhoto && ctx.selectedRabbitId) {
+    inputProfilePhoto.addEventListener("change", async () => {
+      const file = inputProfilePhoto.files?.[0];
+      if (!file) return;
+      try {
+        const dataUrl = await compressImage(file);
+        addPhoto(ctx, ctx.selectedRabbitId, {
+          dataUrl,
+          date: new Date().toISOString().slice(0, 10),
+          source: "profile",
+        });
+      } catch (err) {
+        alert("Erreur photo : " + (err?.message || err));
+      } finally {
+        inputProfilePhoto.value = "";
+      }
+    });
+  }
+
+  // Suppression photo depuis l'historique
+  el.rabbitDetails.querySelectorAll("[data-del-photo]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.delPhoto;
+      if (!window.confirm("Supprimer cette photo ?")) return;
+      deletePhoto(ctx, id);
+    });
+  });
 
 }
 
@@ -258,6 +289,19 @@ function rabbitFormHTML(rabbit=null) {
         <textarea class="input" name="notes" placeholder="Observations...">${escapeHTML(r.notes || "")}</textarea>
       </div>
 
+      <div class="field">
+        <div class="label">Photo de profil (optionnel)</div>
+        <div class="photo-upload-zone">
+          <div class="photo-upload-placeholder" id="photoUploadPlaceholder">🐇<br><span>Aucune photo sélectionnée</span></div>
+          <img class="photo-upload-preview" id="photoPreviewImg" style="display:none" alt="Aperçu">
+          <label class="btn secondary" style="cursor:pointer;margin-top:8px">
+            📷 Choisir une photo
+            <input type="file" id="inputRabbitPhoto" accept="image/*" style="display:none">
+          </label>
+          <button type="button" class="btn secondary" id="btnClearRabbitPhoto" style="display:none">Retirer</button>
+        </div>
+      </div>
+
       <div class="row" style="justify-content:flex-end">
         <button type="button" class="btn secondary" id="cancelRabbit">Annuler</button>
         <button type="submit" class="btn" data-testid="rabbit-form-submit">${rabbit ? "Enregistrer" : "Créer"}</button>
@@ -290,6 +334,36 @@ function wireRabbitForm(ctx, existingRabbit) {
     }
   }
 
+  // Gestion de la photo de profil dans le formulaire
+  let selectedPhotoData = null;
+  const photoInput = document.getElementById("inputRabbitPhoto");
+  const photoPreview = document.getElementById("photoPreviewImg");
+  const photoPlaceholder = document.getElementById("photoUploadPlaceholder");
+  const clearPhotoBtn = document.getElementById("btnClearRabbitPhoto");
+
+  photoInput?.addEventListener("change", async () => {
+    const file = photoInput.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressImage(file);
+      selectedPhotoData = dataUrl;
+      if (photoPreview) { photoPreview.src = dataUrl; photoPreview.style.display = ""; }
+      if (photoPlaceholder) photoPlaceholder.style.display = "none";
+      if (clearPhotoBtn) clearPhotoBtn.style.display = "";
+    } catch (err) {
+      alert("Erreur photo : " + (err?.message || err));
+    } finally {
+      photoInput.value = "";
+    }
+  });
+
+  clearPhotoBtn?.addEventListener("click", () => {
+    selectedPhotoData = null;
+    if (photoPreview) { photoPreview.src = ""; photoPreview.style.display = "none"; }
+    if (photoPlaceholder) photoPlaceholder.style.display = "";
+    clearPhotoBtn.style.display = "none";
+  });
+
   form?.addEventListener("submit", (e) => {
     e.preventDefault();
     const fd = new FormData(form);
@@ -299,14 +373,37 @@ function wireRabbitForm(ctx, existingRabbit) {
     data.birthDate = (data.birthDate || "").toString();
 
     try {
-      if (existingRabbit) updateRabbit(ctx, existingRabbit.id, data);
-      else addRabbit(ctx, data);
-
+      if (existingRabbit) {
+        updateRabbit(ctx, existingRabbit.id, data);
+        if (selectedPhotoData) {
+          try {
+            addPhoto(ctx, existingRabbit.id, {
+              dataUrl: selectedPhotoData,
+              date: new Date().toISOString().slice(0, 10),
+              source: "profile",
+            });
+          } catch (photoErr) {
+            alert("Lapin modifié, mais la photo n'a pas pu être sauvegardée : " + (photoErr?.message || photoErr));
+          }
+        }
+      } else {
+        addRabbit(ctx, data);
+        if (selectedPhotoData && ctx.selectedRabbitId) {
+          try {
+            addPhoto(ctx, ctx.selectedRabbitId, {
+              dataUrl: selectedPhotoData,
+              date: new Date().toISOString().slice(0, 10),
+              source: "profile",
+            });
+          } catch (photoErr) {
+            alert("Lapin créé, mais la photo n'a pas pu être sauvegardée : " + (photoErr?.message || photoErr));
+          }
+        }
+      }
       closeModal(ctx.el);
     } catch (err) {
       alert(err?.message || String(err));
     }
-
   });
 }
 
@@ -426,6 +523,19 @@ function renderEventExtra(ctx, type) {
         <div class="label">Poids (kg)</div>
         <input class="input" name="weight" type="number" min="0" step="0.01" placeholder="ex: 2.35" required>
       </div>
+      <div class="field">
+        <div class="label">Photo (optionnel)</div>
+        <div class="photo-upload-zone">
+          <label class="btn secondary" style="cursor:pointer">
+            📷 Joindre une photo
+            <input type="file" id="inputPeseePhoto" accept="image/*" style="display:none">
+          </label>
+          <div id="peseePhotoPreview" style="display:none;margin-top:8px">
+            <img id="peseePhotoImg" class="photo-upload-preview" alt="Aperçu">
+            <button type="button" id="btnClearPeseePhoto" class="btn secondary" style="margin-top:4px;font-size:12px">Retirer la photo</button>
+          </div>
+        </div>
+      </div>
     `;
   }
   if (type === "vente") {
@@ -532,7 +642,25 @@ function wireEventForm(ctx) {
     const draft = { type, date, notes, data: evData };
 
     try {
-      addEvent(ctx, ctx.selectedRabbitId, draft);
+      const ev = addEvent(ctx, ctx.selectedRabbitId, draft);
+
+      if (type === "pesée") {
+        const peseePhotoInput = document.getElementById("inputPeseePhoto");
+        const photoDataUrl = peseePhotoInput?.dataset.dataUrl;
+        if (photoDataUrl) {
+          try {
+            addPhoto(ctx, ctx.selectedRabbitId, {
+              dataUrl: photoDataUrl,
+              date,
+              source: "pesée",
+              eventId: ev.id,
+            });
+          } catch (photoErr) {
+            alert("Pesée enregistrée, mais la photo n'a pas pu être sauvegardée : " + (photoErr?.message || photoErr));
+          }
+        }
+      }
+
       closeModal(ctx.el);
     } catch (err) {
       const msg = err?.message || String(err);
@@ -545,6 +673,36 @@ function wireEventForm(ctx) {
 }
 
 function bindExtraHandlers(type) {
+  if (type === "pesée") {
+    const photoInput = document.getElementById("inputPeseePhoto");
+    const preview = document.getElementById("peseePhotoPreview");
+    const previewImg = document.getElementById("peseePhotoImg");
+    const clearBtn = document.getElementById("btnClearPeseePhoto");
+    if (!photoInput) return;
+
+    photoInput.addEventListener("change", async () => {
+      const file = photoInput.files?.[0];
+      if (!file) return;
+      try {
+        const dataUrl = await compressImage(file);
+        photoInput.dataset.dataUrl = dataUrl;
+        if (previewImg) previewImg.src = dataUrl;
+        if (preview) preview.style.display = "";
+      } catch (err) {
+        alert("Erreur photo : " + (err?.message || err));
+      } finally {
+        photoInput.value = "";
+      }
+    });
+
+    clearBtn?.addEventListener("click", () => {
+      delete photoInput.dataset.dataUrl;
+      if (previewImg) previewImg.src = "";
+      if (preview) preview.style.display = "none";
+    });
+    return;
+  }
+
   if (type !== "mise_bas") return;
   const aliveInput = document.querySelector('input[name="alive"]');
   const bornInput = document.querySelector('input[name="born"]');

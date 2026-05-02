@@ -717,6 +717,112 @@ textarea.input { min-height: 90px; resize: vertical }
 }
 
 /* ================================================================
+   PHOTOS
+   ================================================================ */
+
+/* Avatar dans la fiche lapin */
+.rabbit-detail-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: 8px;
+}
+.rabbit-detail-info { flex: 1; min-width: 0 }
+
+.rabbit-avatar {
+  flex-shrink: 0;
+  width: 72px; height: 72px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 2px solid var(--color-border);
+  background: var(--color-bg);
+  display: flex; align-items: center; justify-content: center;
+}
+.rabbit-avatar-img   { width: 100%; height: 100%; object-fit: cover; display: block }
+.rabbit-avatar-placeholder { font-size: 34px; line-height: 1 }
+
+/* Zone d'upload dans les formulaires */
+.photo-upload-zone {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1);
+}
+.photo-upload-placeholder {
+  width: 120px; height: 96px;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 4px;
+  font-size: 26px; color: var(--color-muted);
+  text-align: center;
+}
+.photo-upload-placeholder span { font-size: 11px }
+.photo-upload-preview {
+  max-width: 160px; max-height: 140px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  border: 1.5px solid var(--color-border);
+  display: block;
+}
+
+/* Grille historique photos */
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+.photo-grid-item {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-bg);
+  aspect-ratio: 1;
+  cursor: default;
+}
+.photo-grid-img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+  transition: transform 220ms ease;
+}
+.photo-grid-item:hover .photo-grid-img { transform: scale(1.06) }
+
+.photo-grid-overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%);
+  padding: 4px 5px 5px;
+  pointer-events: none;
+}
+.photo-grid-label  { font-size: 10px; color: #fff; line-height: 1.3; display: block }
+.photo-grid-source { font-size: 9px; color: rgba(255,255,255,0.75); display: block }
+
+.photo-grid-del {
+  position: absolute; top: 4px; right: 4px;
+  background: rgba(198,40,40,0.82);
+  border: none; color: #fff;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  display: none;
+  align-items: center; justify-content: center;
+  line-height: 1;
+  transition: background 120ms;
+  padding: 0;
+}
+.photo-grid-item:hover .photo-grid-del { display: flex }
+.photo-grid-del:hover { background: rgba(198,40,40,1) }
+
+/* Miniature dans la liste des événements */
+.event-photo-thumb {
+  width: 60px; height: 60px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-border);
+  display: block;
+  flex-shrink: 0;
+}
+
+/* ================================================================
    KEYFRAMES GLOBAUX
    ================================================================ */
 @keyframes fadeIn {

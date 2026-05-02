@@ -4,7 +4,10 @@
       "Bash(node --input-type=module)",
       "Bash(npx vitest *)",
       "Bash(node -e ' *)",
-      "Bash(npx playwright *)"
+      "Bash(npx playwright *)",
+      "Bash(xargs grep *)",
+      "Bash(npm run *)",
+      "Bash(npm test *)"
     ]
   }
 }

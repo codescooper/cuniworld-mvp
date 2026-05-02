@@ -1,8 +1,9 @@
-import { escapeHTML, formatDate, rabbitStatusBadge, sexLabel, daysBetween, getRabbitStage, stageBadge } from "./utils.js";
+import { escapeHTML, escapeAttr, formatDate, rabbitStatusBadge, sexLabel, daysBetween, getRabbitStage, stageBadge } from "./utils.js";
 import { getReproInfo } from "./repro.js";
 import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
 import { buildLots, lotBadge } from "./lots.js";
 import { getReminders, reminderLabel } from "./health.js";
+import { getPhotoHistory, getProfilePhoto } from "./photos.js";
 
 
 
@@ -181,6 +182,28 @@ export function renderRabbitDetails(ctx) {
       </div>
     ` : "";
 
+  const profilePhoto = getProfilePhoto(state, r.id);
+  const allPhotos = getPhotoHistory(state, r.id);
+
+  const avatarHTML = profilePhoto
+    ? `<img class="rabbit-avatar-img" src="${escapeAttr(profilePhoto.dataUrl)}" alt="Photo de ${escapeHTML(r.name)}">`
+    : `<div class="rabbit-avatar-placeholder">🐇</div>`;
+
+  const photoGridHTML = allPhotos.length > 0
+    ? `<div class="photo-grid">
+        ${allPhotos.map(p => `
+          <div class="photo-grid-item">
+            <img class="photo-grid-img" src="${escapeAttr(p.dataUrl)}" alt="${escapeHTML(p.date)}" loading="lazy">
+            <div class="photo-grid-overlay">
+              <div class="photo-grid-label">${escapeHTML(p.date)}</div>
+              <div class="photo-grid-source">${p.source === "pesée" ? "Pesée" : "Profil"}</div>
+            </div>
+            <button class="photo-grid-del" data-del-photo="${escapeAttr(p.id)}" title="Supprimer cette photo">×</button>
+          </div>
+        `).join("")}
+      </div>`
+    : `<div class="small muted" style="margin:6px 0">Aucune photo enregistrée.</div>`;
+
   el.rabbitDetails.innerHTML = `
     <div class="row" style="justify-content:space-between;margin-bottom:8px">
       <button class="btn secondary" id="btnBack" data-testid="btn-back">← Retour</button>
@@ -190,8 +213,13 @@ export function renderRabbitDetails(ctx) {
       </div>
     </div>
 
-    <div style="font-size:18px;font-weight:900">${escapeHTML(r.name)} <span class="badge">${escapeHTML(r.code)}</span></div>
-    <div class="small" style="margin-bottom:4px">${rabbitStatusBadge(r.status)} <span class="badge">${sexLabel(r.sex)}</span></div>
+    <div class="rabbit-detail-header">
+      <div class="rabbit-avatar">${avatarHTML}</div>
+      <div class="rabbit-detail-info">
+        <div style="font-size:18px;font-weight:900">${escapeHTML(r.name)} <span class="badge">${escapeHTML(r.code)}</span></div>
+        <div class="small" style="margin-bottom:4px">${rabbitStatusBadge(r.status)} <span class="badge">${sexLabel(r.sex)}</span></div>
+      </div>
+    </div>
 
     <div class="sep"></div>
 
@@ -214,6 +242,15 @@ export function renderRabbitDetails(ctx) {
     <div class="row">
       <button class="btn" id="btnAddEvent" data-testid="btn-add-event">+ Ajouter un événement</button>
     </div>
+
+    <div class="sep"></div>
+
+    <div style="font-weight:700;margin-bottom:8px">📷 Photos (${allPhotos.length})</div>
+    ${photoGridHTML}
+    <label class="btn secondary" style="cursor:pointer;margin-top:8px;display:inline-flex;align-items:center;gap:6px">
+      📷 Ajouter une photo de profil
+      <input type="file" id="inputProfilePhoto" accept="image/*" style="display:none">
+    </label>
   `;
 }
 
@@ -260,17 +297,24 @@ export function renderEventsPanel(ctx) {
     <div class="muted">Historique de <strong>${escapeHTML(r.name)}</strong> (${events.length})</div>
     <div class="sep"></div>
     <div class="list">
-      ${events.map(e => `
-        <div class="item">
-          <div>
-            <div><strong>${escapeHTML(types[e.type] || e.type)}</strong> <span class="badge">${escapeHTML(e.date)}</span></div>
-            <div class="small">${escapeHTML(formatEventDetails(e))}</div>
+      ${events.map(e => {
+        const linkedPhoto = (state.photos || []).find(p => p.eventId === e.id);
+        const thumbHTML = linkedPhoto
+          ? `<img class="event-photo-thumb" src="${escapeAttr(linkedPhoto.dataUrl)}" alt="Photo" loading="lazy" title="Photo du ${escapeHTML(linkedPhoto.date)}">`
+          : "";
+        return `
+          <div class="item">
+            <div style="flex:1">
+              <div><strong>${escapeHTML(types[e.type] || e.type)}</strong> <span class="badge">${escapeHTML(e.date)}</span></div>
+              <div class="small">${escapeHTML(formatEventDetails(e))}</div>
+              ${thumbHTML ? `<div style="margin-top:6px">${thumbHTML}</div>` : ""}
+            </div>
+            <div>
+              <button class="btn danger" data-del-event="${e.id}">Suppr.</button>
+            </div>
           </div>
-          <div>
-            <button class="btn danger" data-del-event="${e.id}">Suppr.</button>
-          </div>
-        </div>
-      `).join("")}
+        `;
+      }).join("")}
     </div>
     <div class="sep"></div>
     <button class="btn" id="btnAddEvent2" data-testid="btn-add-event-2">+ Ajouter un événement</button>
