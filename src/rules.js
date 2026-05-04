@@ -1,6 +1,7 @@
 import { daysBetween } from "./utils.js";
 import { getReproInfo } from "./repro.js";
 import { getBreedingStatus } from "./breeding.js";
+import { isNameFromPool, releaseRabbitName } from "./rabbitNameService.js";
 
 export const RULES = {
   MIN_GESTATION_DAYS: 28,
@@ -172,6 +173,7 @@ export function applyEventSideEffects(ctx, event) {
   if (event.type === "décès" || event.type === "deces") {
     r.status = "mort";
     r.updatedAt = nowISO();
+    if (isNameFromPool(r.name)) releaseRabbitName(state, r.name);
   }
 
   if (event.type === "vente") {

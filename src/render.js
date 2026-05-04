@@ -245,6 +245,7 @@ export function renderRabbitDetails(ctx) {
         <div>Détail:</div>
         <div class="small">${escapeHTML(breedingInfo.reason)}</div>
         ${breedingInfo.availableFrom ? `<div>Disponible le:</div><div><strong>${escapeHTML(breedingInfo.availableFrom)}</strong></div>` : ""}
+        ${r.breedingOverride && r.breedingOverride !== "auto" ? `<div>Mode:</div><div class="small" style="color:#888">Renseigné manuellement</div>` : ""}
       </div>
     ` : ""}
 

@@ -76,8 +76,16 @@ export function getBreedingStatus(rabbit, state, currentDate = _today()) {
     return { status: "indisponible", reason };
   }
 
+  // ── Override manuel ───────────────────────────────────────────────────────────
+  // "indisponible" : bloque immédiatement, quels que soient âge et événements.
+  // "disponible"   : saute uniquement la vérification d'âge ; gestation/allaitement/repos restent actifs.
+  if (rabbit.breedingOverride === "indisponible") {
+    return { status: "indisponible", reason: "Non disponible (renseigné manuellement)." };
+  }
+  const skipAgeCheck = rabbit.breedingOverride === "disponible";
+
   // ── Trop jeune ───────────────────────────────────────────────────────────────
-  if (rabbit.birthDate) {
+  if (!skipAgeCheck && rabbit.birthDate) {
     const ageDays = daysBetween(rabbit.birthDate, currentDate);
     if (ageDays < BREEDING_CONFIG.MIN_AGE_DAYS) {
       const daysLeft = BREEDING_CONFIG.MIN_AGE_DAYS - ageDays;

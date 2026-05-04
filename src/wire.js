@@ -2,6 +2,7 @@ import { openModal, closeModal } from "./modal.js";
 import { escapeHTML, escapeAttr, generateRabbitCode, num, numOrNull } from "./utils.js";
 import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent, addPhoto, deletePhoto } from "./actions.js";
 import { compressImage } from "./photos.js";
+import { isNameFromPool, isNameAvailable, isNameUsedByLivingRabbit, suggestAvailableRabbitName } from "./rabbitNameService.js";
 
 
 export function wireStatic(ctx) {
@@ -251,7 +252,11 @@ function rabbitFormHTML(rabbit=null, state=null) {
         </div>
         <div class="field">
           <div class="label">Nom</div>
-          <input class="input" name="name" placeholder="ex: Naya" value="${escapeAttr(r.name || "")}">
+          <div style="display:flex;gap:6px;align-items:center">
+            <input class="input" name="name" id="rabbitNameInput" placeholder="ex: Naya" value="${escapeAttr(r.name || "")}" style="flex:1">
+            <button type="button" id="btnSuggestName" title="Proposer un nom disponible" style="padding:0 10px;height:38px;border-radius:8px;border:1px solid #ccc;background:#f5f5f0;font-size:1.1rem;cursor:pointer;flex-shrink:0">🎲</button>
+          </div>
+          <div id="nameBadge" style="min-height:18px;margin-top:3px;font-size:.78rem"></div>
         </div>
       </div>
 
@@ -279,6 +284,16 @@ function rabbitFormHTML(rabbit=null, state=null) {
           <div class="label">Cage</div>
           <input class="input" name="cage" placeholder="ex: A-03" value="${escapeAttr(r.cage || "")}">
         </div>
+      </div>
+
+      <div class="field">
+        <div class="label">Disponibilité reproduction</div>
+        <select class="input" name="breedingOverride">
+          <option value="auto"        ${(!r.breedingOverride || r.breedingOverride === "auto")        ? "selected" : ""}>Calculée automatiquement</option>
+          <option value="disponible"  ${r.breedingOverride === "disponible"  ? "selected" : ""}>Disponible (forcer)</option>
+          <option value="indisponible" ${r.breedingOverride === "indisponible" ? "selected" : ""}>Non disponible (forcer)</option>
+        </select>
+        <div style="font-size:.8rem;color:#888;margin-top:3px">Utile si la date de naissance est inconnue.</div>
       </div>
 
       <div class="row2">
@@ -339,6 +354,53 @@ function wireRabbitForm(ctx, existingRabbit) {
   const sexSelect = form?.querySelector('select[name="sex"]');
   cancel?.addEventListener("click", () => closeModal(ctx.el));
 
+  // ── Suggestion de nom ───────────────────────────────────────────────────────
+  const nameInput  = document.getElementById("rabbitNameInput");
+  const suggestBtn = document.getElementById("btnSuggestName");
+  const nameBadge  = document.getElementById("nameBadge");
+
+  // Suit si le nom affiché vient d'une suggestion automatique (vs tapé manuellement)
+  let isSuggested = false;
+  let currentSuggestion = null;
+
+  function showBadge(type) {
+    if (!nameBadge) return;
+    if (type === "suggest") {
+      nameBadge.innerHTML = `<span style="color:#4f7942;font-weight:600">✨ Nom suggéré</span>`;
+    } else if (type === "manual") {
+      nameBadge.innerHTML = `<span style="color:#888">✏️ Nom manuel</span>`;
+    } else {
+      nameBadge.innerHTML = "";
+    }
+  }
+
+  // Dès que l'utilisateur tape lui-même, on sort du mode "suggestion"
+  nameInput?.addEventListener("input", () => {
+    isSuggested = false;
+    currentSuggestion = null;
+    showBadge(nameInput.value.trim() ? "manual" : null);
+  });
+
+  suggestBtn?.addEventListener("click", () => {
+    const currentValue = (nameInput?.value || "").trim();
+
+    // Si un nom a été tapé manuellement, demander confirmation avant d'écraser
+    if (currentValue && !isSuggested) {
+      if (!window.confirm(`Remplacer "${currentValue}" par un nom suggéré ?`)) return;
+    }
+
+    const next = suggestAvailableRabbitName(ctx.state, currentSuggestion);
+    currentSuggestion = next;
+    isSuggested = true;
+    if (nameInput) nameInput.value = next;
+    showBadge("suggest");
+  });
+
+  // Si on édite un lapin et qu'il a déjà un nom du pool, on l'indique
+  if (existingRabbit?.name && isNameFromPool(existingRabbit.name)) {
+    showBadge("suggest");
+  }
+
   if (codeInput && sexSelect && !existingRabbit) {
     const markManual = () => {
       codeInput.dataset.manual = "1";
@@ -395,6 +457,29 @@ function wireRabbitForm(ctx, existingRabbit) {
     data.birthDate = (data.birthDate || "").toString();
     data.motherId = data.motherId || null;
     data.fatherId = data.fatherId || null;
+    data.breedingOverride = data.breedingOverride || "auto";
+
+    // ── Validation du nom ─────────────────────────────────────────────────────
+    const submittedName = (data.name || "").trim();
+    const ownerId = existingRabbit?.id ?? null;
+
+    if (submittedName && isNameFromPool(submittedName)) {
+      // Nom Naruto : vérifier qu'il est encore disponible
+      if (!isNameAvailable(ctx.state, submittedName, ownerId)) {
+        alert(`"${submittedName}" vient d'être pris par un autre lapin. Choisis-en un autre.`);
+        const next = suggestAvailableRabbitName(ctx.state, submittedName);
+        if (nameInput) { nameInput.value = next; }
+        currentSuggestion = next;
+        isSuggested = true;
+        showBadge("suggest");
+        return;
+      }
+    } else if (submittedName) {
+      // Nom manuel : avertir si déjà utilisé par un lapin vivant
+      if (isNameUsedByLivingRabbit(submittedName, ctx.state.rabbits, ownerId)) {
+        if (!window.confirm(`Un lapin actif s'appelle déjà "${submittedName}". Continuer quand même ?`)) return;
+      }
+    }
 
     try {
       if (existingRabbit) {

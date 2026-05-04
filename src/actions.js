@@ -1,5 +1,6 @@
 import { validateEvent, applyEventSideEffects } from "./rules.js";
 import { generateRabbitCode, getRabbitStage, num, numOrNull } from "./utils.js";
+import { isNameFromPool, lockRabbitName, releaseRabbitName } from "./rabbitNameService.js";
 
 export function persist(ctx) {
   ctx.state = ctx.Store.save(ctx.state);
@@ -23,10 +24,12 @@ export function addRabbit(ctx, data) {
     notes: (data.notes || "").trim(),
     motherId: (data.motherId || null),
     fatherId: (data.fatherId || null),
+    breedingOverride: data.breedingOverride || "auto",
     createdAt: nowISO(),
     updatedAt: nowISO(),
   };
   ctx.state.rabbits.unshift(rabbit);
+  if (isNameFromPool(rabbit.name)) lockRabbitName(ctx.state, rabbit.name, rabbit.id);
   persist(ctx);
   ctx.selectedRabbitId = rabbit.id;
   ctx.render();
@@ -36,12 +39,23 @@ export function updateRabbit(ctx, id, patch) {
   const { nowISO } = ctx.Store.helpers;
   const i = ctx.state.rabbits.findIndex((r) => r.id === id);
   if (i === -1) return;
+
+  // Gestion du changement de nom sur le pool Naruto
+  const oldName = ctx.state.rabbits[i].name;
+  const newName = patch.name;
+  if (newName && newName !== oldName) {
+    if (isNameFromPool(oldName)) releaseRabbitName(ctx.state, oldName);
+    if (isNameFromPool(newName))  lockRabbitName(ctx.state, newName, id);
+  }
+
   ctx.state.rabbits[i] = { ...ctx.state.rabbits[i], ...patch, updatedAt: nowISO() };
   persist(ctx);
   ctx.render();
 }
 
 export function deleteRabbit(ctx, id) {
+  const target = ctx.state.rabbits.find(r => r.id === id);
+  if (target && isNameFromPool(target.name)) releaseRabbitName(ctx.state, target.name);
   ctx.state.rabbits = ctx.state.rabbits.filter((r) => r.id !== id);
   ctx.state.events = ctx.state.events.filter((e) => e.rabbitId !== id);
   if (ctx.state.photos) {

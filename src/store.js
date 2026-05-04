@@ -2,7 +2,7 @@ import { saveData, loadData } from "./storage.js";
 
 const KEY = "cuniworld_mvp_state";
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 function nowISO() {
   return new Date().toISOString();
@@ -19,6 +19,7 @@ function defaultState() {
     rabbits: [],
     events: [],
     photos: [],
+    usedNames: {},   // { [name]: rabbitId } — noms Naruto actuellement attribués
   };
 }
 
@@ -27,7 +28,11 @@ function migrate(state) {
   if (!state.version) return { ...defaultState(), ...state, version: SCHEMA_VERSION };
   // v1 → v2 : ajout du tableau photos
   if (state.version === 1) {
-    return { ...state, photos: [], version: 2 };
+    state = { ...state, photos: [], version: 2 };
+  }
+  // v2 → v3 : ajout du dictionnaire usedNames
+  if (state.version === 2) {
+    state = { ...state, usedNames: {}, version: 3 };
   }
   return state;
 }

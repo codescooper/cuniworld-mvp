@@ -182,6 +182,39 @@ describe("getBreedingStatus", () => {
   });
 });
 
+// ─── breedingOverride ─────────────────────────────────────────────────────────
+
+describe("getBreedingStatus – breedingOverride", () => {
+  it('override "indisponible" bloque même si lapin mature', () => {
+    const r = { id: "r1", sex: "M", status: "actif", birthDate: daysAgo(200), breedingOverride: "indisponible" };
+    const { status, reason } = getBreedingStatus(r, makeState(), TODAY);
+    expect(status).toBe("indisponible");
+    expect(reason).toContain("manuellement");
+  });
+
+  it('override "disponible" bypass le check d\'âge', () => {
+    const r = { id: "r1", sex: "F", status: "actif", birthDate: daysAgo(60), breedingOverride: "disponible" };
+    const { status } = getBreedingStatus(r, makeState(), TODAY);
+    expect(status).toBe("disponible");
+  });
+
+  it('override "disponible" ne bypass PAS gestation/allaitement', () => {
+    const r = { id: "r1", sex: "F", status: "actif", breedingOverride: "disponible" };
+    const state = makeState([
+      { id: "e1", rabbitId: "r1", type: "saillie",  date: daysAgo(50) },
+      { id: "e2", rabbitId: "r1", type: "mise_bas", date: daysAgo(10) },
+    ]);
+    const { status } = getBreedingStatus(r, state, TODAY);
+    expect(status).toBe("allaitement");
+  });
+
+  it('override "auto" (défaut) conserve le comportement normal', () => {
+    const r = { id: "r1", sex: "F", status: "actif", birthDate: daysAgo(60), breedingOverride: "auto" };
+    const { status } = getBreedingStatus(r, makeState(), TODAY);
+    expect(status).toBe("trop_jeune");
+  });
+});
+
 // ─── Validation règles via validateEvent ─────────────────────────────────────
 
 describe("validateEvent – saillie avec règles breeding", () => {
