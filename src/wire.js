@@ -11,7 +11,7 @@ export function wireStatic(ctx) {
   ctx.el.lotQ?.addEventListener("input", () => ctx.render());
 
   el.btnNewRabbit.addEventListener("click", () => {
-    openModal(el, "Nouveau lapin", rabbitFormHTML(null));
+    openModal(el, "Nouveau lapin", rabbitFormHTML(null, ctx.state));
     wireRabbitForm(ctx, null);
   });
 
@@ -145,7 +145,7 @@ export function wireDynamic(ctx) {
     btnEdit.addEventListener("click", () => {
       const r = ctx.state.rabbits.find(x => x.id === ctx.selectedRabbitId);
       if (!r) return;
-      openModal(el, "Modifier lapin", rabbitFormHTML(r));
+      openModal(el, "Modifier lapin", rabbitFormHTML(r, ctx.state));
       wireRabbitForm(ctx, r);
     });
   }
@@ -235,8 +235,13 @@ export function wireDynamic(ctx) {
 
 /* -------- Forms HTML + wiring -------- */
 
-function rabbitFormHTML(rabbit=null) {
+function rabbitFormHTML(rabbit=null, state=null) {
   const r = rabbit || {};
+  const allRabbits = state?.rabbits || [];
+  const does  = allRabbits.filter(x => x.sex === "F" && x.status === "actif" && x.id !== r.id);
+  const bucks = allRabbits.filter(x => x.sex === "M" && x.status === "actif" && x.id !== r.id);
+  const currentMotherId = r.motherId || r.doeId || "";
+  const currentFatherId = r.fatherId || r.buckId || "";
   return `
     <form id="rabbitForm" class="form">
       <div class="row2">
@@ -273,6 +278,23 @@ function rabbitFormHTML(rabbit=null) {
         <div class="field">
           <div class="label">Cage</div>
           <input class="input" name="cage" placeholder="ex: A-03" value="${escapeAttr(r.cage || "")}">
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <div class="label">Mère (optionnel)</div>
+          <select class="input" name="motherId">
+            <option value="">Non renseignée</option>
+            ${does.map(f => `<option value="${escapeAttr(f.id)}" ${currentMotherId === f.id ? "selected" : ""}>${escapeHTML(f.name)} (${escapeHTML(f.code)})</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <div class="label">Père (optionnel)</div>
+          <select class="input" name="fatherId">
+            <option value="">Non renseigné</option>
+            ${bucks.map(m => `<option value="${escapeAttr(m.id)}" ${currentFatherId === m.id ? "selected" : ""}>${escapeHTML(m.name)} (${escapeHTML(m.code)})</option>`).join("")}
+          </select>
         </div>
       </div>
 
@@ -371,6 +393,8 @@ function wireRabbitForm(ctx, existingRabbit) {
     data.sex = (data.sex || "U").toString();
     data.status = (data.status || "actif").toString();
     data.birthDate = (data.birthDate || "").toString();
+    data.motherId = data.motherId || null;
+    data.fatherId = data.fatherId || null;
 
     try {
       if (existingRabbit) {

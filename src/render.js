@@ -1,5 +1,6 @@
 import { escapeHTML, escapeAttr, formatDate, rabbitStatusBadge, sexLabel, daysBetween, getRabbitStage, stageBadge } from "./utils.js";
 import { getReproInfo } from "./repro.js";
+import { getBreedingStatus, breedingStatusBadge } from "./breeding.js";
 import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
 import { buildLots, lotBadge } from "./lots.js";
 import { getReminders, reminderLabel } from "./health.js";
@@ -110,8 +111,10 @@ export function renderRabbitDetails(ctx) {
     return;
   }
   const stage = getRabbitStage(r);
+  const todayISO = new Date().toISOString().slice(0, 10);
 
   const repro = getReproInfo(state, r);
+  const breedingInfo = r.status === "actif" ? getBreedingStatus(r, state, todayISO) : null;
   const reproHTML = (repro && repro.dueDate)
     ? `
       <div class="sep"></div>
@@ -226,11 +229,24 @@ export function renderRabbitDetails(ctx) {
     <div class="kv">
       <div>Race: </div><div>${escapeHTML(r.breed || "—")}</div>
       <div>Naissance: </div><div>${escapeHTML(formatDate(r.birthDate))}</div>
+      ${r.birthDate ? `<div>Âge:</div><div>${_ageText(r.birthDate, todayISO)}</div>` : ""}
       <div>Stade: </div><div>${escapeHTML(stage)}</div>
       <div>Cage: </div><div>${escapeHTML(r.cage || "—")}</div>
       <div>Statut: </div><div>${escapeHTML(r.status)}</div>
       <div>Notes: </div><div>${escapeHTML(r.notes || "—")}</div>
     </div>
+
+    ${breedingInfo ? `
+      <div class="sep"></div>
+      <div style="font-weight:700;margin-bottom:6px">🐇 Reproduction</div>
+      <div class="kv">
+        <div>Statut:</div>
+        <div>${breedingStatusBadge(breedingInfo.status)}</div>
+        <div>Détail:</div>
+        <div class="small">${escapeHTML(breedingInfo.reason)}</div>
+        ${breedingInfo.availableFrom ? `<div>Disponible le:</div><div><strong>${escapeHTML(breedingInfo.availableFrom)}</strong></div>` : ""}
+      </div>
+    ` : ""}
 
     ${reproHTML}
     ${gestationHTML}
@@ -328,6 +344,18 @@ export function renderAll(ctx) {
   renderEventsPanel(ctx);
   renderLots(ctx);
   renderGenealogy(ctx);
+}
+
+function _ageText(birthDate, today) {
+  const days = daysBetween(birthDate, today);
+  if (days >= 365) {
+    const years = Math.floor(days / 365);
+    const months = Math.floor((days % 365) / 30);
+    return months > 0 ? `${years} an(s) ${months} mois (${days}j)` : `${years} an(s) (${days}j)`;
+  }
+  if (days >= 30) return `${Math.floor(days / 30)} mois (${days}j)`;
+  if (days >= 7)  return `${Math.floor(days / 7)} semaine(s) (${days}j)`;
+  return `${days} jour(s)`;
 }
 
 function getFilteredRabbits(ctx) {

@@ -21,6 +21,8 @@ export function addRabbit(ctx, data) {
     status: data.status || "actif",
     stage: data.stage || getRabbitStage({ birthDate: data.birthDate, stage: data.stage }),
     notes: (data.notes || "").trim(),
+    motherId: (data.motherId || null),
+    fatherId: (data.fatherId || null),
     createdAt: nowISO(),
     updatedAt: nowISO(),
   };

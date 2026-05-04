@@ -1,5 +1,6 @@
 import { daysBetween } from "./utils.js";
 import { getReproInfo } from "./repro.js";
+import { getBreedingStatus } from "./breeding.js";
 
 export const RULES = {
   MIN_GESTATION_DAYS: 28,
@@ -42,16 +43,18 @@ export function validateEvent(state, rabbitId, draft, opts = {}) {
     if (male.sex !== "M") return { ok: false, error: "Saillie : sélection invalide (pas un mâle)." };
     if (male.status !== "actif") return { ok: false, error: "Saillie : le mâle doit être actif." };
 
-    // Bloquer si gestation déjà en cours
-    const repro = getReproInfo(state, r);
-    if (repro?.lastMating?.date) {
-      const lastMatingDate = repro.lastMating.date;
-      const lastBirthDate = repro?.lastBirth?.date;
-      const pregnant = !lastBirthDate || lastBirthDate < lastMatingDate;
-      if (pregnant) {
-        return { ok: false, error: "Impossible : une gestation est déjà en cours pour cette femelle." };
-      }
+    // Vérification du statut reproduction (maturité, gestation, allaitement, repos)
+    const breedingStatus = getBreedingStatus(r, state, date);
+    const blockers = {
+      trop_jeune:   `Femelle trop jeune. Disponible le ${breedingStatus.availableFrom}.`,
+      gestante:     "Une gestation est déjà en cours pour cette femelle.",
+      allaitement:  `Femelle en allaitement. Disponible le ${breedingStatus.availableFrom}.`,
+      repos:        `Femelle en repos post-sevrage. Disponible le ${breedingStatus.availableFrom}.`,
+    };
+    if (blockers[breedingStatus.status]) {
+      return { ok: false, error: blockers[breedingStatus.status] };
     }
+
     return { ok: true };
   }
 
