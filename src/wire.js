@@ -123,6 +123,18 @@ export function wireDynamic(ctx) {
     });
   });
 
+  // Bouton "Ajouter une pesée" depuis la section poids de la fiche
+  document.querySelectorAll("[data-quick-weight]").forEach(node => {
+    node.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = node.dataset.quickWeight;
+      if (!id) return;
+      ctx.selectedRabbitId = id;
+      openModal(el, "Peser ce lapin", eventFormHTML("pesée"));
+      wireEventForm(ctx);
+    });
+  });
+
   document.querySelectorAll("[data-gene-focus]").forEach(node => {
     node.addEventListener("click", () => {
       const id = node.dataset.geneFocus;
@@ -516,23 +528,18 @@ function wireRabbitForm(ctx, existingRabbit) {
   });
 }
 
-function eventFormHTML() {
+function eventFormHTML(preType = "autre") {
   const today = new Date().toISOString().slice(0,10);
+  const types = ["saillie","mise_bas","sevrage","vaccin","traitement","pesée","vente","décès","autre"];
+  const labels = { saillie:"Saillie", mise_bas:"Mise-bas", sevrage:"Sevrage", vaccin:"Vaccin", traitement:"Traitement", "pesée":"Pesée", vente:"Vente", "décès":"Décès", autre:"Autre" };
+  const options = types.map(t => `<option value="${t}" ${t === preType ? "selected" : ""}>${labels[t]}</option>`).join("");
   return `
     <form id="eventForm" class="form">
       <div class="row2">
         <div class="field">
           <div class="label">Type</div>
           <select class="input" name="type" id="evType">
-            <option value="saillie">Saillie</option>
-            <option value="mise_bas">Mise-bas</option>
-            <option value="sevrage">Sevrage</option>
-            <option value="vaccin">Vaccin</option>
-            <option value="traitement">Traitement</option>
-            <option value="pesée">Pesée</option>
-            <option value="vente">Vente</option>
-            <option value="décès">Décès</option>
-            <option value="autre" selected>Autre</option>
+            ${options}
           </select>
         </div>
         <div class="field">

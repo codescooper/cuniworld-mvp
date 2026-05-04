@@ -1,6 +1,7 @@
 import { escapeHTML, escapeAttr, formatDate, rabbitStatusBadge, sexLabel, daysBetween, getRabbitStage, stageBadge } from "./utils.js";
 import { getReproInfo } from "./repro.js";
 import { getBreedingStatus, breedingStatusBadge } from "./breeding.js";
+import { getRabbitWeightHistory, getCurrentWeight, getTotalHerdWeightEvolution, renderWeightSVG } from "./weightService.js";
 import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
 import { buildLots, lotBadge } from "./lots.js";
 import { getReminders, reminderLabel } from "./health.js";
@@ -64,6 +65,32 @@ export function renderDashboard(ctx) {
     el.dash.innerHTML += `<div style="grid-column:1/-1;margin-top:6px">${list}</div>`;
   } else {
     el.dash.innerHTML += `<div style="grid-column:1/-1;margin-top:6px" class="small">Aucun rappel vaccin/traitement à venir.</div>`;
+  }
+
+  // ── Tendance poids cheptel ───────────────────────────────────────────────────
+  const herdEvo    = getTotalHerdWeightEvolution(state);
+  const herdPoints = herdEvo.map(p => ({ label: p.date, value: p.totalWeightKg }));
+
+  if (herdEvo.length > 0) {
+    const first   = herdEvo[0].totalWeightKg;
+    const last    = herdEvo[herdEvo.length - 1].totalWeightKg;
+    const gain    = last - first;
+    const gainStr = `${gain >= 0 ? "+" : ""}${gain.toFixed(2)} kg`;
+    const evoLine = herdEvo.length > 1
+      ? `<div>Évolution:</div><div>${first.toFixed(2)} → ${last.toFixed(2)} kg (${gainStr})</div>`
+      : "";
+
+    el.dash.innerHTML += `
+      <div style="grid-column:1/-1;margin-top:18px;padding-top:14px;border-top:1px solid #eee">
+        <div style="font-weight:700;margin-bottom:8px">⚖️ Tendance du poids du cheptel</div>
+        <div class="kv" style="margin-bottom:10px;max-width:340px">
+          <div>Poids total actuel:</div><div><strong>${last.toFixed(2)} kg</strong></div>
+          ${evoLine}
+          <div>Dates de mesure:</div><div>${herdEvo.length}</div>
+        </div>
+        ${renderWeightSVG(herdPoints, { id: "herd", color: "#4f7942" })}
+      </div>
+    `;
   }
 }
 
@@ -185,6 +212,10 @@ export function renderRabbitDetails(ctx) {
       </div>
     ` : "";
 
+  // ── Poids individuel ────────────────────────────────────────────────────────
+  const weightHistory = getRabbitWeightHistory(state, r.id);
+  const weightHTML    = _buildWeightSection(r, weightHistory, todayISO);
+
   const profilePhoto = getProfilePhoto(state, r.id);
   const allPhotos = getPhotoHistory(state, r.id);
 
@@ -253,6 +284,8 @@ export function renderRabbitDetails(ctx) {
     ${gestationHTML}
     ${litterHTML}
     ${genealogyHTML}
+
+    ${weightHTML}
 
     <div class="sep"></div>
 
@@ -345,6 +378,63 @@ export function renderAll(ctx) {
   renderEventsPanel(ctx);
   renderLots(ctx);
   renderGenealogy(ctx);
+}
+
+function _buildWeightSection(r, history, todayISO) {
+  const isActive = r.status === "actif";
+  const points = history.map(w => ({ label: w.date, value: w.weightKg }));
+  const current = history.length > 0 ? history[history.length - 1] : null;
+  const first   = history.length > 1 ? history[0] : null;
+
+  let statsHTML = "";
+  if (current) {
+    const gainTotal = first ? (current.weightKg - first.weightKg) : null;
+    const days      = first ? daysBetween(first.date, current.date) : 0;
+    const avgPerDay = (gainTotal !== null && days > 0) ? gainTotal / days : null;
+
+    const gainStr = gainTotal !== null
+      ? `${gainTotal >= 0 ? "+" : ""}${gainTotal.toFixed(3)} kg`
+      : null;
+    const avgStr = avgPerDay !== null
+      ? `${avgPerDay >= 0 ? "+" : ""}${(avgPerDay * 1000).toFixed(1)} g/j`
+      : null;
+
+    statsHTML = `
+      <div class="kv" style="margin-bottom:10px">
+        <div>Poids actuel:</div><div><strong>${current.weightKg.toFixed(3)} kg</strong></div>
+        ${gainStr ? `<div>Gain total:</div><div>${gainStr}</div>` : ""}
+        ${avgStr  ? `<div>Gain moyen:</div><div>${avgStr}</div>` : ""}
+        <div>Pesées enregistrées:</div><div>${history.length}</div>
+      </div>`;
+  }
+
+  // Historique condensé (max 5 dernières pesées)
+  const recent = history.slice().reverse().slice(0, 5);
+  const histHTML = recent.length > 0
+    ? `<div style="margin-top:8px">
+        <div class="small muted" style="margin-bottom:4px">Dernières pesées</div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          ${recent.map(w => `
+            <div style="display:flex;justify-content:space-between;font-size:.85rem;padding:4px 6px;background:#f9f9f7;border-radius:6px">
+              <span style="color:#666">${formatDate(w.date)}</span>
+              <strong>${w.weightKg.toFixed(3)} kg</strong>
+            </div>`).join("")}
+        </div>
+      </div>`
+    : `<div class="muted small">Aucune pesée enregistrée.</div>`;
+
+  const addBtn = isActive
+    ? `<button class="btn secondary" data-quick-weight="${escapeAttr(r.id)}" style="font-size:.85rem;margin-top:10px">⚖️ Ajouter une pesée</button>`
+    : "";
+
+  return `
+    <div class="sep"></div>
+    <div style="font-weight:700;margin-bottom:8px">⚖️ Évolution du poids</div>
+    ${statsHTML}
+    ${points.length > 0 ? renderWeightSVG(points, { id: r.id.replace(/[^a-z0-9]/gi, "x"), color: "#2e7d7a", height: 170 }) : ""}
+    ${histHTML}
+    ${addBtn}
+  `;
 }
 
 function _ageText(birthDate, today) {

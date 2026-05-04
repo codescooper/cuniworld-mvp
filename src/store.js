@@ -1,4 +1,5 @@
 import { saveData, loadData } from "./storage.js";
+import { migrateRabbitWeightData } from "./weightService.js";
 
 const KEY = "cuniworld_mvp_state";
 
@@ -39,9 +40,11 @@ function migrate(state) {
 
 export const Store = {
   load() {
-    // loadData réinitialise automatiquement si le JSON est corrompu
     const raw = loadData(KEY, null);
-    return migrate(raw ?? defaultState());
+    const state = migrate(raw ?? defaultState());
+    // Migration one-shot : champs weight/currentWeight → événements pesée
+    if (migrateRabbitWeightData(state)) saveData(KEY, state);
+    return state;
   },
 
   save(state) {
