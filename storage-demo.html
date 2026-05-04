@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Demo – Auto-save localStorage</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f5f5f0;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e0e0d8;
+      border-radius: 12px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    }
+
+    h1 { font-size: 1.25rem; margin-bottom: .25rem; }
+    p.subtitle { font-size: .875rem; color: #666; margin-bottom: 1.75rem; }
+
+    label { display: block; font-size: .875rem; font-weight: 600; margin-bottom: .4rem; }
+
+    input[type="text"], textarea {
+      width: 100%;
+      padding: .6rem .8rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: .9375rem;
+      font-family: inherit;
+      transition: border-color .15s;
+      resize: vertical;
+    }
+    input[type="text"]:focus, textarea:focus {
+      outline: none;
+      border-color: #4f7942;
+    }
+
+    textarea { min-height: 110px; }
+
+    .field { margin-bottom: 1.25rem; }
+
+    /* Indicateur de statut */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      font-size: .8125rem;
+      color: #666;
+      min-height: 1.5rem;
+      margin-top: .5rem;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: #ccc;
+      transition: background .3s;
+    }
+    .dot.pending  { background: #f0a500; }
+    .dot.saved    { background: #4f7942; }
+    .dot.error    { background: #d04040; }
+
+    .actions {
+      display: flex;
+      gap: .75rem;
+      margin-top: 1.5rem;
+    }
+
+    button {
+      padding: .5rem 1.1rem;
+      border-radius: 8px;
+      border: none;
+      font-size: .875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    button:hover { opacity: .85; }
+
+    .btn-reset {
+      background: #f5f5f0;
+      border: 1px solid #ccc;
+      color: #333;
+    }
+    .btn-clear {
+      background: #fdf0f0;
+      border: 1px solid #e0b0b0;
+      color: #d04040;
+    }
+
+    .hint {
+      margin-top: 1.5rem;
+      padding: .75rem 1rem;
+      background: #f0f7ee;
+      border-left: 3px solid #4f7942;
+      border-radius: 0 8px 8px 0;
+      font-size: .8125rem;
+      color: #3a5e31;
+    }
+
+    #cross-tab-notice {
+      display: none;
+      margin-top: .75rem;
+      padding: .5rem .75rem;
+      background: #fffbe6;
+      border: 1px solid #f0d060;
+      border-radius: 8px;
+      font-size: .8125rem;
+      color: #7a5e00;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>Auto-save avec localStorage</h1>
+  <p class="subtitle">
+    Saisissez du texte – les données sont sauvegardées automatiquement
+    et restaurées après un refresh.
+  </p>
+
+  <div class="field">
+    <label for="input-name">Votre prénom</label>
+    <input id="input-name" type="text" placeholder="Ex : Alice" autocomplete="off" />
+  </div>
+
+  <div class="field">
+    <label for="input-notes">Notes libres</label>
+    <textarea id="input-notes" placeholder="Écrivez quelque chose…"></textarea>
+  </div>
+
+  <div class="status-bar">
+    <div id="dot" class="dot"></div>
+    <span id="status-text">En attente de saisie…</span>
+  </div>
+
+  <div class="actions">
+    <button class="btn-reset" id="btn-reload">↺ Simuler un refresh</button>
+    <button class="btn-clear" id="btn-clear">Effacer les données</button>
+  </div>
+
+  <div class="hint">
+    💡 Ouvrez cette page dans un <strong>second onglet</strong> et tapez du texte :
+    les deux onglets se synchronisent en temps réel.
+  </div>
+
+  <div id="cross-tab-notice">
+    ↔ Données reçues depuis un autre onglet !
+  </div>
+</div>
+
+<script type="module">
+  /**
+   * Démonstration de src/storage.js
+   *
+   * Concepts illustrés :
+   *   1. loadData  → restauration après refresh
+   *   2. createAutoSave → écriture debouncée (300ms)
+   *   3. watch     → synchronisation entre onglets
+   */
+  import { loadData, deleteData, createAutoSave, watch } from "./src/storage.js";
+
+  // ── Clé de stockage ───────────────────────────────────────────────────────
+  const STORAGE_KEY = "demo-form";
+
+  // Valeur par défaut : structure de notre formulaire
+  const DEFAULT = { name: "", notes: "" };
+
+  // ── Références DOM ────────────────────────────────────────────────────────
+  const inputName  = document.getElementById("input-name");
+  const inputNotes = document.getElementById("input-notes");
+  const dot        = document.getElementById("dot");
+  const statusText = document.getElementById("status-text");
+  const btnReload  = document.getElementById("btn-reload");
+  const btnClear   = document.getElementById("btn-clear");
+  const crossTabNotice = document.getElementById("cross-tab-notice");
+
+  // ── Utilitaires UI ────────────────────────────────────────────────────────
+  function setStatus(type, message) {
+    dot.className = `dot ${type}`;
+    statusText.textContent = message;
+  }
+
+  function fillForm(data) {
+    inputName.value  = data.name  ?? "";
+    inputNotes.value = data.notes ?? "";
+  }
+
+  // ── 1. Restauration au chargement ─────────────────────────────────────────
+  // loadData retourne DEFAULT si la clé est absente ou si le JSON est corrompu.
+  const saved = loadData(STORAGE_KEY, DEFAULT);
+  fillForm(saved);
+
+  if (saved.name || saved.notes) {
+    const time = new Date().toLocaleTimeString();
+    setStatus("saved", `Données restaurées à ${time}`);
+  }
+
+  // ── 2. Auto-save debouncé (300 ms) ────────────────────────────────────────
+  // createAutoSave retourne une fonction qui attend 300 ms d'inactivité
+  // avant d'écrire dans localStorage, pour ne pas saturer les I/O.
+  const autoSave = createAutoSave(STORAGE_KEY, 300);
+
+  function readForm() {
+    return { name: inputName.value, notes: inputNotes.value };
+  }
+
+  function onInput() {
+    setStatus("pending", "Sauvegarde en cours…");
+    autoSave(readForm());
+    // Après le délai, le dot passe au vert via l'observateur ci-dessous
+  }
+
+  inputName.addEventListener("input", onInput);
+  inputNotes.addEventListener("input", onInput);
+
+  // ── 3. Observateur local : feedback visuel après écriture ─────────────────
+  // watch est notifié par saveData, donc exactement après chaque écriture effective.
+  watch(STORAGE_KEY, (data, key) => {
+    if (data === undefined) return; // deleteData → géré séparément
+    const time = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setStatus("saved", `Sauvegardé à ${time}`);
+  });
+
+  // ── 4. Synchronisation cross-onglet ───────────────────────────────────────
+  // L'événement "storage" natif est relayé par storage.js vers watch().
+  // On distingue l'origine via un flag pour l'UI.
+  let isCrossTab = false;
+
+  window.addEventListener("storage", () => {
+    isCrossTab = true;
+  });
+
+  // On patche l'observateur existant pour détecter l'origine
+  watch(STORAGE_KEY, (data) => {
+    if (!isCrossTab || data === undefined) return;
+    isCrossTab = false;
+    fillForm(data);
+    crossTabNotice.style.display = "block";
+    setTimeout(() => (crossTabNotice.style.display = "none"), 3000);
+  });
+
+  // ── Boutons ───────────────────────────────────────────────────────────────
+
+  // Simule un refresh : force la sauvegarde en attente puis recharge
+  btnReload.addEventListener("click", () => {
+    autoSave.flush();                        // écriture immédiate avant reload
+    location.reload();
+  });
+
+  // Efface les données et réinitialise le formulaire
+  btnClear.addEventListener("click", () => {
+    autoSave.cancel();
+    deleteData(STORAGE_KEY);
+    fillForm(DEFAULT);
+    setStatus("", "Données effacées");
+  });
+</script>
+
+</body>
+</html>
