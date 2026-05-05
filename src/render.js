@@ -6,6 +6,7 @@ import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
 import { buildLots, lotBadge } from "./lots.js";
 import { getReminders, reminderLabel } from "./health.js";
 import { getPhotoHistory, getProfilePhoto } from "./photos.js";
+import { getTodayFarmActions } from "./farmActionsService.js";
 
 
 
@@ -34,7 +35,7 @@ export function renderDashboard(ctx) {
     .filter(x => x.daysLeft >= 0 && x.daysLeft <= 7)
     .sort((a,b) => a.daysLeft - b.daysLeft);
 
-  el.dash.innerHTML = `
+  el.dash.innerHTML = _renderFarmActionsCard(ctx) + `
     <div class="tile"><div class="n">${total}</div><div class="t">Lapins (total)</div></div>
     <div class="tile"><div class="n">${actifs}</div><div class="t">Actifs</div></div>
     <div class="tile"><div class="n">${femelles}</div><div class="t">Femelles actives</div></div>
@@ -467,6 +468,69 @@ function _buildWeightSection(r, history, todayISO) {
     ${points.length > 0 ? renderWeightSVG(points, { id: r.id.replace(/[^a-z0-9]/gi, "x"), color: "#2e7d7a", height: 170 }) : ""}
     ${histHTML}
     ${addBtn}
+  `;
+}
+
+// ── "Aujourd'hui dans la ferme" card ──────────────────────────────────────────
+
+function _renderFarmActionsCard(ctx) {
+  const today = new Date().toISOString().slice(0, 10);
+  const { urgent, today: todayList, opportunities, total, summary } = getTodayFarmActions(ctx.state, today);
+
+  if (total === 0) {
+    return `
+      <div class="farm-actions-card" id="farmActionsCard" style="grid-column:1/-1">
+        <div class="farm-actions-header">
+          <span class="farm-actions-title">📋 Aujourd'hui dans la ferme</span>
+          <span class="farm-actions-ok">✅ Tout est à jour !</span>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="farm-actions-card" id="farmActionsCard" style="grid-column:1/-1">
+      <div class="farm-actions-header">
+        <span class="farm-actions-title">📋 Aujourd'hui dans la ferme</span>
+        <span class="farm-actions-summary">${escapeHTML(summary)}</span>
+      </div>
+      ${urgent.length > 0 ? _farmSectionHTML('urgent', '🔴 Urgent', urgent, true) : ''}
+      ${todayList.length > 0 ? _farmSectionHTML('today', "🟡 À faire aujourd'hui", todayList, urgent.length === 0) : ''}
+      ${opportunities.length > 0 ? _farmSectionHTML('opportunity', '🟢 Opportunités', opportunities, false) : ''}
+    </div>
+  `;
+}
+
+function _farmSectionHTML(key, title, actions, open) {
+  return `
+    <details class="farm-section farm-section-${key}" ${open ? 'open' : ''}>
+      <summary class="farm-section-header">
+        ${escapeHTML(title)} <span class="farm-section-count">${actions.length}</span>
+      </summary>
+      <div class="farm-section-list">
+        ${actions.map(_farmActionCardHTML).join('')}
+      </div>
+    </details>
+  `;
+}
+
+function _farmActionCardHTML(a) {
+  return `
+    <div class="farm-action-card" data-farm-action-id="${escapeAttr(a.id)}">
+      <span class="farm-action-icon">${a.icon}</span>
+      <div class="farm-action-body">
+        <div class="farm-action-label">${escapeHTML(a.label)}</div>
+        <div class="farm-action-meta">${escapeHTML(a.meta)}</div>
+      </div>
+      <div class="farm-action-btns">
+        <button class="btn farm-action-treat"
+          data-farm-treat="${escapeAttr(a.id)}"
+          data-farm-action="${escapeAttr(a.action)}"
+          data-farm-rabbit="${escapeAttr(a.rabbitId || '')}">Traiter</button>
+        <button class="btn ghost farm-action-dismiss"
+          data-farm-dismiss="${escapeAttr(a.id)}">Ignorer</button>
+      </div>
+    </div>
   `;
 }
 

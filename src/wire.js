@@ -5,6 +5,7 @@ import { compressImage } from "./photos.js";
 import { isNameFromPool, isNameAvailable, isNameUsedByLivingRabbit, suggestAvailableRabbitName } from "./rabbitNameService.js";
 import { openWeightCheckModal } from "./weightCheck.js";
 import { openPhotoCheckModal, openSinglePhotoModal } from "./photoCheck.js";
+import { dismissActionForToday } from "./farmActionsService.js";
 
 
 export function wireStatic(ctx) {
@@ -130,6 +131,9 @@ export function wireDynamic(ctx) {
   if (btnWeightCheck) {
     btnWeightCheck.addEventListener("click", () => openWeightCheckModal(ctx));
   }
+
+  // Carte "Aujourd'hui dans la ferme" — Traiter / Ignorer
+  wireFarmActions(ctx);
 
   // Bouton "Ajouter une photo" depuis la fiche lapin
   const btnPhotoSingle = document.getElementById("btnPhotoCheckSingle");
@@ -261,6 +265,43 @@ export function wireDynamic(ctx) {
     });
   });
 
+}
+
+/* -------- Farm Actions wiring -------- */
+
+function wireFarmActions(ctx) {
+  // "Ignorer aujourd'hui" — dismiss et re-render
+  document.querySelectorAll("[data-farm-dismiss]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      dismissActionForToday(btn.dataset.farmDismiss);
+      ctx.render();
+    });
+  });
+
+  // "Traiter" — route vers le bon module
+  document.querySelectorAll("[data-farm-treat]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const action   = btn.dataset.farmAction;
+      const rabbitId = btn.dataset.farmRabbit;
+
+      if (action === 'weightCheck') {
+        openWeightCheckModal(ctx);
+      } else if (action === 'photoCheck') {
+        if (rabbitId) openSinglePhotoModal(ctx, rabbitId);
+        else openPhotoCheckModal(ctx);
+      } else if (action === 'openRabbit' && rabbitId) {
+        ctx.selectedRabbitId = rabbitId;
+        // Ouvrir le panneau lapins si pas déjà ouvert
+        const panel = document.getElementById('panel-rabbits');
+        if (panel && panel.style.display === 'none') {
+          document.querySelector('.menu-card[data-panel="rabbits"]')?.click();
+        }
+        ctx.render();
+      }
+    });
+  });
 }
 
 /* -------- Forms HTML + wiring -------- */
