@@ -454,6 +454,12 @@ textarea.input { min-height: 90px; resize: vertical }
 .item:hover  { border-color: rgba(26,122,71,0.3); box-shadow: var(--shadow-sm) }
 .item.active { border-color: var(--color-primary); background: var(--color-primary-light); box-shadow: var(--shadow-sm) }
 
+/* Items compacts dans le split layout */
+.rl-item { min-height: 48px; padding: var(--space-2) var(--space-3) }
+.rl-event-btn { opacity: 0; transition: opacity 150ms }
+.rl-item:hover .rl-event-btn,
+.rl-item.active .rl-event-btn { opacity: 1 }
+
 /* ================================================================
    BADGES
    ================================================================ */
@@ -551,7 +557,93 @@ textarea.input { min-height: 90px; resize: vertical }
 .field { display: flex; flex-direction: column }
 
 /* ================================================================
-   TWO COLUMNS (Détails + Événements)
+   SPLIT LAYOUT LAPINS (liste ← → détail)
+   ================================================================ */
+#panel-rabbits .panel-body { padding: 0 }
+
+.rl-body {
+  display: flex;
+  align-items: stretch;
+}
+
+/* Colonne gauche : liste scrollable */
+.rl-left {
+  width: 340px;
+  min-width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;
+  max-height: 76vh;
+  padding: var(--space-4);
+  background: var(--color-bg);
+}
+
+.rl-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  position: sticky;
+  top: 0;
+  background: var(--color-bg);
+  z-index: 1;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-3);
+}
+
+/* Colonne droite : fiche scrollable */
+.rl-right {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 76vh;
+  padding: var(--space-4);
+}
+
+/* Message état vide dans la colonne droite */
+.rl-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 220px;
+  color: var(--color-muted);
+  text-align: center;
+  gap: var(--space-3);
+}
+.rl-empty-state .rl-empty-icon { font-size: 2.5rem; opacity: .4 }
+.rl-empty-state .rl-empty-text { font-size: var(--font-size-sm) }
+
+/* Bouton "← Retour" : uniquement sur mobile */
+#btnBack { display: none }
+
+/* ─── Mobile : affichage alternatif liste / détail ─── */
+@media (max-width: 900px) {
+  .rl-body { flex-direction: column }
+
+  .rl-left {
+    width: 100%;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .rl-right {
+    max-height: none;
+    padding: var(--space-3);
+  }
+
+  /* Quand un lapin est sélectionné sur mobile → cache la liste, montre le détail */
+  #panel-rabbits.rabbit-selected .rl-left { display: none }
+  #panel-rabbits:not(.rabbit-selected) .rl-right { display: none }
+
+  /* Bouton retour visible sur mobile */
+  #btnBack { display: inline-flex }
+}
+
+/* ================================================================
+   TWO COLUMNS (Détails + Événements) [conservé pour autres usages]
    ================================================================ */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4) }
 .two-col .col h3 {

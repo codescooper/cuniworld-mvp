@@ -116,20 +116,25 @@ export function renderRabbitList(ctx) {
 
   el.rabbitList.innerHTML = rabbits.map(r => {
     const active = r.id === ctx.selectedRabbitId ? "active" : "";
-    const stage = getRabbitStage(r);
-    const repro = getReproInfo(ctx.state, r);
-    const pregnantBadge = (repro?.isPregnant) ? `<span class="badge accent">🤰 Gestante</span>` : "";
+    const stage  = getRabbitStage(r);
+    const repro  = getReproInfo(ctx.state, r);
+    const pregnantBadge = repro?.isPregnant ? `<span class="badge accent">🤰</span>` : "";
     return `
-      <div class="item ${active}" data-testid="rabbit-item" data-rabbit="${r.id}">
-        <div>
-          <div><strong>${escapeHTML(r.code)}</strong> — ${escapeHTML(r.name)} <span class="badge">${sexLabel(r.sex)}</span> ${stageBadge(stage)} ${pregnantBadge}</div>
-          <div class="small">Race: ${escapeHTML(r.breed || "—")} · Cage: ${escapeHTML(r.cage || "—")} · Naissance: ${escapeHTML(formatDate(r.birthDate))}</div>
-          <div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap">
-            <button class="btn ghost" type="button" data-open-rabbit="${r.id}">Voir</button>
-            <button class="btn ghost" type="button" data-add-event="${r.id}">Nouvel événement</button>
+      <div class="item rl-item ${active}" data-testid="rabbit-item" data-rabbit="${r.id}" style="cursor:pointer">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <strong>${escapeHTML(r.code)}</strong>
+            <span>${escapeHTML(r.name)}</span>
+            <span class="badge">${sexLabel(r.sex)}</span>
+            ${stageBadge(stage)}
+            ${pregnantBadge}
+            ${rabbitStatusBadge(r.status)}
+          </div>
+          <div class="small" style="margin-top:2px;color:var(--color-muted)">
+            ${escapeHTML(r.breed || "—")} · ${escapeHTML(r.cage || "—")} · ${escapeHTML(formatDate(r.birthDate))}
           </div>
         </div>
-        <div>${rabbitStatusBadge(r.status)}</div>
+        <button class="btn ghost rl-event-btn" type="button" data-add-event="${r.id}" title="Nouvel événement" style="flex-shrink:0;padding:4px 8px;font-size:1rem">＋</button>
       </div>
     `;
   }).join("");
@@ -138,13 +143,27 @@ export function renderRabbitList(ctx) {
 export function renderRabbitDetails(ctx) {
   const { state, el } = ctx;
 
+  // Toggle classe mobile master/detail
+  const panel = document.getElementById("panel-rabbits");
+  panel?.classList.toggle("rabbit-selected", !!ctx.selectedRabbitId);
+
   if (!ctx.selectedRabbitId) {
-    el.rabbitDetails.innerHTML = `<div class="muted">Sélectionne un lapin dans la liste.</div>`;
+    el.rabbitDetails.innerHTML = `
+      <div class="rl-empty-state">
+        <div class="rl-empty-icon">🐇</div>
+        <div class="rl-empty-text">Sélectionne un lapin dans la liste<br>pour voir ses détails.</div>
+      </div>`;
     return;
   }
   const r = state.rabbits.find(x => x.id === ctx.selectedRabbitId);
   if (!r) {
-    el.rabbitDetails.innerHTML = `<div class="muted">Lapin introuvable.</div>`;
+    ctx.selectedRabbitId = null;
+    panel?.classList.remove("rabbit-selected");
+    el.rabbitDetails.innerHTML = `
+      <div class="rl-empty-state">
+        <div class="rl-empty-icon">🐇</div>
+        <div class="rl-empty-text">Sélectionne un lapin dans la liste<br>pour voir ses détails.</div>
+      </div>`;
     return;
   }
   const stage = getRabbitStage(r);

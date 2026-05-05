@@ -110,7 +110,7 @@
         </div>
       </div>
 
-      <!-- Panneau : Lapins (liste + détails + événements) -->
+      <!-- Panneau : Lapins (split layout liste / détail) -->
       <div class="section-panel" id="panel-rabbits" data-panel="rabbits" style="display:none">
         <div class="panel-header">
           <div class="panel-title-group">
@@ -119,42 +119,37 @@
           </div>
           <button class="panel-close" data-close-panel="rabbits" aria-label="Fermer">✕</button>
         </div>
-        <div class="panel-body">
-          <!-- Recherche & filtres -->
-          <div class="row">
-            <input id="q" class="input" placeholder="Rechercher (code, nom, race, cage…)" data-testid="rabbit-search" />
-            <select id="sexFilter" class="input" data-testid="filter-sex">
-              <option value="">Sexe: Tous</option>
-              <option value="F">Femelle</option>
-              <option value="M">Mâle</option>
-              <option value="U">Inconnu</option>
-            </select>
-            <select id="statusFilter" class="input" data-testid="filter-status">
-              <option value="">Statut: Tous</option>
-              <option value="actif">Actif</option>
-              <option value="mort">Mort</option>
-            </select>
-          </div>
-          <div id="rabbitList" class="list" data-testid="rabbit-list"></div>
+        <div class="panel-body rl-body">
 
-          <!-- Détails + événements (sous la liste) -->
-          <div id="rabbitDetailsSection">
-            <div class="sep" style="margin:var(--space-4) 0"></div>
-            <div class="two-col">
-              <div class="col">
-                <h3>Fiche lapin</h3>
-                <div id="rabbitDetails" class="muted" data-testid="rabbit-details">
-                  Sélectionnez un lapin dans la liste.
-                </div>
-              </div>
-              <div class="col">
-                <h3>Historique</h3>
-                <div id="eventsPanel" class="muted" data-testid="events-panel">
-                  Sélectionnez un lapin pour voir ses événements.
-                </div>
+          <!-- COLONNE GAUCHE : recherche + liste -->
+          <div class="rl-left">
+            <div class="rl-search">
+              <input id="q" class="input" placeholder="Rechercher…" data-testid="rabbit-search" />
+              <div class="row" style="gap:var(--space-2)">
+                <select id="sexFilter" class="input" data-testid="filter-sex" style="flex:1">
+                  <option value="">Sexe: Tous</option>
+                  <option value="F">Femelle</option>
+                  <option value="M">Mâle</option>
+                  <option value="U">Inconnu</option>
+                </select>
+                <select id="statusFilter" class="input" data-testid="filter-status" style="flex:1">
+                  <option value="">Statut: Tous</option>
+                  <option value="actif">Actif</option>
+                  <option value="mort">Mort</option>
+                </select>
               </div>
             </div>
+            <div id="rabbitList" class="list" data-testid="rabbit-list"></div>
           </div>
+
+          <!-- COLONNE DROITE : fiche + événements -->
+          <div class="rl-right">
+            <div id="rabbitDetails" class="muted" data-testid="rabbit-details">
+              Sélectionne un lapin pour voir ses détails.
+            </div>
+            <div id="eventsPanel" data-testid="events-panel"></div>
+          </div>
+
         </div>
       </div>
 
