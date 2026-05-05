@@ -264,6 +264,11 @@ wireStatic(ctx);
 
 if (!supabaseConfigured || isE2E) {
   // Mode hors-ligne / tests
+  const authOverlay = document.getElementById("authOverlay");
+  if (authOverlay) {
+    authOverlay.classList.add("hidden");
+    authOverlay.innerHTML = "";
+  }
   if (!isE2E) seedIfEmpty();
   else ["dashboard", "rabbits", "lots"].forEach(openPanel);
   ctx.render();
