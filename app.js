@@ -1,22 +1,25 @@
-// app.js (racine)
 import { Store } from "./src/store.js";
 import { getEls } from "./src/dom.js";
 import { renderAll } from "./src/render.js";
 import { wireStatic, wireDynamic } from "./src/wire.js";
 import { GUIDE_STEPS, getGuideStep, getNextStep, getPrevStep } from "./src/guide.js";
+import { bootWithAuth } from "./src/wireAuth.js";
 
 const el = getEls();
 
 const ctx = {
   Store,
   el,
-  state: Store.load(),
-  selectedRabbitId: null,
-  selectedLotId: null,
+  state:      Store.load(),   // cache local — remplacé par Supabase après auth
+  farmId:     null,
+  farmName:   null,
+  currentUser: null,
+  selectedRabbitId:     null,
+  selectedLotId:        null,
   selectedGeneRabbitId: null,
-  openPanels: new Set(),
-  guideMode: false,
-  currentStep: null,
+  openPanels:    new Set(),
+  guideMode:     false,
+  currentStep:   null,
   completedSteps: new Set(),
 
   render: () => {
@@ -24,7 +27,6 @@ const ctx = {
     wireDynamic(ctx);
     wireGuide(ctx);
     syncMenuCards();
-    // Ouvre automatiquement le panneau lapins quand un lapin est sélectionné
     if (ctx.selectedRabbitId && !ctx.openPanels.has("rabbits")) {
       openPanel("rabbits");
     }
@@ -32,10 +34,10 @@ const ctx = {
 };
 
 // ================================================================
-// SEED INITIAL
+// SEED INITIAL (mode hors-ligne uniquement)
 // ================================================================
 function seedIfEmpty() {
-  if (ctx.state.rabbits.length > 0) return;
+  if (ctx.state.rabbits.length > 0 || ctx.farmId) return;
   const { uid, nowISO } = Store.helpers;
 
   const a = {
@@ -52,41 +54,34 @@ function seedIfEmpty() {
   };
 
   ctx.state.rabbits = [a, b];
-  ctx.state.events = [
-    { id: uid("ev"), rabbitId: a.id, type: "vaccin",     date: "2026-01-10", notes: "Rappel",         data: {},                      createdAt: nowISO() },
-    { id: uid("ev"), rabbitId: a.id, type: "mise_bas",   date: "2026-01-12", notes: "Première portée", data: { born: 8, alive: 7, dead: 1 }, createdAt: nowISO() },
-    { id: uid("ev"), rabbitId: b.id, type: "traitement", date: "2026-01-08", notes: "Vermifuge",        data: {},                      createdAt: nowISO() },
+  ctx.state.events  = [
+    { id: uid("ev"), rabbitId: a.id, type: "vaccin",    date: "2026-01-10", notes: "Rappel",          data: {},                           createdAt: nowISO() },
+    { id: uid("ev"), rabbitId: a.id, type: "mise_bas",  date: "2026-01-12", notes: "Première portée", data: { born: 8, alive: 7, dead: 1 }, createdAt: nowISO() },
+    { id: uid("ev"), rabbitId: b.id, type: "traitement",date: "2026-01-08", notes: "Vermifuge",        data: {},                           createdAt: nowISO() },
   ];
-
   ctx.state = Store.save(ctx.state);
 }
 
 // ================================================================
-// SYSTÈME DE PANNEAUX
+// PANNEAUX
 // ================================================================
-
-/** Ouvre un panneau (sans effet si déjà ouvert). */
 function openPanel(name) {
   if (ctx.openPanels.has(name)) return;
   ctx.openPanels.add(name);
-
   const panel = document.getElementById(`panel-${name}`);
   if (panel) {
     panel.classList.remove("panel-closing");
     panel.style.display = "";
-    void panel.offsetWidth; // force reflow pour rejouer l'animation
+    void panel.offsetWidth;
   }
-
   syncMenuCards();
   syncEmptyState();
   savePanelState();
 }
 
-/** Ferme un panneau avec animation. */
 function closePanel(name) {
   if (!ctx.openPanels.has(name)) return;
   ctx.openPanels.delete(name);
-
   const panel = document.getElementById(`panel-${name}`);
   if (panel) {
     panel.classList.add("panel-closing");
@@ -97,60 +92,49 @@ function closePanel(name) {
       }
     }, 220);
   }
-
   syncMenuCards();
   syncEmptyState();
   savePanelState();
 }
 
-/** Bascule l'état d'un panneau. */
 function togglePanel(name) {
-  if (ctx.openPanels.has(name)) closePanel(name);
-  else                           openPanel(name);
+  if (ctx.openPanels.has(name)) closePanel(name); else openPanel(name);
 }
 
-/** Met à jour l'état visuel des cartes du menu. */
 function syncMenuCards() {
   document.querySelectorAll(".menu-card[data-panel]").forEach(card => {
     card.classList.toggle("active", ctx.openPanels.has(card.dataset.panel));
   });
 }
 
-/** Affiche/masque l'état vide selon le nombre de panneaux ouverts. */
 function syncEmptyState() {
   const empty = document.getElementById("emptyState");
   if (empty) empty.style.display = ctx.openPanels.size === 0 ? "" : "none";
 }
 
-/** Persiste la liste des panneaux ouverts. */
 function savePanelState() {
   try { localStorage.setItem("openPanels", JSON.stringify([...ctx.openPanels])); } catch (_) {}
 }
 
 // ================================================================
-// CÂBLAGE DU MENU ET DES PANNEAUX (une seule fois à l'init)
+// MENU
 // ================================================================
 function wireMenuCards() {
-  // Clics sur les cartes du menu → toggle panneau
   document.querySelectorAll(".menu-card[data-panel]").forEach(card => {
     card.addEventListener("click", () => togglePanel(card.dataset.panel));
   });
 
-  // Délégation : boutons de fermeture dans les panneaux
   document.getElementById("panelsContainer")?.addEventListener("click", e => {
     const btn = e.target.closest("[data-close-panel]");
     if (btn) closePanel(btn.dataset.closePanel);
   });
 
-  // Auto-bascule vers le panneau lapins quand on clique sur un lapin
-  // (sur desktop aussi, pour ouvrir le panneau si fermé)
   document.addEventListener("click", e => {
     if (e.target.closest("[data-open-rabbit]") && !ctx.openPanels.has("rabbits")) {
       openPanel("rabbits");
     }
   });
 
-  // Restaure les panneaux sauvegardés
   try {
     const saved = JSON.parse(localStorage.getItem("openPanels") || "[]");
     saved.forEach(name => openPanel(name));
@@ -160,21 +144,17 @@ function wireMenuCards() {
 }
 
 // ================================================================
-// CÂBLAGE DU GUIDE
+// GUIDE
 // ================================================================
 function wireGuide(ctx) {
   const guideToggle = document.getElementById("guideToggle");
   const guideOverlay = document.getElementById("guideOverlay");
-  const guideClose   = document.getElementById("guideClose");
-  const guidePrev    = document.getElementById("guidePrev");
-  const guideNext    = document.getElementById("guideNext");
-
   if (!guideToggle) return;
 
   guideToggle.addEventListener("change", () => {
     if (guideToggle.checked) {
-      ctx.guideMode = true;
-      ctx.currentStep = GUIDE_STEPS[0].id;
+      ctx.guideMode    = true;
+      ctx.currentStep  = GUIDE_STEPS[0].id;
       ctx.completedSteps.clear();
       updateGuideDisplay();
     } else {
@@ -183,18 +163,18 @@ function wireGuide(ctx) {
     }
   });
 
-  guideClose?.addEventListener("click", () => {
+  document.getElementById("guideClose")?.addEventListener("click", () => {
     guideToggle.checked = false;
     ctx.guideMode = false;
     guideOverlay.classList.add("hidden");
   });
 
-  guidePrev?.addEventListener("click", () => {
+  document.getElementById("guidePrev")?.addEventListener("click", () => {
     const prev = getPrevStep(ctx.currentStep);
     if (prev) { ctx.currentStep = prev.id; updateGuideDisplay(); }
   });
 
-  guideNext?.addEventListener("click", () => {
+  document.getElementById("guideNext")?.addEventListener("click", () => {
     const next = getNextStep(ctx.currentStep);
     ctx.completedSteps.add(ctx.currentStep);
     if (next) {
@@ -210,25 +190,16 @@ function wireGuide(ctx) {
   function updateGuideDisplay() {
     const step = getGuideStep(ctx.currentStep);
     if (!step) return;
-
     const stepIdx  = GUIDE_STEPS.findIndex(s => s.id === step.id);
     const progress = ((stepIdx + 1) / GUIDE_STEPS.length) * 100;
 
-    const guideTitle       = document.getElementById("guideTitle");
-    const guideStepNumber  = document.getElementById("guideStepNumber");
-    const guideDescription = document.getElementById("guideDescription");
+    document.getElementById("guideTitle")?.textContent       = step.title;
+    document.getElementById("guideStepNumber")?.textContent  = `Étape ${stepIdx + 1}/${GUIDE_STEPS.length}`;
+    document.getElementById("guideDescription")?.textContent = step.description;
 
-    if (guideTitle)       guideTitle.textContent       = step.title;
-    if (guideStepNumber)  guideStepNumber.textContent  = `Étape ${stepIdx + 1}/${GUIDE_STEPS.length}`;
-    if (guideDescription) guideDescription.textContent = step.description;
-
-    const progressBar = document.querySelector(".guide-progress");
-    if (progressBar) progressBar.style.setProperty("--progress", `${progress}%`);
-
-    if (step.highlight) {
-      const target = document.querySelector(step.highlight);
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
+    const pb = document.querySelector(".guide-progress");
+    if (pb) pb.style.setProperty("--progress", `${progress}%`);
+    if (step.highlight) document.querySelector(step.highlight)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
     const prevBtn = document.getElementById("guidePrev");
     const nextBtn = document.getElementById("guideNext");
@@ -240,25 +211,13 @@ function wireGuide(ctx) {
 }
 
 // ================================================================
-// CÂBLAGE DES BOUTONS EXTRA (FAB + panneau Actions)
+// BOUTONS EXTRA (FAB + panneau Actions)
 // ================================================================
 function wireExtra() {
-  // FAB mobile → nouveau lapin
-  document.getElementById("fabNewRabbit")?.addEventListener("click", () => {
-    ctx.el.btnNewRabbit?.click();
-  });
+  document.getElementById("fabNewRabbit")?.addEventListener("click", () => ctx.el.btnNewRabbit?.click());
+  document.getElementById("moreNewRabbit")?.addEventListener("click", () => ctx.el.btnNewRabbit?.click());
+  document.getElementById("moreExport")?.addEventListener("click", () => ctx.el.btnExport?.click());
 
-  // Panneau Actions → nouveau lapin
-  document.getElementById("moreNewRabbit")?.addEventListener("click", () => {
-    ctx.el.btnNewRabbit?.click();
-  });
-
-  // Panneau Actions → exporter
-  document.getElementById("moreExport")?.addEventListener("click", () => {
-    ctx.el.btnExport?.click();
-  });
-
-  // Panneau Actions → importer
   document.getElementById("moreFileImport")?.addEventListener("change", async e => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -270,39 +229,40 @@ function wireExtra() {
       alert("Import réussi.");
     } catch (err) {
       alert("Import échoué : " + (err?.message || err));
-    } finally {
-      e.target.value = "";
-    }
+    } finally { e.target.value = ""; }
   });
 
-  // Panneau Actions → réinitialiser
-  document.getElementById("moreReset")?.addEventListener("click", () => {
-    ctx.el.btnReset?.click();
-  });
+  document.getElementById("moreReset")?.addEventListener("click", () => ctx.el.btnReset?.click());
 
-  // Panneau Actions → guide toggle
   document.getElementById("moreGuideToggle")?.addEventListener("change", e => {
     const master = document.getElementById("guideToggle");
-    if (master) {
-      master.checked = e.target.checked;
-      master.dispatchEvent(new Event("change"));
-    }
+    if (master) { master.checked = e.target.checked; master.dispatchEvent(new Event("change")); }
   });
 }
 
 // ================================================================
 // INITIALISATION
 // ================================================================
-wireStatic(ctx);
+const isE2E = new URLSearchParams(window.location.search).has("e2e");
+
+// En mode E2E (tests Playwright) ou si les variables Supabase sont absentes,
+// on saute l'auth et on lance l'app directement en mode local.
+const supabaseConfigured =
+  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY;
+
 wireMenuCards();
 wireExtra();
+wireStatic(ctx);
 
-const isE2E = new URLSearchParams(window.location.search).has("e2e");
-if (!isE2E) {
-  seedIfEmpty();
+if (!supabaseConfigured || isE2E) {
+  // Mode hors-ligne / tests
+  if (!isE2E) seedIfEmpty();
+  else ["dashboard", "rabbits", "lots"].forEach(openPanel);
+  ctx.render();
 } else {
-  // Mode E2E : ouvre les panneaux clés pour que les tests accèdent au contenu
-  ["dashboard", "rabbits", "lots"].forEach(openPanel);
+  // Mode collaboratif : auth Supabase
+  bootWithAuth(ctx, () => {
+    // Callback appelé une fois la ferme chargée (et re-appelé si changement de ferme)
+    ctx.render();
+  });
 }
-
-ctx.render();

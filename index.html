@@ -23,6 +23,7 @@
     </div>
 
     <div class="actions">
+      <div id="userInfo" class="user-info hidden"></div>
       <button id="btnNewRabbit" class="btn" data-testid="btn-new-rabbit">+ Nouveau lapin</button>
       <button id="btnExport" class="btn secondary" data-testid="btn-export">⬇ Exporter</button>
       <label class="btn secondary file" data-testid="btn-import">
@@ -291,6 +292,11 @@
       </div>
       <div id="modalBody" class="modal-body" data-testid="modal-body"></div>
     </div>
+  </div>
+
+  <!-- ===== AUTH OVERLAY ===== -->
+  <div id="authOverlay" class="auth-overlay hidden" aria-modal="true" role="dialog">
+    <!-- Contenu injecté dynamiquement par wireAuth.js -->
   </div>
 
   <script type="module" src="app.js"></script>
