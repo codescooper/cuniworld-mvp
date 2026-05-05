@@ -19,14 +19,87 @@ Ce dépôt contient le **MVP fonctionnel**, testé et prêt à évoluer.
 ## 🧱 Stack technique
 
 - **HTML / CSS / JavaScript vanilla**
-- Stockage : `localStorage`
+- Build/dev server : **Vite**
+- Backend collaboratif : **Supabase**
+- Stockage local : `localStorage`
 - Tests unitaires : **Vitest**
 - Tests E2E : **Playwright**
-- Déploiement : **GitHub Pages**
 
 ---
 
-## ✅ Fonctionnalités implémentées (V4.1)
+## 🚀 Lancer le projet
+
+```bash
+npm install
+npm run dev
+```
+
+---
+
+## 🔌 Connecter l’app à Supabase (pas à pas)
+
+> Important : le mode collaboratif Supabase fonctionne avec un build Vite (dev/build). Éviter d’ouvrir les fichiers bruts directement depuis GitHub Pages sans pipeline de build.
+
+### 1) Créer les tables
+
+Dans le dashboard Supabase :
+- Ouvrir **SQL Editor**
+- Exécuter le script `supabase-schema.sql`
+
+### 2) Récupérer les clés projet
+
+Dans Supabase : **Project Settings → API**
+- Copier **Project URL**
+- Copier **anon public key**
+
+### 3) Créer un fichier `.env.local`
+
+À la racine du repo :
+
+```bash
+VITE_SUPABASE_URL=https://<votre-projet>.supabase.co
+VITE_SUPABASE_ANON_KEY=<votre_anon_key>
+```
+
+### 4) Redémarrer le serveur Vite
+
+```bash
+npm run dev
+```
+
+Au démarrage, l’app passera en mode authentifié Supabase si les 2 variables sont présentes et valides.
+
+### 5) Vérifier que ça marche
+
+- Écran d’auth visible (connexion / inscription)
+- Après login : sélection/création de ferme
+- Les changements se synchronisent entre onglets/utilisateurs
+
+---
+
+## 🧪 Tests
+
+### Tests unitaires
+
+```bash
+npm run test
+```
+
+### Tests E2E
+
+```bash
+npm run test:e2e
+```
+
+### Tous les tests
+
+```bash
+npm run test:all
+```
+
+---
+
+## ✅ Fonctionnalités implémentées
 
 ### Lapins
 - Création / modification / suppression
@@ -56,37 +129,3 @@ Ce dépôt contient le **MVP fonctionnel**, testé et prêt à évoluer.
 - Export JSON
 - Reset complet
 - Import avec restauration complète
-
----
-
-## 🧪 Tests
-
-### Tests unitaires
-bash
-npm run test
-reproduction
-
-lots
-
-portées
-
-santé
-
-utilitaires
-
-Tests E2E
-npm run test:e2e
-
-
-Scénarios couverts :
-
-Parcours complet élevage
-
-Export / reset / import
-
-Rappels à venir
-
-Rappels en retard
-
-Tous les tests
-npm run test:all

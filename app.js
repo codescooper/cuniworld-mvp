@@ -3,7 +3,6 @@ import { getEls } from "./src/dom.js";
 import { renderAll } from "./src/render.js";
 import { wireStatic, wireDynamic } from "./src/wire.js";
 import { GUIDE_STEPS, getGuideStep, getNextStep, getPrevStep } from "./src/guide.js";
-import { bootWithAuth } from "./src/wireAuth.js";
 import { openWeightCheckModal } from "./src/weightCheck.js";
 import { openPhotoCheckModal } from "./src/photoCheck.js";
 
@@ -254,9 +253,10 @@ const isE2E = new URLSearchParams(window.location.search).has("e2e");
 
 // En mode E2E (tests Playwright) ou si les variables Supabase sont absentes,
 // on saute l'auth et on lance l'app directement en mode local.
+const viteEnv = import.meta?.env ?? {};
 const supabaseConfigured =
-  import.meta.env.VITE_SUPABASE_URL?.startsWith("https://") &&
-  (import.meta.env.VITE_SUPABASE_ANON_KEY?.length ?? 0) > 20;
+  viteEnv.VITE_SUPABASE_URL?.startsWith("https://") &&
+  (viteEnv.VITE_SUPABASE_ANON_KEY?.length ?? 0) > 20;
 
 wireMenuCards();
 wireExtra();
@@ -269,8 +269,13 @@ if (!supabaseConfigured || isE2E) {
   ctx.render();
 } else {
   // Mode collaboratif : auth Supabase
-  bootWithAuth(ctx, () => {
-    // Callback appelé une fois la ferme chargée (et re-appelé si changement de ferme)
-    ctx.render();
+  import("./src/wireAuth.js").then(({ bootWithAuth }) => {
+    bootWithAuth(ctx, () => {
+      // Callback appelé une fois la ferme chargée (et re-appelé si changement de ferme)
+      ctx.render();
+    });
+  }).catch((err) => {
+    console.error("Impossible de charger l'auth Supabase:", err);
+    alert("Mode collaboratif indisponible. Vérifiez le build Vite et la configuration Supabase.");
   });
 }
