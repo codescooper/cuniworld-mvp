@@ -298,6 +298,12 @@ function rabbitFormHTML(rabbit=null, state=null) {
         </div>
       </div>
 
+      ${!rabbit ? `
+      <div class="field">
+        <div class="label">Poids initial <span style="font-weight:normal;color:var(--color-muted)">(kg, optionnel)</span></div>
+        <input class="input" name="initialWeight" type="number" min="0.01" step="0.01" placeholder="ex: 1.25">
+      </div>` : ""}
+
       <div class="field">
         <div class="label">Disponibilité reproduction</div>
         <select class="input" name="breedingOverride">

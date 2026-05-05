@@ -34,6 +34,23 @@ export function addRabbit(ctx, data) {
     lockRabbitName(ctx.state, rabbit.name, rabbit.id);
     if (fid(ctx)) DB.setUsedName(fid(ctx), rabbit.name, rabbit.id);
   }
+
+  // Pesée initiale optionnelle
+  const initW = parseFloat(data.initialWeight);
+  if (Number.isFinite(initW) && initW > 0) {
+    const ev = {
+      id:        uid("ev"),
+      rabbitId:  rabbit.id,
+      type:      "pesée",
+      date:      new Date().toISOString().slice(0, 10),
+      notes:     "Poids à l'inscription",
+      data:      { weight: initW },
+      createdAt: nowISO(),
+    };
+    ctx.state.events.unshift(ev);
+    if (fid(ctx)) DB.upsertEvent(fid(ctx), ev);
+  }
+
   persist(ctx);
   if (fid(ctx)) DB.upsertRabbit(fid(ctx), rabbit);
   ctx.selectedRabbitId = rabbit.id;
