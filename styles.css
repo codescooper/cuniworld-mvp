@@ -823,6 +823,48 @@ textarea.input { min-height: 90px; resize: vertical }
 }
 
 /* ================================================================
+   PRISE DE POIDS ASSISTÉE
+   ================================================================ */
+.wc-progress {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.wc-step {
+  font-size: var(--font-size-sm); color: var(--color-muted);
+  white-space: nowrap; flex-shrink: 0;
+}
+.wc-bar {
+  flex: 1; height: 6px; background: var(--color-border);
+  border-radius: 999px; overflow: hidden;
+}
+.wc-fill {
+  height: 100%; background: var(--color-primary);
+  border-radius: 999px; transition: width 300ms ease;
+}
+
+.wc-rabbit-card {
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+.wc-name {
+  font-size: 1.15rem; font-weight: var(--font-weight-bold);
+  display: flex; align-items: center; gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.wc-meta {
+  display: flex; gap: var(--space-4); flex-wrap: wrap;
+  font-size: var(--font-size-sm); color: var(--color-muted);
+  margin-bottom: var(--space-2);
+}
+.wc-last {
+  display: flex; gap: var(--space-4); flex-wrap: wrap;
+  font-size: var(--font-size-sm);
+}
+
+/* ================================================================
    AUTH OVERLAY
    ================================================================ */
 .auth-overlay {

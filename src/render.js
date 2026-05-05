@@ -77,16 +77,26 @@ export function renderDashboard(ctx) {
     const gain    = last - first;
     const gainStr = `${gain >= 0 ? "+" : ""}${gain.toFixed(2)} kg`;
     const evoLine = herdEvo.length > 1
-      ? `<div>Évolution:</div><div>${first.toFixed(2)} → ${last.toFixed(2)} kg (${gainStr})</div>`
+      ? `<div>Évolution (1ère → dernière pesée):</div><div>${first.toFixed(2)} → ${last.toFixed(2)} kg <strong>(${gainStr})</strong></div>`
       : "";
+
+    // Lapins actifs ayant au moins une pesée
+    const weighedIds = new Set(
+      state.events.filter(e => e.type === "pesée" && Number(e.data?.weight) > 0).map(e => e.rabbitId)
+    );
+    const rabbitsWeighed = state.rabbits.filter(r => r.status === "actif" && weighedIds.has(r.id)).length;
+    const rabbitsActive  = state.rabbits.filter(r => r.status === "actif").length;
 
     el.dash.innerHTML += `
       <div style="grid-column:1/-1;margin-top:18px;padding-top:14px;border-top:1px solid #eee">
-        <div style="font-weight:700;margin-bottom:8px">⚖️ Tendance du poids du cheptel</div>
-        <div class="kv" style="margin-bottom:10px;max-width:340px">
-          <div>Poids total actuel:</div><div><strong>${last.toFixed(2)} kg</strong></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+          <div style="font-weight:700">⚖️ Poids total du cheptel</div>
+          <button class="btn secondary" id="btnWeightCheck" style="font-size:.85rem;padding:4px 12px">⚖️ Peser les lapins</button>
+        </div>
+        <div class="kv" style="margin-bottom:10px;max-width:380px">
+          <div>Poids total actuel :</div><div><strong>${last.toFixed(2)} kg</strong></div>
+          <div>Lapins pris en compte :</div><div>${rabbitsWeighed} / ${rabbitsActive} actifs</div>
           ${evoLine}
-          <div>Dates de mesure:</div><div>${herdEvo.length}</div>
         </div>
         ${renderWeightSVG(herdPoints, { id: "herd", color: "#4f7942" })}
       </div>

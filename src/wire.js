@@ -3,6 +3,7 @@ import { escapeHTML, escapeAttr, generateRabbitCode, num, numOrNull } from "./ut
 import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent, addPhoto, deletePhoto } from "./actions.js";
 import { compressImage } from "./photos.js";
 import { isNameFromPool, isNameAvailable, isNameUsedByLivingRabbit, suggestAvailableRabbitName } from "./rabbitNameService.js";
+import { openWeightCheckModal } from "./weightCheck.js";
 
 
 export function wireStatic(ctx) {
@@ -122,6 +123,12 @@ export function wireDynamic(ctx) {
       wireEventForm(ctx);
     });
   });
+
+  // Bouton "Peser les lapins" depuis le dashboard
+  const btnWeightCheck = document.getElementById("btnWeightCheck");
+  if (btnWeightCheck) {
+    btnWeightCheck.addEventListener("click", () => openWeightCheckModal(ctx));
+  }
 
   // Bouton "Ajouter une pesée" depuis la section poids de la fiche
   document.querySelectorAll("[data-quick-weight]").forEach(node => {

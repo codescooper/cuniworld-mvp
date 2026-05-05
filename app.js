@@ -4,6 +4,7 @@ import { renderAll } from "./src/render.js";
 import { wireStatic, wireDynamic } from "./src/wire.js";
 import { GUIDE_STEPS, getGuideStep, getNextStep, getPrevStep } from "./src/guide.js";
 import { bootWithAuth } from "./src/wireAuth.js";
+import { openWeightCheckModal } from "./src/weightCheck.js";
 
 const el = getEls();
 
@@ -232,6 +233,7 @@ function wireExtra() {
     } finally { e.target.value = ""; }
   });
 
+  document.getElementById("moreWeightCheck")?.addEventListener("click", () => openWeightCheckModal(ctx));
   document.getElementById("moreReset")?.addEventListener("click", () => ctx.el.btnReset?.click());
 
   document.getElementById("moreGuideToggle")?.addEventListener("change", e => {
