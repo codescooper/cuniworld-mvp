@@ -1,10 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-const URL  = import.meta.env.VITE_SUPABASE_URL      || '';
-const KEY  = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const env = import.meta?.env ?? {};
+const URL = env.VITE_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || '';
+const KEY = env.VITE_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
 
-if (!URL || !KEY) {
+export const supabaseConfigured = Boolean(URL && KEY);
+
+if (!supabaseConfigured) {
   console.warn('[Supabase] Variables VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY manquantes — mode local uniquement.');
 }
 
-export const supabase = createClient(URL, KEY);
+export const supabase = supabaseConfigured ? createClient(URL, KEY) : null;
