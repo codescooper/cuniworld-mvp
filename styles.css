@@ -865,6 +865,55 @@ textarea.input { min-height: 90px; resize: vertical }
 }
 
 /* ================================================================
+   PRISE DE PHOTO ASSISTÉE
+   ================================================================ */
+.pc-last-photo {
+  margin-top: var(--space-3);
+  display: flex; align-items: center; gap: var(--space-3);
+}
+.pc-thumb {
+  width: 64px; height: 64px; object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-border);
+  flex-shrink: 0;
+}
+.pc-thumb-label { font-size: var(--font-size-sm); color: var(--color-muted) }
+.pc-no-photo {
+  margin-top: var(--space-3);
+  font-size: var(--font-size-sm); color: var(--color-muted);
+}
+
+.pc-upload-zone {
+  margin-top: var(--space-3);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  text-align: center;
+  transition: border-color 150ms;
+}
+.pc-upload-zone:focus-within { border-color: var(--color-primary) }
+.pc-upload-label {
+  cursor: pointer; display: block;
+  color: var(--color-primary); font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+}
+.pc-upload-label:hover { text-decoration: underline }
+.pc-preview {
+  max-width: 100%; max-height: 220px;
+  border-radius: var(--radius-md);
+  margin-top: var(--space-3);
+  object-fit: contain;
+}
+
+/* Note overlay dans la galerie */
+.photo-grid-note {
+  font-size: 10px; color: rgba(255,255,255,0.85);
+  margin-top: 2px; font-style: italic;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 90px;
+}
+
+/* ================================================================
    AUTH OVERLAY
    ================================================================ */
 .auth-overlay {

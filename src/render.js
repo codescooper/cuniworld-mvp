@@ -233,14 +233,16 @@ export function renderRabbitDetails(ctx) {
     ? `<img class="rabbit-avatar-img" src="${escapeAttr(profilePhoto.dataUrl)}" alt="Photo de ${escapeHTML(r.name)}">`
     : `<div class="rabbit-avatar-placeholder">🐇</div>`;
 
-  const photoGridHTML = allPhotos.length > 0
+  // Photos triées chronologiquement pour l'"évolution visuelle" (ASC)
+  const photosAsc = [...allPhotos].reverse();
+  const photoGridHTML = photosAsc.length > 0
     ? `<div class="photo-grid">
-        ${allPhotos.map(p => `
+        ${photosAsc.map(p => `
           <div class="photo-grid-item">
             <img class="photo-grid-img" src="${escapeAttr(p.dataUrl)}" alt="${escapeHTML(p.date)}" loading="lazy">
             <div class="photo-grid-overlay">
               <div class="photo-grid-label">${escapeHTML(p.date)}</div>
-              <div class="photo-grid-source">${p.source === "pesée" ? "Pesée" : "Profil"}</div>
+              ${p.note ? `<div class="photo-grid-note">${escapeHTML(p.note)}</div>` : ""}
             </div>
             <button class="photo-grid-del" data-del-photo="${escapeAttr(p.id)}" title="Supprimer cette photo">×</button>
           </div>
@@ -305,10 +307,12 @@ export function renderRabbitDetails(ctx) {
 
     <div class="sep"></div>
 
-    <div style="font-weight:700;margin-bottom:8px">📷 Photos (${allPhotos.length})</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      <div style="font-weight:700">📷 Évolution visuelle (${allPhotos.length} photo${allPhotos.length !== 1 ? "s" : ""})</div>
+      <button class="btn secondary" id="btnPhotoCheckSingle" data-rabbit-id="${escapeAttr(r.id)}" style="font-size:.85rem;padding:4px 12px">📷 Ajouter une photo</button>
+    </div>
     ${photoGridHTML}
-    <label class="btn secondary" style="cursor:pointer;margin-top:8px;display:inline-flex;align-items:center;gap:6px">
-      📷 Ajouter une photo de profil
+    <label class="btn secondary" style="cursor:pointer;margin-top:8px;display:inline-flex;align-items:center;gap:6px;display:none">
       <input type="file" id="inputProfilePhoto" accept="image/*" style="display:none">
     </label>
   `;

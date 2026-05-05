@@ -139,7 +139,7 @@ export function deleteEvent(ctx, eventId) {
   ctx.render();
 }
 
-export function addPhoto(ctx, rabbitId, { dataUrl, date, source = "profile", eventId = null }) {
+export function addPhoto(ctx, rabbitId, { dataUrl, date, source = "profile", eventId = null, note = "" }) {
   const { uid, nowISO } = ctx.Store.helpers;
   if (!ctx.state.photos) ctx.state.photos = [];
   const photo = {
@@ -149,6 +149,7 @@ export function addPhoto(ctx, rabbitId, { dataUrl, date, source = "profile", eve
     date:     date || new Date().toISOString().slice(0, 10),
     source,
     eventId,
+    note:     (note || "").trim(),
     createdAt: nowISO(),
   };
   ctx.state.photos.unshift(photo);

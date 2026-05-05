@@ -4,6 +4,7 @@ import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent, addPhoto,
 import { compressImage } from "./photos.js";
 import { isNameFromPool, isNameAvailable, isNameUsedByLivingRabbit, suggestAvailableRabbitName } from "./rabbitNameService.js";
 import { openWeightCheckModal } from "./weightCheck.js";
+import { openPhotoCheckModal, openSinglePhotoModal } from "./photoCheck.js";
 
 
 export function wireStatic(ctx) {
@@ -128,6 +129,15 @@ export function wireDynamic(ctx) {
   const btnWeightCheck = document.getElementById("btnWeightCheck");
   if (btnWeightCheck) {
     btnWeightCheck.addEventListener("click", () => openWeightCheckModal(ctx));
+  }
+
+  // Bouton "Ajouter une photo" depuis la fiche lapin
+  const btnPhotoSingle = document.getElementById("btnPhotoCheckSingle");
+  if (btnPhotoSingle) {
+    btnPhotoSingle.addEventListener("click", () => {
+      const id = btnPhotoSingle.dataset.rabbitId;
+      if (id) openSinglePhotoModal(ctx, id);
+    });
   }
 
   // Bouton "Ajouter une pesée" depuis la section poids de la fiche

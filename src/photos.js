@@ -1,3 +1,5 @@
+import { daysBetween } from './utils.js';
+
 export function compressImage(file, maxDim = 600, quality = 0.72) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -34,4 +36,28 @@ export function getPhotoHistory(state, rabbitId) {
 export function getProfilePhoto(state, rabbitId) {
   const history = getPhotoHistory(state, rabbitId);
   return history.find(p => p.source === "profile") || history[0] || null;
+}
+
+/**
+ * Retourne les lapins actifs non photographiés depuis ≥ thresholdDays jours
+ * (ou jamais photographiés), triés par urgence.
+ */
+export function getRabbitsDueForPhotoCheck(state, thresholdDays = 7) {
+  const today = new Date().toISOString().slice(0, 10);
+  return (state.rabbits || [])
+    .filter(r => r.status === 'actif')
+    .map(r => {
+      const history   = getPhotoHistory(state, r.id); // tri DESC → [0] = plus récente
+      const lastPhoto = history[0] || null;
+      return { rabbit: r, lastPhoto };
+    })
+    .filter(({ lastPhoto }) =>
+      !lastPhoto || daysBetween(lastPhoto.date, today) >= thresholdDays
+    )
+    .sort((a, b) => {
+      if (!a.lastPhoto && b.lastPhoto)  return -1;
+      if (a.lastPhoto && !b.lastPhoto)  return  1;
+      if (!a.lastPhoto && !b.lastPhoto) return 0;
+      return a.lastPhoto.date.localeCompare(b.lastPhoto.date);
+    });
 }

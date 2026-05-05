@@ -5,6 +5,7 @@ import { wireStatic, wireDynamic } from "./src/wire.js";
 import { GUIDE_STEPS, getGuideStep, getNextStep, getPrevStep } from "./src/guide.js";
 import { bootWithAuth } from "./src/wireAuth.js";
 import { openWeightCheckModal } from "./src/weightCheck.js";
+import { openPhotoCheckModal } from "./src/photoCheck.js";
 
 const el = getEls();
 
@@ -233,6 +234,7 @@ function wireExtra() {
     } finally { e.target.value = ""; }
   });
 
+  document.getElementById("morePhotoCheck")?.addEventListener("click", () => openPhotoCheckModal(ctx));
   document.getElementById("moreWeightCheck")?.addEventListener("click", () => openWeightCheckModal(ctx));
   document.getElementById("moreReset")?.addEventListener("click", () => ctx.el.btnReset?.click());
 
