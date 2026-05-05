@@ -195,9 +195,12 @@ function wireGuide(ctx) {
     const stepIdx  = GUIDE_STEPS.findIndex(s => s.id === step.id);
     const progress = ((stepIdx + 1) / GUIDE_STEPS.length) * 100;
 
-    document.getElementById("guideTitle")?.textContent       = step.title;
-    document.getElementById("guideStepNumber")?.textContent  = `Étape ${stepIdx + 1}/${GUIDE_STEPS.length}`;
-    document.getElementById("guideDescription")?.textContent = step.description;
+    const guideTitle = document.getElementById("guideTitle");
+    const guideStepNumber = document.getElementById("guideStepNumber");
+    const guideDescription = document.getElementById("guideDescription");
+    if (guideTitle) guideTitle.textContent = step.title;
+    if (guideStepNumber) guideStepNumber.textContent = `Étape ${stepIdx + 1}/${GUIDE_STEPS.length}`;
+    if (guideDescription) guideDescription.textContent = step.description;
 
     const pb = document.querySelector(".guide-progress");
     if (pb) pb.style.setProperty("--progress", `${progress}%`);

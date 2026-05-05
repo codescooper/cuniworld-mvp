@@ -10,7 +10,8 @@
       "Bash(npm test *)",
       "Bash(node *)",
       "Bash(grep -E \"\\\\.\\(js|html\\)$\")",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(npx vite *)"
     ]
   }
 }
