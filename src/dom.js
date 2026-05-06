@@ -26,6 +26,7 @@ export function getEls() {
     geneQ: $("geneQ"),
     geneGraph: $("geneGraph"),
     geneList: $("geneList"),
+    syncBadge: $("syncBadge"),
 
   };
 }

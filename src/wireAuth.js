@@ -2,6 +2,7 @@ import { Auth } from './auth.js';
 import { FarmService } from './farmService.js';
 import { DB } from './db.js';
 import { escapeHTML } from './utils.js';
+import { hydrateAndMigratePhotos } from './photoStorage.js';
 
 function escAttr(s) { return String(s).replace(/"/g, '&quot;'); }
 
@@ -230,6 +231,7 @@ async function _loadFarm(farmId, farmName, ctx, onReady, isNew = false) {
     ctx.farmId   = farmId;
     ctx.farmName = farmName;
     ctx.state    = await _withTimeout(DB.loadFarmState(farmId), 12000, 'loadFarmState');
+    await hydrateAndMigratePhotos(ctx.state, farmId);
 
     if (isNew) await _offerMigration(ctx);
 

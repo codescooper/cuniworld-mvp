@@ -6,6 +6,7 @@ import { isNameFromPool, isNameAvailable, isNameUsedByLivingRabbit, suggestAvail
 import { openWeightCheckModal } from "./weightCheck.js";
 import { openPhotoCheckModal, openSinglePhotoModal } from "./photoCheck.js";
 import { dismissActionForToday } from "./farmActionsService.js";
+import { showToast, showConfirm } from "./notifications.js";
 
 
 export function wireStatic(ctx) {
@@ -38,16 +39,17 @@ export function wireStatic(ctx) {
       ctx.state = Store.importJSON(text);
       ctx.selectedRabbitId = null;
       ctx.render();
-      alert("Import réussi.");
+      showToast("Import réussi.", "success");
     } catch (err) {
-      alert("Import échoué : " + (err?.message || err));
+      showToast("Import échoué : " + (err?.message || err), "error");
     } finally {
       el.fileImport.value = "";
     }
   });
 
-  el.btnReset.addEventListener("click", () => {
-    if (!window.confirm("Tout supprimer ? (lapins + événements)")) return;
+  el.btnReset.addEventListener("click", async () => {
+    const ok = await showConfirm({ title: "Réinitialiser", message: "Tout supprimer ? (lapins + événements)", confirmLabel: "Supprimer", cancelLabel: "Annuler", danger: true });
+    if (!ok) return;
     ctx.state = Store.reset();
     ctx.selectedRabbitId = null;
     ctx.render();
@@ -186,10 +188,11 @@ export function wireDynamic(ctx) {
 
   const btnDel = document.getElementById("btnDeleteRabbit");
   if (btnDel) {
-    btnDel.addEventListener("click", () => {
+    btnDel.addEventListener("click", async () => {
       const r = ctx.state.rabbits.find(x => x.id === ctx.selectedRabbitId);
       if (!r) return;
-      if (!window.confirm(`Supprimer ${r.name} (${r.code}) ?`)) return;
+      const ok = await showConfirm({ title: "Supprimer le lapin", message: `Supprimer ${r.name} (${r.code}) ?`, confirmLabel: "Supprimer", cancelLabel: "Annuler", danger: true });
+      if (!ok) return;
       deleteRabbit(ctx, r.id);
     });
   }
@@ -203,9 +206,10 @@ export function wireDynamic(ctx) {
   });
 
   el.eventsPanel.querySelectorAll("[data-del-event]").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const id = btn.dataset.delEvent;
-      if (!window.confirm("Supprimer cet événement ?")) return;
+      const ok = await showConfirm({ title: "Supprimer l'événement", message: "Supprimer cet événement ?", confirmLabel: "Supprimer", cancelLabel: "Annuler", danger: true });
+      if (!ok) return;
       deleteEvent(ctx, id);
     });
   });
@@ -242,13 +246,13 @@ export function wireDynamic(ctx) {
       if (!file) return;
       try {
         const dataUrl = await compressImage(file);
-        addPhoto(ctx, ctx.selectedRabbitId, {
+        await addPhoto(ctx, ctx.selectedRabbitId, {
           dataUrl,
           date: new Date().toISOString().slice(0, 10),
           source: "profile",
         });
       } catch (err) {
-        alert("Erreur photo : " + (err?.message || err));
+        showToast("Erreur photo : " + (err?.message || err), "error");
       } finally {
         inputProfilePhoto.value = "";
       }
@@ -257,10 +261,11 @@ export function wireDynamic(ctx) {
 
   // Suppression photo depuis l'historique
   el.rabbitDetails.querySelectorAll("[data-del-photo]").forEach(btn => {
-    btn.addEventListener("click", (e) => {
+    btn.addEventListener("click", async (e) => {
       e.stopPropagation();
       const id = btn.dataset.delPhoto;
-      if (!window.confirm("Supprimer cette photo ?")) return;
+      const ok = await showConfirm({ title: "Supprimer la photo", message: "Supprimer cette photo ?", confirmLabel: "Supprimer", cancelLabel: "Annuler", danger: true });
+      if (!ok) return;
       deletePhoto(ctx, id);
     });
   });
@@ -393,6 +398,7 @@ function rabbitFormHTML(rabbit=null, state=null) {
         <div class="label">Statut</div>
         <select class="input" name="status">
           <option value="actif" ${r.status==="actif"?"selected":""}>Actif</option>
+          <option value="vendu" ${r.status==="vendu"?"selected":""}>Vendu</option>
           <option value="mort" ${r.status==="mort"?"selected":""}>Mort</option>
         </select>
       </div>
@@ -457,12 +463,13 @@ function wireRabbitForm(ctx, existingRabbit) {
     showBadge(nameInput.value.trim() ? "manual" : null);
   });
 
-  suggestBtn?.addEventListener("click", () => {
+  suggestBtn?.addEventListener("click", async () => {
     const currentValue = (nameInput?.value || "").trim();
 
     // Si un nom a été tapé manuellement, demander confirmation avant d'écraser
     if (currentValue && !isSuggested) {
-      if (!window.confirm(`Remplacer "${currentValue}" par un nom suggéré ?`)) return;
+      const ok = await showConfirm({ title: "Remplacer le nom", message: `Remplacer "${currentValue}" par un nom suggéré ?`, confirmLabel: "Remplacer", cancelLabel: "Annuler" });
+      if (!ok) return;
     }
 
     const next = suggestAvailableRabbitName(ctx.state, currentSuggestion);
@@ -511,7 +518,7 @@ function wireRabbitForm(ctx, existingRabbit) {
       if (photoPlaceholder) photoPlaceholder.style.display = "none";
       if (clearPhotoBtn) clearPhotoBtn.style.display = "";
     } catch (err) {
-      alert("Erreur photo : " + (err?.message || err));
+      showToast("Erreur photo : " + (err?.message || err), "error");
     } finally {
       photoInput.value = "";
     }
@@ -524,12 +531,12 @@ function wireRabbitForm(ctx, existingRabbit) {
     clearPhotoBtn.style.display = "none";
   });
 
-  form?.addEventListener("submit", (e) => {
+  form?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
     const data = Object.fromEntries(fd.entries());
     data.sex = (data.sex || "U").toString();
-    data.status = (data.status || "actif").toString();
+    data.status = (data.status || existingRabbit?.status || "actif").toString();
     data.birthDate = (data.birthDate || "").toString();
     data.motherId = data.motherId || null;
     data.fatherId = data.fatherId || null;
@@ -542,7 +549,7 @@ function wireRabbitForm(ctx, existingRabbit) {
     if (submittedName && isNameFromPool(submittedName)) {
       // Nom Naruto : vérifier qu'il est encore disponible
       if (!isNameAvailable(ctx.state, submittedName, ownerId)) {
-        alert(`"${submittedName}" vient d'être pris par un autre lapin. Choisis-en un autre.`);
+        showToast(`"${submittedName}" vient d'être pris par un autre lapin. Choisis-en un autre.`, "warn");
         const next = suggestAvailableRabbitName(ctx.state, submittedName);
         if (nameInput) { nameInput.value = next; }
         currentSuggestion = next;
@@ -553,7 +560,8 @@ function wireRabbitForm(ctx, existingRabbit) {
     } else if (submittedName) {
       // Nom manuel : avertir si déjà utilisé par un lapin vivant
       if (isNameUsedByLivingRabbit(submittedName, ctx.state.rabbits, ownerId)) {
-        if (!window.confirm(`Un lapin actif s'appelle déjà "${submittedName}". Continuer quand même ?`)) return;
+        const ok = await showConfirm({ title: "Nom déjà utilisé", message: `Un lapin actif s'appelle déjà "${submittedName}". Continuer quand même ?`, confirmLabel: "Continuer", cancelLabel: "Annuler" });
+        if (!ok) return;
       }
     }
 
@@ -562,34 +570,36 @@ function wireRabbitForm(ctx, existingRabbit) {
         updateRabbit(ctx, existingRabbit.id, data);
         if (selectedPhotoData) {
           try {
-            addPhoto(ctx, existingRabbit.id, {
+            await addPhoto(ctx, existingRabbit.id, {
               dataUrl: selectedPhotoData,
               date: new Date().toISOString().slice(0, 10),
               source: "profile",
             });
           } catch (photoErr) {
-            alert("Lapin modifié, mais la photo n'a pas pu être sauvegardée : " + (photoErr?.message || photoErr));
+            showToast("Lapin modifié, mais la photo n'a pas pu être sauvegardée : " + (photoErr?.message || photoErr), "warn");
           }
         }
       } else {
         addRabbit(ctx, data);
         if (selectedPhotoData && ctx.selectedRabbitId) {
           try {
-            addPhoto(ctx, ctx.selectedRabbitId, {
+            await addPhoto(ctx, ctx.selectedRabbitId, {
               dataUrl: selectedPhotoData,
               date: new Date().toISOString().slice(0, 10),
               source: "profile",
             });
           } catch (photoErr) {
-            alert("Lapin créé, mais la photo n'a pas pu être sauvegardée : " + (photoErr?.message || photoErr));
+            showToast("Lapin créé, mais la photo n'a pas pu être sauvegardée : " + (photoErr?.message || photoErr), "warn");
           }
         }
       }
       closeModal(ctx.el);
     } catch (err) {
-      alert(err?.message || String(err));
+      showToast(err?.message || String(err), "error");
     }
   });
+
+  setupModalFormKeyboardUX(form, '[data-testid="rabbit-form-submit"]');
 }
 
 function eventFormHTML(preType = "autre") {
@@ -749,7 +759,7 @@ function wireEventForm(ctx) {
 
   const showError = (message) => {
     if (!errorBox) {
-      alert(message);
+      showToast(message, "error");
       return;
     }
     errorBox.textContent = message;
@@ -777,7 +787,7 @@ function wireEventForm(ctx) {
     clearError();
   });
 
-  form?.addEventListener("submit", (e) => {
+  form?.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!ctx.selectedRabbitId) return;
     if (isSubmitting) return;
@@ -829,14 +839,14 @@ function wireEventForm(ctx) {
         const photoDataUrl = peseePhotoInput?.dataset.dataUrl;
         if (photoDataUrl) {
           try {
-            addPhoto(ctx, ctx.selectedRabbitId, {
+            await addPhoto(ctx, ctx.selectedRabbitId, {
               dataUrl: photoDataUrl,
               date,
               source: "pesée",
               eventId: ev.id,
             });
           } catch (photoErr) {
-            alert("Pesée enregistrée, mais la photo n'a pas pu être sauvegardée : " + (photoErr?.message || photoErr));
+            showToast("Pesée enregistrée, mais la photo n'a pas pu être sauvegardée : " + (photoErr?.message || photoErr), "warn");
           }
         }
       }
@@ -848,6 +858,69 @@ function wireEventForm(ctx) {
       isSubmitting = false;
       if (submitBtn) submitBtn.disabled = false;
       return;
+    }
+  });
+
+  setupModalFormKeyboardUX(form, '[data-testid="event-form-submit"]');
+}
+
+function setupModalFormKeyboardUX(form, submitSelector) {
+  if (!form) return;
+
+  const getFocusableFields = () => {
+    const nodes = Array.from(form.querySelectorAll("input, select, textarea"));
+    return nodes.filter((node) => {
+      if (!(node instanceof HTMLElement)) return false;
+      if (node.matches('[type="hidden"], [type="file"]')) return false;
+      if (node.hasAttribute("disabled")) return false;
+      if (node.getAttribute("aria-hidden") === "true") return false;
+      if (node.offsetParent === null) return false;
+      return true;
+    });
+  };
+
+  const focusFirstField = () => {
+    const first = getFocusableFields()[0];
+    if (!first) return;
+    first.focus({ preventScroll: true });
+    if (first instanceof HTMLInputElement && first.type !== "date") {
+      first.select?.();
+    }
+  };
+
+  requestAnimationFrame(() => {
+    focusFirstField();
+  });
+
+  form.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    if (e.defaultPrevented) return;
+
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (!target.matches("input, select, textarea")) return;
+    if (target.matches('[type="file"]')) return;
+
+    if (target.tagName === "TEXTAREA" && e.shiftKey) {
+      return; // autorise retour ligne
+    }
+
+    e.preventDefault();
+    const fields = getFocusableFields();
+    const idx = fields.indexOf(target);
+    const next = idx >= 0 ? fields[idx + 1] : null;
+
+    if (next) {
+      next.focus({ preventScroll: true });
+      if (next instanceof HTMLInputElement && next.type !== "date") {
+        next.select?.();
+      }
+      return;
+    }
+
+    const submitBtn = form.querySelector(submitSelector);
+    if (submitBtn instanceof HTMLButtonElement && !submitBtn.disabled) {
+      submitBtn.click();
     }
   });
 }
@@ -869,7 +942,7 @@ function bindExtraHandlers(type) {
         if (previewImg) previewImg.src = dataUrl;
         if (preview) preview.style.display = "";
       } catch (err) {
-        alert("Erreur photo : " + (err?.message || err));
+        showToast("Erreur photo : " + (err?.message || err), "error");
       } finally {
         photoInput.value = "";
       }

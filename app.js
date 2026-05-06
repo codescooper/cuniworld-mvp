@@ -6,6 +6,11 @@ import { GUIDE_STEPS, getGuideStep, getNextStep, getPrevStep } from "./src/guide
 import { openWeightCheckModal } from "./src/weightCheck.js";
 import { openPhotoCheckModal } from "./src/photoCheck.js";
 import { getReminders } from "./src/health.js";
+import { hydrateAndMigratePhotos } from "./src/photoStorage.js";
+import { exportRabbitsCSV, exportEventsCSV } from "./src/csvExport.js";
+import { createSyncManager } from "./src/syncManager.js";
+import { getPendingMutationCount, replayMutationQueue } from "./src/mutationQueue.js";
+import { showToast, showConfirm } from "./src/notifications.js";
 
 const el = getEls();
 
@@ -18,6 +23,7 @@ const ctx = {
   farmId:     null,
   farmName:   null,
   currentUser: null,
+  syncStatus: "local",
   selectedRabbitId:     null,
   selectedLotId:        null,
   selectedGeneRabbitId: null,
@@ -30,11 +36,20 @@ const ctx = {
     renderAll(ctx);
     wireDynamic(ctx);
     updateNavBadges(ctx);
+    updateSyncBadge(ctx);
+    renderBackupList(ctx);
     if (ctx.selectedRabbitId && ctx.activePanel !== "rabbits") {
       setActivePanel("rabbits");
     }
   },
+  setSyncStatus: (status) => {
+    const allowed = new Set(["local", "syncing", "synced", "error"]);
+    ctx.syncStatus = allowed.has(status) ? status : "local";
+    updateSyncBadge(ctx);
+  },
+  updatePendingMutations: () => updateSyncBadge(ctx),
 };
+ctx.syncManager = createSyncManager((status) => ctx.setSyncStatus(status));
 
 // ================================================================
 // SEED INITIAL (mode hors-ligne uniquement)
@@ -90,6 +105,22 @@ function updateNavBadges(ctx) {
     const badge = document.getElementById("badge-dashboard");
     if (badge) badge.textContent = overdue.length > 0 ? String(overdue.length) : "";
   } catch (_) {}
+}
+
+function updateSyncBadge(ctx) {
+  const badge = ctx.el.syncBadge;
+  if (!badge) return;
+  const labels = {
+    local: "Local",
+    syncing: "Sync en cours",
+    synced: "Synchronisé",
+    error: "Erreur sync",
+  };
+  const status = ctx.syncStatus || "local";
+  const pending = getPendingMutationCount();
+  badge.className = `sync-badge ${status}`;
+  const base = labels[status] || labels.local;
+  badge.textContent = pending > 0 ? `${base} · ${pending} en attente` : base;
 }
 
 function wireNav() {
@@ -181,6 +212,8 @@ function wireGuide(ctx) {
 function wireExtra() {
   document.getElementById("moreNewRabbit")?.addEventListener("click", () => ctx.el.btnNewRabbit?.click());
   document.getElementById("moreExport")?.addEventListener("click", () => ctx.el.btnExport?.click());
+  document.getElementById("moreExportRabbitsCSV")?.addEventListener("click", () => exportRabbitsCSV(ctx.state));
+  document.getElementById("moreExportEventsCSV")?.addEventListener("click", () => exportEventsCSV(ctx.state));
 
   document.getElementById("moreFileImport")?.addEventListener("change", async e => {
     const file = e.target.files?.[0];
@@ -190,20 +223,85 @@ function wireExtra() {
       ctx.state = Store.importJSON(text);
       ctx.selectedRabbitId = null;
       ctx.render();
-      alert("Import réussi.");
+      showToast("Import réussi.", "success");
     } catch (err) {
-      alert("Import échoué : " + (err?.message || err));
+      showToast("Import échoué : " + (err?.message || err), "error");
     } finally { e.target.value = ""; }
   });
 
   document.getElementById("morePhotoCheck")?.addEventListener("click", () => openPhotoCheckModal(ctx));
   document.getElementById("moreWeightCheck")?.addEventListener("click", () => openWeightCheckModal(ctx));
   document.getElementById("moreReset")?.addEventListener("click", () => ctx.el.btnReset?.click());
+  document.getElementById("moreRetrySync")?.addEventListener("click", async () => {
+    if (!ctx.farmId) return;
+    const { remaining, replayed } = await replayMutationQueue();
+    ctx.updatePendingMutations();
+    if (remaining === 0) ctx.setSyncStatus("synced");
+    showToast(`Synchronisation relancée : ${replayed} rejouée(s), ${remaining} en attente.`, "success");
+  });
 
   document.getElementById("moreGuideToggle")?.addEventListener("change", e => {
     const master = document.getElementById("guideToggle");
     if (master) { master.checked = e.target.checked; master.dispatchEvent(new Event("change")); }
   });
+
+  document.getElementById("backupList")?.addEventListener("click", async (e) => {
+    const restoreId = e.target?.closest?.("[data-restore-backup]")?.dataset?.restoreBackup;
+    const exportId = e.target?.closest?.("[data-export-backup]")?.dataset?.exportBackup;
+    if (restoreId) {
+      const ok = await showConfirm({ title: "Restaurer un backup", message: "Restaurer cette sauvegarde locale ?", confirmLabel: "Restaurer", cancelLabel: "Annuler" });
+      if (!ok) return;
+      try {
+        ctx.state = Store.restoreBackup(restoreId);
+        ctx.selectedRabbitId = null;
+        ctx.render();
+        showToast("Backup restauré.", "success");
+      } catch (err) {
+        showToast("Restauration impossible : " + (err?.message || err), "error");
+      }
+      return;
+    }
+    if (exportId) {
+      const backups = Store.listBackups();
+      const backup = backups.find((b) => b.id === exportId);
+      if (!backup) return;
+      const json = Store.exportJSON(backup.state || {});
+      const blob = new Blob([json], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `cuniworld_backup_${(backup.createdAt || "").slice(0, 10) || "export"}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+    }
+  });
+}
+
+function renderBackupList(ctx) {
+  const host = document.getElementById("backupList");
+  if (!host) return;
+  const backups = Store.listBackups().slice().reverse();
+  if (!backups.length) {
+    host.innerHTML = `<div class="muted">Aucune sauvegarde locale disponible.</div>`;
+    return;
+  }
+  host.innerHTML = backups.map((b) => {
+    const rabbits = Array.isArray(b?.state?.rabbits) ? b.state.rabbits.length : 0;
+    const events = Array.isArray(b?.state?.events) ? b.state.events.length : 0;
+    const reason = b?.reason || "—";
+    const date = b?.createdAt || "—";
+    return `
+      <div class="item" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+        <div class="small">
+          <div><strong>${date}</strong> · raison: <strong>${reason}</strong></div>
+          <div>${rabbits} lapin(s) · ${events} événement(s)</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn secondary" data-export-backup="${b.id}">Exporter ce backup</button>
+          <button class="btn" data-restore-backup="${b.id}">Restaurer</button>
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
 // ================================================================
@@ -225,32 +323,46 @@ const savedPanel = (() => {
   } catch (_) { return "dashboard"; }
 })();
 
-wireNav();
-wireExtra();
-wireStatic(ctx);
-wireGuide(ctx);
+async function initApp() {
+  wireNav();
+  wireExtra();
+  wireStatic(ctx);
+  wireGuide(ctx);
 
-if (!supabaseConfigured || isE2E) {
-  const authOverlay = document.getElementById("authOverlay");
-  if (authOverlay) {
-    authOverlay.style.display = "none";
-    authOverlay.setAttribute("aria-hidden", "true");
-    authOverlay.innerHTML = "";
+  try {
+    await hydrateAndMigratePhotos(ctx.state);
+    ctx.state = Store.save(ctx.state);
+  } catch (err) {
+    showToast("Erreur stockage photos local (IndexedDB) : " + (err?.message || err), "error");
   }
-  if (!isE2E) {
-    seedIfEmpty();
-    setActivePanel(savedPanel);
-  } else {
-    setActivePanel("dashboard");
-  }
-} else {
-  import("./src/wireAuth.js").then(({ bootWithAuth }) => {
-    bootWithAuth(ctx, () => setActivePanel(savedPanel), joinFarmId);
-  }).catch((err) => {
-    console.error("[CuniWorld] Impossible de charger l'auth Supabase:", err);
+
+  if (!supabaseConfigured || isE2E) {
+    ctx.setSyncStatus("local");
     const authOverlay = document.getElementById("authOverlay");
-    if (authOverlay) { authOverlay.style.display = "none"; authOverlay.innerHTML = ""; }
-    seedIfEmpty();
-    setActivePanel(savedPanel);
-  });
+    if (authOverlay) {
+      authOverlay.style.display = "none";
+      authOverlay.setAttribute("aria-hidden", "true");
+      authOverlay.innerHTML = "";
+    }
+    if (!isE2E) {
+      seedIfEmpty();
+      setActivePanel(savedPanel);
+    } else {
+      setActivePanel("dashboard");
+    }
+  } else {
+    ctx.setSyncStatus("synced");
+    replayMutationQueue().then(() => ctx.updatePendingMutations()).catch(() => {});
+    import("./src/wireAuth.js").then(({ bootWithAuth }) => {
+      bootWithAuth(ctx, () => setActivePanel(savedPanel), joinFarmId);
+    }).catch((err) => {
+      console.error("[CuniWorld] Impossible de charger l'auth Supabase:", err);
+      const authOverlay = document.getElementById("authOverlay");
+      if (authOverlay) { authOverlay.style.display = "none"; authOverlay.innerHTML = ""; }
+      seedIfEmpty();
+      setActivePanel(savedPanel);
+    });
+  }
 }
+
+initApp();
