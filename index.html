@@ -40,87 +40,64 @@
     </div>
   </header>
 
-  <!-- ===== CONTENU PRINCIPAL ===== -->
-  <main class="container">
+  <!-- ===== APP LAYOUT ===== -->
+  <div class="app-layout">
 
-    <!-- ─── MENU PRINCIPAL (icônes) ─── -->
-    <div class="app-menu" id="appMenu">
-      <div class="menu-grid">
+    <!-- ─── SIDEBAR ─── -->
+    <nav class="sidebar" aria-label="Navigation principale">
+      <button class="nav-item active" data-panel="dashboard" data-testid="nav-dashboard">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Tableau de bord</span>
+        <span class="nav-badge" id="badge-dashboard"></span>
+      </button>
+      <button class="nav-item" data-panel="rabbits" data-testid="nav-rabbits">
+        <span class="nav-icon">🐇</span>
+        <span class="nav-label">Mes Lapins</span>
+        <span class="nav-badge" id="badge-rabbits"></span>
+      </button>
+      <button class="nav-item" data-panel="lots" data-testid="nav-lots">
+        <span class="nav-icon">📦</span>
+        <span class="nav-label">Lots / Jeunes</span>
+        <span class="nav-badge" id="badge-lots"></span>
+      </button>
+      <button class="nav-item" data-panel="genealogy" data-testid="nav-genealogy">
+        <span class="nav-icon">🌳</span>
+        <span class="nav-label">Généalogie</span>
+        <span class="nav-badge" id="badge-genealogy"></span>
+      </button>
+      <button class="nav-item" data-panel="actions" data-testid="nav-actions">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Actions</span>
+        <span class="nav-badge" id="badge-actions"></span>
+      </button>
+    </nav>
 
-        <button class="menu-card" data-panel="dashboard" aria-label="Tableau de bord">
-          <span class="menu-card-ripple"></span>
-          <span class="menu-card-icon">📊</span>
-          <span class="menu-card-label">Tableau de bord</span>
-          <span class="menu-card-dot"></span>
-        </button>
-
-        <button class="menu-card" data-panel="rabbits" aria-label="Mes Lapins">
-          <span class="menu-card-ripple"></span>
-          <span class="menu-card-icon">🐇</span>
-          <span class="menu-card-label">Mes Lapins</span>
-          <span class="menu-card-dot"></span>
-        </button>
-
-        <button class="menu-card" data-panel="lots" aria-label="Lots">
-          <span class="menu-card-ripple"></span>
-          <span class="menu-card-icon">📦</span>
-          <span class="menu-card-label">Lots / Jeunes</span>
-          <span class="menu-card-dot"></span>
-        </button>
-
-        <button class="menu-card" data-panel="genealogy" aria-label="Généalogie">
-          <span class="menu-card-ripple"></span>
-          <span class="menu-card-icon">🌳</span>
-          <span class="menu-card-label">Généalogie</span>
-          <span class="menu-card-dot"></span>
-        </button>
-
-        <button class="menu-card" data-panel="actions" aria-label="Actions">
-          <span class="menu-card-ripple"></span>
-          <span class="menu-card-icon">⚙️</span>
-          <span class="menu-card-label">Actions</span>
-          <span class="menu-card-dot"></span>
-        </button>
-
-      </div>
-    </div>
-
-    <!-- ─── ÉTAT VIDE ─── -->
-    <div class="empty-state" id="emptyState">
-      <div class="empty-icon">🐇</div>
-      <div class="empty-title">Bienvenue dans CuniWorld</div>
-      <div class="empty-sub">Choisissez une section dans le menu ci-dessus pour commencer.</div>
-    </div>
-
-    <!-- ─── PANNEAUX OUVERTS ─── -->
-    <div class="panels-container" id="panelsContainer">
+    <!-- ─── CONTENU PRINCIPAL ─── -->
+    <main class="content-area">
 
       <!-- Panneau : Tableau de bord -->
-      <div class="section-panel" id="panel-dashboard" data-panel="dashboard" style="display:none">
+      <div class="section-panel panel-active" id="panel-dashboard" data-panel="dashboard">
         <div class="panel-header">
           <div class="panel-title-group">
             <span class="panel-icon">📊</span>
             <span class="panel-title">Tableau de bord</span>
           </div>
-          <button class="panel-close" data-close-panel="dashboard" aria-label="Fermer">✕</button>
         </div>
         <div class="panel-body">
           <div id="dash" class="dash" data-testid="dash"></div>
         </div>
       </div>
 
-      <!-- Panneau : Lapins (split layout liste / détail) -->
-      <div class="section-panel" id="panel-rabbits" data-panel="rabbits" style="display:none">
+      <!-- Panneau : Lapins (split liste / détail) -->
+      <div class="section-panel" id="panel-rabbits" data-panel="rabbits">
         <div class="panel-header">
           <div class="panel-title-group">
             <span class="panel-icon">🐇</span>
             <span class="panel-title">Mes Lapins</span>
           </div>
-          <button class="panel-close" data-close-panel="rabbits" aria-label="Fermer">✕</button>
         </div>
         <div class="panel-body rl-body">
 
-          <!-- COLONNE GAUCHE : recherche + liste -->
           <div class="rl-left">
             <div class="rl-search">
               <input id="q" class="input" placeholder="Rechercher…" data-testid="rabbit-search" />
@@ -141,7 +118,6 @@
             <div id="rabbitList" class="list" data-testid="rabbit-list"></div>
           </div>
 
-          <!-- COLONNE DROITE : fiche + événements -->
           <div class="rl-right">
             <div id="rabbitDetails" class="muted" data-testid="rabbit-details">
               Sélectionne un lapin pour voir ses détails.
@@ -153,13 +129,12 @@
       </div>
 
       <!-- Panneau : Lots -->
-      <div class="section-panel" id="panel-lots" data-panel="lots" style="display:none">
+      <div class="section-panel" id="panel-lots" data-panel="lots">
         <div class="panel-header">
           <div class="panel-title-group">
             <span class="panel-icon">📦</span>
             <span class="panel-title">Lots / Jeunes</span>
           </div>
-          <button class="panel-close" data-close-panel="lots" aria-label="Fermer">✕</button>
         </div>
         <div class="panel-body">
           <div class="row">
@@ -171,13 +146,12 @@
       </div>
 
       <!-- Panneau : Généalogie -->
-      <div class="section-panel" id="panel-genealogy" data-panel="genealogy" style="display:none">
+      <div class="section-panel" id="panel-genealogy" data-panel="genealogy">
         <div class="panel-header">
           <div class="panel-title-group">
             <span class="panel-icon">🌳</span>
             <span class="panel-title">Généalogie</span>
           </div>
-          <button class="panel-close" data-close-panel="genealogy" aria-label="Fermer">✕</button>
         </div>
         <div class="panel-body">
           <div class="row">
@@ -189,13 +163,12 @@
       </div>
 
       <!-- Panneau : Actions -->
-      <div class="section-panel" id="panel-actions" data-panel="actions" style="display:none">
+      <div class="section-panel" id="panel-actions" data-panel="actions">
         <div class="panel-header">
           <div class="panel-title-group">
             <span class="panel-icon">⚙️</span>
             <span class="panel-title">Actions & Paramètres</span>
           </div>
-          <button class="panel-close" data-close-panel="actions" aria-label="Fermer">✕</button>
         </div>
         <div class="panel-body">
           <div class="more-actions">
@@ -267,11 +240,9 @@
         </div>
       </div>
 
-    </div><!-- /panelsContainer -->
-  </main>
+    </main><!-- /content-area -->
 
-  <!-- ===== FAB (mobile only) ===== -->
-  <button id="fabNewRabbit" class="fab" aria-label="Nouveau lapin" data-testid="fab-new-rabbit">+</button>
+  </div><!-- /app-layout -->
 
   <!-- ===== GUIDE OVERLAY ===== -->
   <div id="guideOverlay" class="guide-overlay hidden" data-testid="guide-overlay">

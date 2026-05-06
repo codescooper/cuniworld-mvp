@@ -5,20 +5,23 @@ import { wireStatic, wireDynamic } from "./src/wire.js";
 import { GUIDE_STEPS, getGuideStep, getNextStep, getPrevStep } from "./src/guide.js";
 import { openWeightCheckModal } from "./src/weightCheck.js";
 import { openPhotoCheckModal } from "./src/photoCheck.js";
+import { getReminders } from "./src/health.js";
 
 const el = getEls();
+
+const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "actions"];
 
 const ctx = {
   Store,
   el,
-  state:      Store.load(),   // cache local — remplacé par Supabase après auth
+  state:      Store.load(),
   farmId:     null,
   farmName:   null,
   currentUser: null,
   selectedRabbitId:     null,
   selectedLotId:        null,
   selectedGeneRabbitId: null,
-  openPanels:    new Set(),
+  activePanel:   "dashboard",
   guideMode:     false,
   currentStep:   null,
   completedSteps: new Set(),
@@ -26,10 +29,9 @@ const ctx = {
   render: () => {
     renderAll(ctx);
     wireDynamic(ctx);
-    wireGuide(ctx);
-    syncMenuCards();
-    if (ctx.selectedRabbitId && !ctx.openPanels.has("rabbits")) {
-      openPanel("rabbits");
+    updateNavBadges(ctx);
+    if (ctx.selectedRabbitId && ctx.activePanel !== "rabbits") {
+      setActivePanel("rabbits");
     }
   },
 };
@@ -64,98 +66,57 @@ function seedIfEmpty() {
 }
 
 // ================================================================
-// PANNEAUX
+// NAVIGATION — panneau unique actif
 // ================================================================
-function openPanel(name) {
-  if (ctx.openPanels.has(name)) return;
-  ctx.openPanels.add(name);
-  const panel = document.getElementById(`panel-${name}`);
-  if (panel) {
-    panel.classList.remove("panel-closing");
-    panel.style.display = "";
-    void panel.offsetWidth;
-  }
-  syncMenuCards();
-  syncEmptyState();
-  savePanelState();
+function setActivePanel(name) {
+  const prev = ctx.activePanel;
+  if (prev === name) { ctx.render(); return; }
+
+  document.getElementById(`panel-${prev}`)?.classList.remove("panel-active");
+  document.querySelector(`.nav-item[data-panel="${prev}"]`)?.classList.remove("active");
+
+  ctx.activePanel = name;
+
+  document.getElementById(`panel-${name}`)?.classList.add("panel-active");
+  document.querySelector(`.nav-item[data-panel="${name}"]`)?.classList.add("active");
+
+  try { localStorage.setItem("cuniworld_active_panel", name); } catch (_) {}
+  ctx.render();
 }
 
-function closePanel(name) {
-  if (!ctx.openPanels.has(name)) return;
-  ctx.openPanels.delete(name);
-  const panel = document.getElementById(`panel-${name}`);
-  if (panel) {
-    panel.classList.add("panel-closing");
-    setTimeout(() => {
-      if (panel.classList.contains("panel-closing")) {
-        panel.style.display = "none";
-        panel.classList.remove("panel-closing");
-      }
-    }, 220);
-  }
-  syncMenuCards();
-  syncEmptyState();
-  savePanelState();
+function updateNavBadges(ctx) {
+  try {
+    const { overdue } = getReminders(ctx.state, { windowDays: 7 });
+    const badge = document.getElementById("badge-dashboard");
+    if (badge) badge.textContent = overdue.length > 0 ? String(overdue.length) : "";
+  } catch (_) {}
 }
 
-function togglePanel(name) {
-  if (ctx.openPanels.has(name)) closePanel(name); else openPanel(name);
-}
-
-function syncMenuCards() {
-  document.querySelectorAll(".menu-card[data-panel]").forEach(card => {
-    card.classList.toggle("active", ctx.openPanels.has(card.dataset.panel));
-  });
-}
-
-function syncEmptyState() {
-  const empty = document.getElementById("emptyState");
-  if (empty) empty.style.display = ctx.openPanels.size === 0 ? "" : "none";
-}
-
-function savePanelState() {
-  try { localStorage.setItem("openPanels", JSON.stringify([...ctx.openPanels])); } catch (_) {}
-}
-
-// ================================================================
-// MENU
-// ================================================================
-function wireMenuCards() {
-  document.querySelectorAll(".menu-card[data-panel]").forEach(card => {
-    card.addEventListener("click", () => togglePanel(card.dataset.panel));
+function wireNav() {
+  document.querySelectorAll(".nav-item[data-panel]").forEach(item => {
+    item.addEventListener("click", () => setActivePanel(item.dataset.panel));
   });
 
-  document.getElementById("panelsContainer")?.addEventListener("click", e => {
-    const btn = e.target.closest("[data-close-panel]");
-    if (btn) closePanel(btn.dataset.closePanel);
-  });
-
+  // data-open-rabbit links basculent vers le panneau lapins
   document.addEventListener("click", e => {
-    if (e.target.closest("[data-open-rabbit]") && !ctx.openPanels.has("rabbits")) {
-      openPanel("rabbits");
+    if (e.target.closest("[data-open-rabbit]") && ctx.activePanel !== "rabbits") {
+      setActivePanel("rabbits");
     }
   });
-
-  try {
-    const saved = JSON.parse(localStorage.getItem("openPanels") || "[]");
-    saved.forEach(name => openPanel(name));
-  } catch (_) {}
-
-  syncEmptyState();
 }
 
 // ================================================================
 // GUIDE
 // ================================================================
 function wireGuide(ctx) {
-  const guideToggle = document.getElementById("guideToggle");
+  const guideToggle  = document.getElementById("guideToggle");
   const guideOverlay = document.getElementById("guideOverlay");
   if (!guideToggle) return;
 
   guideToggle.addEventListener("change", () => {
     if (guideToggle.checked) {
-      ctx.guideMode    = true;
-      ctx.currentStep  = GUIDE_STEPS[0].id;
+      ctx.guideMode   = true;
+      ctx.currentStep = GUIDE_STEPS[0].id;
       ctx.completedSteps.clear();
       updateGuideDisplay();
     } else {
@@ -194,11 +155,11 @@ function wireGuide(ctx) {
     const stepIdx  = GUIDE_STEPS.findIndex(s => s.id === step.id);
     const progress = ((stepIdx + 1) / GUIDE_STEPS.length) * 100;
 
-    const guideTitle = document.getElementById("guideTitle");
-    const guideStepNumber = document.getElementById("guideStepNumber");
+    const guideTitle       = document.getElementById("guideTitle");
+    const guideStepNumber  = document.getElementById("guideStepNumber");
     const guideDescription = document.getElementById("guideDescription");
-    if (guideTitle) guideTitle.textContent = step.title;
-    if (guideStepNumber) guideStepNumber.textContent = `Étape ${stepIdx + 1}/${GUIDE_STEPS.length}`;
+    if (guideTitle)       guideTitle.textContent       = step.title;
+    if (guideStepNumber)  guideStepNumber.textContent  = `Étape ${stepIdx + 1}/${GUIDE_STEPS.length}`;
     if (guideDescription) guideDescription.textContent = step.description;
 
     const pb = document.querySelector(".guide-progress");
@@ -215,10 +176,9 @@ function wireGuide(ctx) {
 }
 
 // ================================================================
-// BOUTONS EXTRA (FAB + panneau Actions)
+// BOUTONS EXTRA (panneau Actions)
 // ================================================================
 function wireExtra() {
-  document.getElementById("fabNewRabbit")?.addEventListener("click", () => ctx.el.btnNewRabbit?.click());
   document.getElementById("moreNewRabbit")?.addEventListener("click", () => ctx.el.btnNewRabbit?.click());
   document.getElementById("moreExport")?.addEventListener("click", () => ctx.el.btnExport?.click());
 
@@ -249,41 +209,48 @@ function wireExtra() {
 // ================================================================
 // INITIALISATION
 // ================================================================
-const params = new URLSearchParams(window.location.search);
+const params     = new URLSearchParams(window.location.search);
 const isE2E      = params.has("e2e");
 const joinFarmId = params.get("join") || null;
 
-// En mode E2E (tests Playwright) ou si les variables Supabase sont absentes,
-// on saute l'auth et on lance l'app directement en mode local.
 const viteEnv = import.meta.env;
 const supabaseConfigured =
   viteEnv.VITE_SUPABASE_URL?.startsWith("https://") &&
   (viteEnv.VITE_SUPABASE_ANON_KEY?.length ?? 0) > 20;
 
-wireMenuCards();
+const savedPanel = (() => {
+  try {
+    const p = localStorage.getItem("cuniworld_active_panel");
+    return PANELS.includes(p) ? p : "dashboard";
+  } catch (_) { return "dashboard"; }
+})();
+
+wireNav();
 wireExtra();
 wireStatic(ctx);
+wireGuide(ctx);
 
 if (!supabaseConfigured || isE2E) {
-  // Mode hors-ligne / tests : masquer l'overlay auth de façon certaine
   const authOverlay = document.getElementById("authOverlay");
   if (authOverlay) {
     authOverlay.style.display = "none";
     authOverlay.setAttribute("aria-hidden", "true");
     authOverlay.innerHTML = "";
   }
-  if (!isE2E) seedIfEmpty();
-  else ["dashboard", "rabbits", "lots"].forEach(openPanel);
-  ctx.render();
+  if (!isE2E) {
+    seedIfEmpty();
+    setActivePanel(savedPanel);
+  } else {
+    setActivePanel("dashboard");
+  }
 } else {
-  // Mode collaboratif : auth Supabase
   import("./src/wireAuth.js").then(({ bootWithAuth }) => {
-    bootWithAuth(ctx, () => ctx.render(), joinFarmId);
+    bootWithAuth(ctx, () => setActivePanel(savedPanel), joinFarmId);
   }).catch((err) => {
     console.error("[CuniWorld] Impossible de charger l'auth Supabase:", err);
     const authOverlay = document.getElementById("authOverlay");
     if (authOverlay) { authOverlay.style.display = "none"; authOverlay.innerHTML = ""; }
     seedIfEmpty();
-    ctx.render();
+    setActivePanel(savedPanel);
   });
 }
