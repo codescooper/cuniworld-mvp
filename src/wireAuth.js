@@ -16,7 +16,7 @@ function _withTimeout(promise, ms, label) {
 }
 
 // ── Point d'entrée : appelé au boot de l'app ──────────────────────
-export async function bootWithAuth(ctx, onReady) {
+export async function bootWithAuth(ctx, onReady, joinFarmId = null) {
   let session = null;
   try {
     session = await _withTimeout(Auth.getSession(), 8000, 'getSession');
@@ -28,9 +28,9 @@ export async function bootWithAuth(ctx, onReady) {
 
   if (session) {
     ctx.currentUser = session.user;
-    await _selectFarm(ctx, onReady);
+    await _selectFarm(ctx, onReady, joinFarmId);
   } else {
-    _showAuthScreen(ctx, onReady);
+    _showAuthScreen(ctx, onReady, joinFarmId);
   }
 
   // Réagit aux changements d'état auth (déconnexion autre onglet, expiration)
@@ -39,7 +39,7 @@ export async function bootWithAuth(ctx, onReady) {
       DB.unsubscribeAll();
       ctx.farmId = null;
       ctx.currentUser = null;
-      _showAuthScreen(ctx, onReady);
+      _showAuthScreen(ctx, onReady, null);
     }
   });
 }
@@ -52,23 +52,23 @@ function _goOffline(ctx, onReady) {
 }
 
 // ── Écran de connexion / inscription ─────────────────────────────
-function _showAuthScreen(ctx, onReady) {
+function _showAuthScreen(ctx, onReady, joinFarmId = null) {
   const overlay = document.getElementById('authOverlay');
   overlay.classList.remove('hidden');
-  overlay.innerHTML = _authShellHTML();
+  overlay.innerHTML = _authShellHTML(joinFarmId);
 
   overlay.querySelectorAll('.auth-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       overlay.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
-      _renderAuthForm(overlay, tab.dataset.mode, ctx, onReady);
+      _renderAuthForm(overlay, tab.dataset.mode, ctx, onReady, joinFarmId);
     });
   });
 
-  _renderAuthForm(overlay, 'login', ctx, onReady);
+  _renderAuthForm(overlay, 'login', ctx, onReady, joinFarmId);
 }
 
-function _renderAuthForm(overlay, mode, ctx, onReady) {
+function _renderAuthForm(overlay, mode, ctx, onReady, joinFarmId = null) {
   const label = mode === 'login' ? 'Se connecter' : 'Créer le compte';
   overlay.querySelector('#authFormInner').innerHTML = `
     <form id="authSubmitForm" class="auth-form">
@@ -107,7 +107,7 @@ function _renderAuthForm(overlay, mode, ctx, onReady) {
         }
       }
       overlay.classList.add('hidden');
-      await _selectFarm(ctx, onReady);
+      await _selectFarm(ctx, onReady, joinFarmId);
     } catch (ex) {
       errEl.style.color = '';
       errEl.textContent = _friendlyError(ex);
@@ -118,11 +118,32 @@ function _renderAuthForm(overlay, mode, ctx, onReady) {
 }
 
 // ── Sélection / création / rejoindre une ferme ────────────────────
-async function _selectFarm(ctx, onReady) {
+async function _selectFarm(ctx, onReady, joinFarmId = null) {
   const overlay = document.getElementById('authOverlay');
   overlay.style.display = '';
   overlay.classList.remove('hidden');
   overlay.innerHTML = '<div class="auth-card"><p class="auth-loading">Chargement…</p></div>';
+
+  // Auto-join via lien d'invitation
+  if (joinFarmId) {
+    try {
+      const farm = await _withTimeout(FarmService.joinFarm(joinFarmId), 10000, 'joinFarm');
+      _clearJoinParam();
+      await _loadFarm(farm.id, farm.name, ctx, onReady);
+    } catch (ex) {
+      overlay.innerHTML = `
+        <div class="auth-card">
+          <p class="auth-error">Impossible de rejoindre la ferme : ${escapeHTML(ex.message || 'Lien invalide ou ferme introuvable.')}</p>
+          <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+            <button class="btn" id="btnRetryJoin" style="flex:1">Réessayer</button>
+            <button class="btn secondary" id="btnSkipJoin" style="flex:1">Mes fermes</button>
+          </div>
+        </div>`;
+      overlay.querySelector('#btnRetryJoin')?.addEventListener('click', () => _selectFarm(ctx, onReady, joinFarmId));
+      overlay.querySelector('#btnSkipJoin')?.addEventListener('click', () => { _clearJoinParam(); _selectFarm(ctx, onReady, null); });
+    }
+    return;
+  }
 
   let farms = [];
   try {
@@ -143,6 +164,12 @@ async function _selectFarm(ctx, onReady) {
 
   overlay.innerHTML = _farmSelectorHTML(farms, ctx.currentUser?.email);
   _wireFarmSelector(overlay, ctx, onReady);
+}
+
+function _clearJoinParam() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('join');
+  history.replaceState(null, '', url.toString());
 }
 
 function _wireFarmSelector(overlay, ctx, onReady) {
@@ -270,7 +297,17 @@ function _updateTopbar(ctx, onReady) {
   info.classList.remove('hidden');
 
   document.getElementById('btnCopyFarmId')?.addEventListener('click', () => {
-    navigator.clipboard?.writeText(ctx.farmId).then(() => alert(`Identifiant copié :\n${ctx.farmId}\n\nPartagez-le à vos collègues pour qu'ils rejoignent la ferme.`));
+    const base = window.location.origin + window.location.pathname.replace(/\/$/, '');
+    const link = `${base}?join=${ctx.farmId}`;
+    const msg  =
+      `Bonjour,\n\n` +
+      `Je t'invite à rejoindre ma ferme « ${ctx.farmName} » sur CuniWorld, l'application de gestion d'élevage de lapins.\n\n` +
+      `Clique sur ce lien pour rejoindre (ou crée un compte gratuitement si tu n'en as pas) :\n` +
+      `${link}\n\n` +
+      `À bientôt !`;
+    navigator.clipboard?.writeText(msg).then(() =>
+      alert('Message d\'invitation copié !\nColle-le dans un email ou WhatsApp.')
+    );
   });
 
   document.getElementById('btnSwitchFarm')?.addEventListener('click', async () => {
@@ -289,12 +326,16 @@ function _updateTopbar(ctx, onReady) {
 }
 
 // ── HTML templates ────────────────────────────────────────────────
-function _authShellHTML() {
+function _authShellHTML(joinFarmId = null) {
+  const inviteBanner = joinFarmId
+    ? `<p class="auth-invite-banner">Vous avez été invité à rejoindre une ferme. Connectez-vous ou créez un compte pour continuer.</p>`
+    : '';
   return `
     <div class="auth-card">
       <div class="auth-logo">🐇</div>
       <h1 class="auth-title">CuniWorld</h1>
       <p class="auth-sub">Gestion d'élevage collaboratif</p>
+      ${inviteBanner}
       <div class="auth-tabs">
         <button class="auth-tab active" data-mode="login">Se connecter</button>
         <button class="auth-tab" data-mode="signup">Créer un compte</button>

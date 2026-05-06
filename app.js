@@ -249,7 +249,9 @@ function wireExtra() {
 // ================================================================
 // INITIALISATION
 // ================================================================
-const isE2E = new URLSearchParams(window.location.search).has("e2e");
+const params = new URLSearchParams(window.location.search);
+const isE2E      = params.has("e2e");
+const joinFarmId = params.get("join") || null;
 
 // En mode E2E (tests Playwright) ou si les variables Supabase sont absentes,
 // on saute l'auth et on lance l'app directement en mode local.
@@ -276,10 +278,9 @@ if (!supabaseConfigured || isE2E) {
 } else {
   // Mode collaboratif : auth Supabase
   import("./src/wireAuth.js").then(({ bootWithAuth }) => {
-    bootWithAuth(ctx, () => ctx.render());
+    bootWithAuth(ctx, () => ctx.render(), joinFarmId);
   }).catch((err) => {
     console.error("[CuniWorld] Impossible de charger l'auth Supabase:", err);
-    // Fallback offline si le module n'a pas pu se charger
     const authOverlay = document.getElementById("authOverlay");
     if (authOverlay) { authOverlay.style.display = "none"; authOverlay.innerHTML = ""; }
     seedIfEmpty();
