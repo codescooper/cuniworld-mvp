@@ -242,7 +242,7 @@ export function wireDynamic(ctx) {
       if (!file) return;
       try {
         const dataUrl = await compressImage(file);
-        addPhoto(ctx, ctx.selectedRabbitId, {
+        await addPhoto(ctx, ctx.selectedRabbitId, {
           dataUrl,
           date: new Date().toISOString().slice(0, 10),
           source: "profile",
@@ -393,6 +393,7 @@ function rabbitFormHTML(rabbit=null, state=null) {
         <div class="label">Statut</div>
         <select class="input" name="status">
           <option value="actif" ${r.status==="actif"?"selected":""}>Actif</option>
+          <option value="vendu" ${r.status==="vendu"?"selected":""}>Vendu</option>
           <option value="mort" ${r.status==="mort"?"selected":""}>Mort</option>
         </select>
       </div>
@@ -524,12 +525,12 @@ function wireRabbitForm(ctx, existingRabbit) {
     clearPhotoBtn.style.display = "none";
   });
 
-  form?.addEventListener("submit", (e) => {
+  form?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
     const data = Object.fromEntries(fd.entries());
     data.sex = (data.sex || "U").toString();
-    data.status = (data.status || "actif").toString();
+    data.status = (data.status || existingRabbit?.status || "actif").toString();
     data.birthDate = (data.birthDate || "").toString();
     data.motherId = data.motherId || null;
     data.fatherId = data.fatherId || null;
@@ -562,7 +563,7 @@ function wireRabbitForm(ctx, existingRabbit) {
         updateRabbit(ctx, existingRabbit.id, data);
         if (selectedPhotoData) {
           try {
-            addPhoto(ctx, existingRabbit.id, {
+            await addPhoto(ctx, existingRabbit.id, {
               dataUrl: selectedPhotoData,
               date: new Date().toISOString().slice(0, 10),
               source: "profile",
@@ -575,7 +576,7 @@ function wireRabbitForm(ctx, existingRabbit) {
         addRabbit(ctx, data);
         if (selectedPhotoData && ctx.selectedRabbitId) {
           try {
-            addPhoto(ctx, ctx.selectedRabbitId, {
+            await addPhoto(ctx, ctx.selectedRabbitId, {
               dataUrl: selectedPhotoData,
               date: new Date().toISOString().slice(0, 10),
               source: "profile",
@@ -590,6 +591,8 @@ function wireRabbitForm(ctx, existingRabbit) {
       alert(err?.message || String(err));
     }
   });
+
+  setupModalFormKeyboardUX(form, '[data-testid="rabbit-form-submit"]');
 }
 
 function eventFormHTML(preType = "autre") {
@@ -777,7 +780,7 @@ function wireEventForm(ctx) {
     clearError();
   });
 
-  form?.addEventListener("submit", (e) => {
+  form?.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!ctx.selectedRabbitId) return;
     if (isSubmitting) return;
@@ -829,7 +832,7 @@ function wireEventForm(ctx) {
         const photoDataUrl = peseePhotoInput?.dataset.dataUrl;
         if (photoDataUrl) {
           try {
-            addPhoto(ctx, ctx.selectedRabbitId, {
+            await addPhoto(ctx, ctx.selectedRabbitId, {
               dataUrl: photoDataUrl,
               date,
               source: "pesée",
@@ -848,6 +851,69 @@ function wireEventForm(ctx) {
       isSubmitting = false;
       if (submitBtn) submitBtn.disabled = false;
       return;
+    }
+  });
+
+  setupModalFormKeyboardUX(form, '[data-testid="event-form-submit"]');
+}
+
+function setupModalFormKeyboardUX(form, submitSelector) {
+  if (!form) return;
+
+  const getFocusableFields = () => {
+    const nodes = Array.from(form.querySelectorAll("input, select, textarea"));
+    return nodes.filter((node) => {
+      if (!(node instanceof HTMLElement)) return false;
+      if (node.matches('[type="hidden"], [type="file"]')) return false;
+      if (node.hasAttribute("disabled")) return false;
+      if (node.getAttribute("aria-hidden") === "true") return false;
+      if (node.offsetParent === null) return false;
+      return true;
+    });
+  };
+
+  const focusFirstField = () => {
+    const first = getFocusableFields()[0];
+    if (!first) return;
+    first.focus({ preventScroll: true });
+    if (first instanceof HTMLInputElement && first.type !== "date") {
+      first.select?.();
+    }
+  };
+
+  requestAnimationFrame(() => {
+    focusFirstField();
+  });
+
+  form.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    if (e.defaultPrevented) return;
+
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (!target.matches("input, select, textarea")) return;
+    if (target.matches('[type="file"]')) return;
+
+    if (target.tagName === "TEXTAREA" && e.shiftKey) {
+      return; // autorise retour ligne
+    }
+
+    e.preventDefault();
+    const fields = getFocusableFields();
+    const idx = fields.indexOf(target);
+    const next = idx >= 0 ? fields[idx + 1] : null;
+
+    if (next) {
+      next.focus({ preventScroll: true });
+      if (next instanceof HTMLInputElement && next.type !== "date") {
+        next.select?.();
+      }
+      return;
+    }
+
+    const submitBtn = form.querySelector(submitSelector);
+    if (submitBtn instanceof HTMLButtonElement && !submitBtn.disabled) {
+      submitBtn.click();
     }
   });
 }

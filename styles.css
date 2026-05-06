@@ -63,6 +63,22 @@ body {
   gap: var(--space-2);
 }
 
+.sync-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.sync-badge.local { color: #6b7280; background: #f3f4f6; border-color: #d1d5db; }
+.sync-badge.syncing { color: #1d4ed8; background: #dbeafe; border-color: #93c5fd; }
+.sync-badge.synced { color: #166534; background: #dcfce7; border-color: #86efac; }
+.sync-badge.error { color: #991b1b; background: #fee2e2; border-color: #fca5a5; }
+
 /* Primary CTA — Nouveau lapin */
 .btn-new {
   display: flex;

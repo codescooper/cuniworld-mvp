@@ -204,14 +204,14 @@ function _renderStepContent(ctx, r, lastPhoto, { showProgress, current, total, o
   });
 
   // ── Enregistrement ─────────────────────────────────────────────
-  function save() {
+  async function save() {
     if (!selectedDataUrl) {
       errEl.textContent = 'Sélectionnez une photo avant d\'enregistrer.';
       return;
     }
     const note = (document.getElementById('pcNote')?.value || '').trim();
     try {
-      addPhoto(ctx, r.id, {
+      await addPhoto(ctx, r.id, {
         dataUrl: selectedDataUrl,
         date:    today,
         source:  'profil',
