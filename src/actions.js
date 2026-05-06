@@ -24,6 +24,22 @@ function trackCloudWrite(ctx, promise, meta = null) {
   });
 }
 
+function setSyncStatus(ctx, status) {
+  if (typeof ctx.setSyncStatus === "function") ctx.setSyncStatus(status);
+  else ctx.syncStatus = status;
+}
+
+function trackCloudWrite(ctx, promise) {
+  if (!promise || typeof promise.then !== "function") return;
+  setSyncStatus(ctx, "syncing");
+  promise
+    .then(() => setSyncStatus(ctx, "synced"))
+    .catch((err) => {
+      console.error("[sync] Cloud write failed:", err);
+      setSyncStatus(ctx, "error");
+    });
+}
+
 export function addRabbit(ctx, data) {
   const { uid, nowISO } = ctx.Store.helpers;
   const nextCode = generateRabbitCode(ctx.state, data.sex || "U");
