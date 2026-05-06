@@ -6,6 +6,8 @@ import { GUIDE_STEPS, getGuideStep, getNextStep, getPrevStep } from "./src/guide
 import { openWeightCheckModal } from "./src/weightCheck.js";
 import { openPhotoCheckModal } from "./src/photoCheck.js";
 import { getReminders } from "./src/health.js";
+import { hydrateAndMigratePhotos } from "./src/photoStorage.js";
+import { exportRabbitsCSV, exportEventsCSV } from "./src/csvExport.js";
 
 const el = getEls();
 
@@ -18,6 +20,7 @@ const ctx = {
   farmId:     null,
   farmName:   null,
   currentUser: null,
+  syncStatus: "local",
   selectedRabbitId:     null,
   selectedLotId:        null,
   selectedGeneRabbitId: null,
@@ -30,9 +33,15 @@ const ctx = {
     renderAll(ctx);
     wireDynamic(ctx);
     updateNavBadges(ctx);
+    updateSyncBadge(ctx);
     if (ctx.selectedRabbitId && ctx.activePanel !== "rabbits") {
       setActivePanel("rabbits");
     }
+  },
+  setSyncStatus: (status) => {
+    const allowed = new Set(["local", "syncing", "synced", "error"]);
+    ctx.syncStatus = allowed.has(status) ? status : "local";
+    updateSyncBadge(ctx);
   },
 };
 
@@ -90,6 +99,20 @@ function updateNavBadges(ctx) {
     const badge = document.getElementById("badge-dashboard");
     if (badge) badge.textContent = overdue.length > 0 ? String(overdue.length) : "";
   } catch (_) {}
+}
+
+function updateSyncBadge(ctx) {
+  const badge = ctx.el.syncBadge;
+  if (!badge) return;
+  const labels = {
+    local: "Local",
+    syncing: "Sync en cours",
+    synced: "Synchronisé",
+    error: "Erreur sync",
+  };
+  const status = ctx.syncStatus || "local";
+  badge.className = `sync-badge ${status}`;
+  badge.textContent = labels[status] || labels.local;
 }
 
 function wireNav() {
@@ -181,6 +204,8 @@ function wireGuide(ctx) {
 function wireExtra() {
   document.getElementById("moreNewRabbit")?.addEventListener("click", () => ctx.el.btnNewRabbit?.click());
   document.getElementById("moreExport")?.addEventListener("click", () => ctx.el.btnExport?.click());
+  document.getElementById("moreExportRabbitsCSV")?.addEventListener("click", () => exportRabbitsCSV(ctx.state));
+  document.getElementById("moreExportEventsCSV")?.addEventListener("click", () => exportEventsCSV(ctx.state));
 
   document.getElementById("moreFileImport")?.addEventListener("change", async e => {
     const file = e.target.files?.[0];
@@ -225,32 +250,45 @@ const savedPanel = (() => {
   } catch (_) { return "dashboard"; }
 })();
 
-wireNav();
-wireExtra();
-wireStatic(ctx);
-wireGuide(ctx);
+async function initApp() {
+  wireNav();
+  wireExtra();
+  wireStatic(ctx);
+  wireGuide(ctx);
 
-if (!supabaseConfigured || isE2E) {
-  const authOverlay = document.getElementById("authOverlay");
-  if (authOverlay) {
-    authOverlay.style.display = "none";
-    authOverlay.setAttribute("aria-hidden", "true");
-    authOverlay.innerHTML = "";
+  try {
+    await hydrateAndMigratePhotos(ctx.state);
+    ctx.state = Store.save(ctx.state);
+  } catch (err) {
+    alert("Erreur stockage photos local (IndexedDB) : " + (err?.message || err));
   }
-  if (!isE2E) {
-    seedIfEmpty();
-    setActivePanel(savedPanel);
-  } else {
-    setActivePanel("dashboard");
-  }
-} else {
-  import("./src/wireAuth.js").then(({ bootWithAuth }) => {
-    bootWithAuth(ctx, () => setActivePanel(savedPanel), joinFarmId);
-  }).catch((err) => {
-    console.error("[CuniWorld] Impossible de charger l'auth Supabase:", err);
+
+  if (!supabaseConfigured || isE2E) {
+    ctx.setSyncStatus("local");
     const authOverlay = document.getElementById("authOverlay");
-    if (authOverlay) { authOverlay.style.display = "none"; authOverlay.innerHTML = ""; }
-    seedIfEmpty();
-    setActivePanel(savedPanel);
-  });
+    if (authOverlay) {
+      authOverlay.style.display = "none";
+      authOverlay.setAttribute("aria-hidden", "true");
+      authOverlay.innerHTML = "";
+    }
+    if (!isE2E) {
+      seedIfEmpty();
+      setActivePanel(savedPanel);
+    } else {
+      setActivePanel("dashboard");
+    }
+  } else {
+    ctx.setSyncStatus("synced");
+    import("./src/wireAuth.js").then(({ bootWithAuth }) => {
+      bootWithAuth(ctx, () => setActivePanel(savedPanel), joinFarmId);
+    }).catch((err) => {
+      console.error("[CuniWorld] Impossible de charger l'auth Supabase:", err);
+      const authOverlay = document.getElementById("authOverlay");
+      if (authOverlay) { authOverlay.style.display = "none"; authOverlay.innerHTML = ""; }
+      seedIfEmpty();
+      setActivePanel(savedPanel);
+    });
+  }
 }
+
+initApp();

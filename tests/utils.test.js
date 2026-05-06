@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { daysBetween, getRabbitStage } from "../src/utils.js";
+import { daysBetween, getRabbitStage, rabbitStatusBadge } from "../src/utils.js";
 
 describe("utils", () => {
   it("daysBetween calcule correctement", () => {
@@ -28,5 +28,9 @@ describe("utils", () => {
     expect(getRabbitStage({ birthDate: "2025-09-01" })).toBe("adulte");
 
     global.Date = realDate;
+  });
+
+  it("rabbitStatusBadge gère le statut vendu", () => {
+    expect(rabbitStatusBadge("vendu")).toContain("Vendu");
   });
 });

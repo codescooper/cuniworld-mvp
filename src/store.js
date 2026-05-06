@@ -2,6 +2,8 @@ import { saveData, loadData } from "./storage.js";
 import { migrateRabbitWeightData } from "./weightService.js";
 
 const KEY = "cuniworld_mvp_state";
+const BACKUPS_KEY = "cuniworld_mvp_backups";
+const MAX_BACKUPS = 5;
 
 const SCHEMA_VERSION = 3;
 
@@ -24,6 +26,27 @@ function defaultState() {
   };
 }
 
+function listBackupsFromStorage() {
+  const raw = loadData(BACKUPS_KEY, []);
+  return Array.isArray(raw) ? raw : [];
+}
+
+function backupCurrentState(reason) {
+  const current = loadData(KEY, null);
+  if (!current || typeof current !== "object") return;
+
+  const backups = listBackupsFromStorage();
+  const entry = {
+    id: uid("backup"),
+    createdAt: nowISO(),
+    reason,
+    version: current.version ?? SCHEMA_VERSION,
+    state: current,
+  };
+  const next = [...backups, entry].slice(-MAX_BACKUPS);
+  saveData(BACKUPS_KEY, next);
+}
+
 function migrate(state) {
   if (!state || typeof state !== "object") return defaultState();
   if (!state.version) return { ...defaultState(), ...state, version: SCHEMA_VERSION };
@@ -36,6 +59,16 @@ function migrate(state) {
     state = { ...state, usedNames: {}, version: 3 };
   }
   return state;
+}
+
+function stripPhotoPayloads(state) {
+  if (!state || !Array.isArray(state.photos)) return state;
+  const photos = state.photos.map((p) => {
+    if (!p || typeof p !== "object") return p;
+    const { dataUrl, ...meta } = p;
+    return meta;
+  });
+  return { ...state, photos };
 }
 
 export const Store = {
@@ -52,21 +85,24 @@ export const Store = {
       ...state,
       meta: { ...(state.meta || {}), updatedAt: nowISO() },
     };
+    const persistable = stripPhotoPayloads(next);
     // saveData lève une Error explicite si le quota est dépassé
-    saveData(KEY, next);
+    saveData(KEY, persistable);
     return next;
   },
 
   reset() {
+    backupCurrentState("reset");
     localStorage.removeItem(KEY);
     return defaultState();
   },
 
   exportJSON(state) {
-    return JSON.stringify(state, null, 2);
+    return JSON.stringify(stripPhotoPayloads(state), null, 2);
   },
 
   importJSON(text) {
+    backupCurrentState("import");
     const parsed = JSON.parse(text);
     const migrated = migrate(parsed);
     if (!Array.isArray(migrated.rabbits) || !Array.isArray(migrated.events)) {
@@ -75,5 +111,19 @@ export const Store = {
     return this.save(migrated);
   },
 
-  helpers: { uid, nowISO, SCHEMA_VERSION },
+  listBackups() {
+    return listBackupsFromStorage();
+  },
+
+  restoreBackup(backupId) {
+    const backups = listBackupsFromStorage();
+    const backup = backups.find((b) => b && b.id === backupId);
+    if (!backup || !backup.state) {
+      throw new Error("Backup introuvable.");
+    }
+    const migrated = migrate(backup.state);
+    return this.save(migrated);
+  },
+
+  helpers: { uid, nowISO, SCHEMA_VERSION, BACKUPS_KEY, MAX_BACKUPS },
 };

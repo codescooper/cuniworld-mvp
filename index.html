@@ -30,6 +30,7 @@
     </div>
 
     <div class="topbar-right">
+      <span id="syncBadge" class="sync-badge local" aria-live="polite">Local</span>
       <div id="userInfo" class="user-info hidden"></div>
       <button id="btnNewRabbit" class="btn-new" data-testid="btn-new-rabbit">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -111,6 +112,7 @@
                 <select id="statusFilter" class="input" data-testid="filter-status" style="flex:1">
                   <option value="">Statut: Tous</option>
                   <option value="actif">Actif</option>
+                  <option value="vendu">Vendu</option>
                   <option value="mort">Mort</option>
                 </select>
               </div>
@@ -186,6 +188,22 @@
               <span class="tile-body">
                 <span class="tile-title">Exporter les données</span>
                 <span class="tile-sub">Sauvegarde JSON de votre élevage</span>
+              </span>
+            </button>
+
+            <button id="moreExportRabbitsCSV" class="more-action-tile" type="button">
+              <span class="tile-icon">🧾</span>
+              <span class="tile-body">
+                <span class="tile-title">Export lapins CSV</span>
+                <span class="tile-sub">Tableau des lapins (Excel/Sheets)</span>
+              </span>
+            </button>
+
+            <button id="moreExportEventsCSV" class="more-action-tile" type="button">
+              <span class="tile-icon">🧾</span>
+              <span class="tile-body">
+                <span class="tile-title">Export événements CSV</span>
+                <span class="tile-sub">Historique des événements (CSV)</span>
               </span>
             </button>
 
