@@ -18,7 +18,10 @@
       "Read(//c/Users/USER/AppData/Local/Temp/claude/C--Users-USER-cuniworld-mvp/53791e35-16df-433f-bb6e-60d5aeaa9595/tasks/**)",
       "PowerShell(netstat *)",
       "Bash(git *)",
-      "Bash(Remove-Item *)"
+      "Bash(Remove-Item *)",
+      "Bash(kill %1)",
+      "Bash(npm --version)",
+      "Bash(Get-Content C:\\\\Users\\\\USER\\\\cuniworld-mvp\\\\.gitignore)"
     ]
   }
 }
