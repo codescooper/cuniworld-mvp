@@ -6,6 +6,7 @@ import {
   addHealthEvent,
   isoDaysFromToday,
   getDashTileNumber,
+  navigateTo,
 } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
@@ -23,6 +24,7 @@ test("vaccin+traitement avec nextDate apparaissent en rappels dashboard", async 
   await addHealthEvent(page, { type: "vaccin", date: isoDaysFromToday(0), nextDate: nextIn3 });
 
   // Vérifs dashboard
+  await navigateTo(page, "dashboard");
   await expect(page.locator("#dash")).toContainText("Rappels");
 
   const upcoming = await getDashTileNumber(page, "Rappels (≤7j)");

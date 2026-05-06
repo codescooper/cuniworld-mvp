@@ -3,6 +3,7 @@ import { FarmService } from './farmService.js';
 import { DB } from './db.js';
 import { escapeHTML } from './utils.js';
 import { hydrateAndMigratePhotos } from './photoStorage.js';
+import { showToast, showConfirm } from './notifications.js';
 
 function escAttr(s) { return String(s).replace(/"/g, '&quot;'); }
 
@@ -264,21 +265,22 @@ async function _offerMigration(ctx) {
     const eCount = local?.events?.length  || 0;
     if (rCount === 0 && eCount === 0) return;
 
-    const ok = window.confirm(
-      `Vous avez ${rCount} lapin(s) et ${eCount} événement(s) en mémoire locale.\n` +
-      `Les importer dans la ferme "${ctx.farmName}" ?`
-    );
+    const ok = await showConfirm({
+      title: 'Importer les données locales',
+      message: `Vous avez ${rCount} lapin(s) et ${eCount} événement(s) en mémoire locale.\nLes importer dans la ferme « ${ctx.farmName} » ?`,
+      confirmLabel: 'Importer',
+      cancelLabel: 'Ignorer',
+    });
     if (!ok) return;
 
-    for (const r of (local.rabbits   || [])) DB.upsertRabbit(ctx.farmId, r);
-    for (const e of (local.events    || [])) DB.upsertEvent(ctx.farmId, e);
-    for (const p of (local.photos    || [])) DB.upsertPhoto(ctx.farmId, p);
-    for (const [n, rid] of Object.entries(local.usedNames || {})) DB.setUsedName(ctx.farmId, n, rid);
+    for (const r of (local.rabbits   || [])) await DB.upsertRabbit(ctx.farmId, r).catch(() => {});
+    for (const e of (local.events    || [])) await DB.upsertEvent(ctx.farmId, e).catch(() => {});
+    for (const p of (local.photos    || [])) await DB.upsertPhoto(ctx.farmId, p).catch(() => {});
+    for (const [n, rid] of Object.entries(local.usedNames || {})) await DB.setUsedName(ctx.farmId, n, rid).catch(() => {});
 
-    // Courte pause pour laisser les upserts se propager
     await new Promise(r => setTimeout(r, 800));
     ctx.state = await DB.loadFarmState(ctx.farmId);
-    alert(`Import terminé : ${rCount} lapin(s) importé(s).`);
+    showToast(`Import terminé : ${rCount} lapin(s) importé(s).`, 'success');
   } catch (_) {}
 }
 
@@ -373,7 +375,8 @@ function _updateTopbar(ctx, onReady) {
   // Logout
   document.getElementById('ddLogout')?.addEventListener('click', async () => {
     closeDropdown();
-    if (!window.confirm('Se déconnecter ?')) return;
+    const ok = await showConfirm({ title: 'Déconnexion', message: 'Se déconnecter de CuniWorld ?', confirmLabel: 'Déconnexion', cancelLabel: 'Annuler', danger: true });
+    if (!ok) return;
     DB.unsubscribeAll();
     await Auth.signOut();
     location.reload();

@@ -168,6 +168,16 @@ export async function addHealthEvent(page, { type = "vaccin", date, nextDate } =
   await closeModalHard(page);
 }
 
+export async function navigateTo(page, panel) {
+  await page.getByTestId(`nav-${panel}`).click();
+  await page.waitForTimeout(120);
+}
+
+export async function confirmCustomDialog(page) {
+  await page.locator('[data-testid="confirm-ok"]').waitFor({ state: "visible", timeout: 3000 });
+  await page.locator('[data-testid="confirm-ok"]').click();
+}
+
 export function isoDaysFromToday(deltaDays) {
   const d = new Date();
   d.setDate(d.getDate() + deltaDays);

@@ -6,6 +6,7 @@ import {
   addHealthEvent,
   isoDaysFromToday,
   getDashTileNumber,
+  navigateTo,
 } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
@@ -21,6 +22,7 @@ test("traitement avec nextDate passé => compteur 'Rappels en retard' > 0", asyn
 
   await addHealthEvent(page, { type: "traitement", date: sevenDaysAgo, nextDate: yesterday });
 
+  await navigateTo(page, "dashboard");
   await expect(page.locator("#dash")).toContainText("Rappels en retard");
 
   const overdue = await getDashTileNumber(page, "Rappels en retard");

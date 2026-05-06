@@ -69,7 +69,11 @@ export function addRabbit(ctx, data) {
   persist(ctx);
   if (fid(ctx)) trackCloudWrite(ctx, DB.upsertRabbit(fid(ctx), rabbit), { type: "upsertRabbit", payload: { farmId: fid(ctx), rabbit } });
   ctx.selectedRabbitId = rabbit.id;
-  ctx.render();
+  if (ctx.navigate) {
+    ctx.navigate("rabbits");
+  } else {
+    ctx.render();
+  }
 }
 
 export function updateRabbit(ctx, id, patch) {

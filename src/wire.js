@@ -298,12 +298,11 @@ function wireFarmActions(ctx) {
         else openPhotoCheckModal(ctx);
       } else if (action === 'openRabbit' && rabbitId) {
         ctx.selectedRabbitId = rabbitId;
-        // Ouvrir le panneau lapins si pas déjà ouvert
-        const panel = document.getElementById('panel-rabbits');
-        if (panel && panel.style.display === 'none') {
-          document.querySelector('.menu-card[data-panel="rabbits"]')?.click();
+        if (ctx.navigate) {
+          ctx.navigate("rabbits");
+        } else {
+          ctx.render();
         }
-        ctx.render();
       }
     });
   });

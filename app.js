@@ -96,6 +96,7 @@ function setActivePanel(name) {
   try { localStorage.setItem("cuniworld_active_panel", name); } catch (_) {}
   ctx.render();
 }
+ctx.navigate = (panel) => setActivePanel(panel);
 
 function updateNavBadges(ctx) {
   try {

@@ -7,6 +7,7 @@ import {
   addSaillieWithMale as addSaillie,
   addMiseBas,
   addSevrage,
+  navigateTo,
 } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
@@ -62,6 +63,9 @@ test("flux complet de reproduction: femelle -> saillie -> mise-bas -> sevrage ->
   // Ajouter sevrage - doit automatiquement sevrer tous les lapereaux actifs
   await addSevrage(page, { date: "2026-02-28", destCage: "C-04" });
 
+  // Naviguer vers le panneau Lots pour vérifier le lot créé
+  await navigateTo(page, "lots");
+
   // Vérifier que le lot a été créé
   await expect(page.locator("#lotList")).toContainText("C-04");
   await expect(page.locator("#lotList")).toContainText("7 sevrés");
@@ -72,7 +76,7 @@ test("flux complet de reproduction: femelle -> saillie -> mise-bas -> sevrage ->
   await expect(page.locator("#lotDetails")).toContainText("7 lapereaux");
 
   // Vérifier que les lapereaux ont changé de cage
-  await page.locator("#btnBack").click();
+  await navigateTo(page, "rabbits");
   await selectRabbitByCode(page, "CW-F001-K01");
   await expect(page.locator("#rabbitDetails")).toContainText("Cage: C-04");
   await expect(page.locator("#rabbitDetails")).toContainText("Stade: jeune");

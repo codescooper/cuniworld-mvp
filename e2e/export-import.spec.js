@@ -8,6 +8,8 @@ import {
   addMiseBas,
   addSevrage,
   addHealthEvent,
+  navigateTo,
+  confirmCustomDialog,
 } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
@@ -24,37 +26,30 @@ test("export -> reset -> import restaure les données", async ({ page }, testInf
   await addSevrage(page, { date: "2026-02-28", weaned: "6", destCage: "C-04" });
   await addHealthEvent(page, { type: "vaccin", date: "2026-03-01", nextDate: "2026-03-10" });
 
-  // Vérifs pré-export
+  // Vérifs pré-export (rabbits panel)
   await expect(page.locator("#rabbitDetails")).toContainText("CW-F001");
   await expect(page.locator("#lotList")).toContainText("C-04");
   await expect(page.locator("#rabbitList")).toContainText("CW-F001-K01");
 
-  // Export
+  // Export depuis le panneau Actions
+  await navigateTo(page, "actions");
   const download = await Promise.all([
     page.waitForEvent("download"),
-    (async () => {
-      const b = page.getByTestId("btn-export");
-      if (await b.count()) await b.click();
-      else await page.locator("#btnExport").click();
-    })(),
+    page.locator("#moreExport").click(),
   ]).then(([d]) => d);
 
   const exportPath = testInfo.outputPath("export-backup.json");
   await download.saveAs(exportPath);
 
-  // Reset (confirm)
-  page.once("dialog", (dialog) => dialog.accept());
-  const reset = page.getByTestId("btn-reset");
-  if (await reset.count()) await reset.click();
-  else await page.locator("#btnReset").click();
+  // Reset (custom confirm)
+  await page.locator("#moreReset").click();
+  await confirmCustomDialog(page);
 
-  // Import (alert "Import réussi.")
-  page.once("dialog", (dialog) => dialog.accept());
-  const file = page.getByTestId("file-import");
-  if (await file.count()) await file.setInputFiles(exportPath);
-  else await page.locator("#fileImport").setInputFiles(exportPath);
+  // Import (file input dans le panneau Actions)
+  await page.locator("#moreFileImport").setInputFiles(exportPath);
 
-  // Re-sélectionner
+  // Re-sélectionner dans le panneau lapins
+  await navigateTo(page, "rabbits");
   await page.getByText("CW-F001", { exact: true }).first().click();
 
   await expect(page.locator("#rabbitDetails")).toContainText("CW-F001");
