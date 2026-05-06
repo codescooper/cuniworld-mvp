@@ -11,6 +11,7 @@ import { exportRabbitsCSV, exportEventsCSV } from "./src/csvExport.js";
 import { createSyncManager } from "./src/syncManager.js";
 import { getPendingMutationCount, replayMutationQueue } from "./src/mutationQueue.js";
 import { showToast, showConfirm } from "./src/notifications.js";
+import { supabaseConfigured } from "./src/supabase.js";
 
 const el = getEls();
 
@@ -38,9 +39,6 @@ const ctx = {
     updateNavBadges(ctx);
     updateSyncBadge(ctx);
     renderBackupList(ctx);
-    if (ctx.selectedRabbitId && ctx.activePanel !== "rabbits") {
-      setActivePanel("rabbits");
-    }
   },
   setSyncStatus: (status) => {
     const allowed = new Set(["local", "syncing", "synced", "error"]);
@@ -130,8 +128,14 @@ function wireNav() {
 
   // data-open-rabbit links basculent vers le panneau lapins
   document.addEventListener("click", e => {
-    if (e.target.closest("[data-open-rabbit]") && ctx.activePanel !== "rabbits") {
+    const target = e.target.closest("[data-open-rabbit]");
+    if (!target) return;
+    const rabbitId = target.dataset.openRabbit;
+    if (rabbitId) ctx.selectedRabbitId = rabbitId;
+    if (ctx.activePanel !== "rabbits") {
       setActivePanel("rabbits");
+    } else {
+      ctx.render();
     }
   });
 }
@@ -311,11 +315,6 @@ const params     = new URLSearchParams(window.location.search);
 const isE2E      = params.has("e2e");
 const joinFarmId = params.get("join") || null;
 
-const viteEnv = import.meta.env;
-const supabaseConfigured =
-  viteEnv.VITE_SUPABASE_URL?.startsWith("https://") &&
-  (viteEnv.VITE_SUPABASE_ANON_KEY?.length ?? 0) > 20;
-
 const savedPanel = (() => {
   try {
     const p = localStorage.getItem("cuniworld_active_panel");
@@ -333,7 +332,7 @@ async function initApp() {
     await hydrateAndMigratePhotos(ctx.state);
     ctx.state = Store.save(ctx.state);
   } catch (err) {
-    showToast("Erreur stockage photos local (IndexedDB) : " + (err?.message || err), "error");
+    console.warn("[photos] Hydratation IndexedDB ignorée:", err?.message || err);
   }
 
   if (!supabaseConfigured || isE2E) {
