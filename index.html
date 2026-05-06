@@ -16,28 +16,27 @@
   <header class="topbar">
     <div class="brand">
       <div class="logo">🐇</div>
-      <div>
-        <div class="title">CuniWorld</div>
-        <div class="subtitle">Gestion élevage · hors-ligne</div>
-      </div>
+      <span class="title">CuniWorld</span>
     </div>
 
-    <div class="actions">
+    <!-- Hidden elements wired by wireStatic / wireExtra — visible counterparts in the Actions panel -->
+    <button id="btnExport" style="display:none" data-testid="btn-export" aria-hidden="true" tabindex="-1"></button>
+    <label style="display:none" aria-hidden="true">
+      <input id="fileImport" type="file" accept="application/json" data-testid="file-import" tabindex="-1" />
+    </label>
+    <button id="btnReset" style="display:none" data-testid="btn-reset" aria-hidden="true" tabindex="-1"></button>
+    <div style="display:none" aria-hidden="true">
+      <input id="guideToggle" type="checkbox" data-testid="guide-toggle" tabindex="-1" />
+    </div>
+
+    <div class="topbar-right">
       <div id="userInfo" class="user-info hidden"></div>
-      <button id="btnNewRabbit" class="btn" data-testid="btn-new-rabbit">+ Nouveau lapin</button>
-      <button id="btnExport" class="btn secondary" data-testid="btn-export">⬇ Exporter</button>
-      <label class="btn secondary file" data-testid="btn-import">
-        ⬆ Importer
-        <input id="fileImport" type="file" accept="application/json" data-testid="file-import" />
-      </label>
-      <button id="btnReset" class="btn danger" data-testid="btn-reset">Réinitialiser</button>
-      <div class="guide-switch">
-        <label class="switch-label">
-          <input id="guideToggle" type="checkbox" class="switch-input" data-testid="guide-toggle" />
-          <span class="switch-slider"></span>
-          <span class="switch-text">Guide</span>
-        </label>
-      </div>
+      <button id="btnNewRabbit" class="btn-new" data-testid="btn-new-rabbit">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+        <span class="btn-new-label">Nouveau lapin</span>
+      </button>
     </div>
   </header>
 

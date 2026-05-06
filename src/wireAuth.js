@@ -285,39 +285,92 @@ function _updateTopbar(ctx, onReady) {
   const info = document.getElementById('userInfo');
   if (!info) return;
 
-  // Code de partage = UUID brut (à copier-coller pour rejoindre)
+  const initials = (ctx.currentUser?.email || '?')[0].toUpperCase();
+
   info.innerHTML = `
-    <button id="btnCopyFarmId" class="btn secondary" title="Copier l'identifiant de la ferme pour inviter un collègue">
-      🏡 ${escapeHTML(ctx.farmName || '')}
+    <button class="farm-chip" id="btnInviteFarm" title="Copier le lien d'invitation">
+      <svg class="farm-chip-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+        <rect x="7" y="7" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M6 4h3v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M6 7l3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span class="farm-chip-name">${escapeHTML(ctx.farmName || '')}</span>
     </button>
-    <span class="user-email-chip">${escapeHTML(ctx.currentUser?.email || '')}</span>
-    <button id="btnSwitchFarm" class="btn secondary" title="Changer de ferme">⇄</button>
-    <button id="btnLogout" class="btn danger">Déconnexion</button>`;
+    <div class="user-avatar-wrap">
+      <button class="user-avatar" id="btnUserMenu" aria-label="Menu utilisateur" aria-expanded="false">
+        ${escapeHTML(initials)}
+      </button>
+      <div class="user-dropdown" id="userDropdown" hidden>
+        <div class="user-dropdown-header">
+          <span class="user-dropdown-email">${escapeHTML(ctx.currentUser?.email || '')}</span>
+        </div>
+        <div class="user-dropdown-divider"></div>
+        <button class="user-dropdown-item" id="ddSwitchFarm">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+            <path d="M2.5 5.5h10M2.5 9.5h10M9.5 2.5l3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Changer de ferme
+        </button>
+        <div class="user-dropdown-divider"></div>
+        <button class="user-dropdown-item danger" id="ddLogout">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+            <path d="M5.5 13H3a1 1 0 01-1-1V3a1 1 0 011-1h2.5M10 10.5l3-3-3-3M13 7.5H5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Déconnexion
+        </button>
+      </div>
+    </div>`;
 
   info.classList.remove('hidden');
 
-  document.getElementById('btnCopyFarmId')?.addEventListener('click', () => {
+  // Farm chip — copier message d'invitation
+  document.getElementById('btnInviteFarm')?.addEventListener('click', () => {
     const base = window.location.origin + window.location.pathname.replace(/\/$/, '');
     const link = `${base}?join=${ctx.farmId}`;
     const msg  =
       `Bonjour,\n\n` +
       `Je t'invite à rejoindre ma ferme « ${ctx.farmName} » sur CuniWorld, l'application de gestion d'élevage de lapins.\n\n` +
       `Clique sur ce lien pour rejoindre (ou crée un compte gratuitement si tu n'en as pas) :\n` +
-      `${link}\n\n` +
-      `À bientôt !`;
+      `${link}\n\nÀ bientôt !`;
     navigator.clipboard?.writeText(msg).then(() =>
       alert('Message d\'invitation copié !\nColle-le dans un email ou WhatsApp.')
     );
   });
 
-  document.getElementById('btnSwitchFarm')?.addEventListener('click', async () => {
+  // Avatar — ouvrir / fermer le dropdown
+  const btnMenu  = document.getElementById('btnUserMenu');
+  const dropdown = document.getElementById('userDropdown');
+
+  btnMenu?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = !dropdown.hidden;
+    dropdown.hidden = isOpen;
+    btnMenu.setAttribute('aria-expanded', String(!isOpen));
+  });
+
+  // Fermer en cliquant ailleurs
+  const closeDropdown = () => {
+    if (!dropdown.hidden) {
+      dropdown.hidden = true;
+      btnMenu?.setAttribute('aria-expanded', 'false');
+    }
+  };
+  document.addEventListener('click', closeDropdown);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDropdown(); });
+
+  // Switch farm
+  document.getElementById('ddSwitchFarm')?.addEventListener('click', async () => {
+    closeDropdown();
     DB.unsubscribeAll();
-    ctx.farmId = null;
+    ctx.farmId   = null;
     ctx.farmName = null;
     await _selectFarm(ctx, onReady);
   });
 
-  document.getElementById('btnLogout')?.addEventListener('click', async () => {
+  // Logout
+  document.getElementById('ddLogout')?.addEventListener('click', async () => {
+    closeDropdown();
     if (!window.confirm('Se déconnecter ?')) return;
     DB.unsubscribeAll();
     await Auth.signOut();
