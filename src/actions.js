@@ -3,12 +3,26 @@ import { generateRabbitCode, getRabbitStage, num, numOrNull } from "./utils.js";
 import { isNameFromPool, lockRabbitName, releaseRabbitName } from "./rabbitNameService.js";
 import { DB } from "./db.js";
 import { putPhotoData, deletePhotoData } from "./photoStorage.js";
+import { uploadPhotoToCloud, deletePhotoFromCloud } from "./photoCloudStorage.js";
+import { enqueueMutation } from "./mutationQueue.js";
 
 export function persist(ctx) {
   ctx.state = ctx.Store.save(ctx.state);
 }
 
 function fid(ctx) { return ctx.farmId || null; }
+function trackCloudWrite(ctx, promise, meta = null) {
+  if (!promise || typeof promise.then !== "function") return promise;
+  if (!ctx.syncManager) return promise;
+  return ctx.syncManager.track(promise).catch((err) => {
+    console.error("[sync] Cloud write failed:", err);
+    if (meta?.type && meta?.payload) {
+      enqueueMutation(meta.type, meta.payload, err);
+      ctx.updatePendingMutations?.();
+    }
+    return undefined;
+  });
+}
 
 function setSyncStatus(ctx, status) {
   if (typeof ctx.setSyncStatus === "function") ctx.setSyncStatus(status);
@@ -49,7 +63,7 @@ export function addRabbit(ctx, data) {
   ctx.state.rabbits.unshift(rabbit);
   if (isNameFromPool(rabbit.name)) {
     lockRabbitName(ctx.state, rabbit.name, rabbit.id);
-    if (fid(ctx)) trackCloudWrite(ctx, DB.setUsedName(fid(ctx), rabbit.name, rabbit.id));
+    if (fid(ctx)) trackCloudWrite(ctx, DB.setUsedName(fid(ctx), rabbit.name, rabbit.id), { type: "setUsedName", payload: { farmId: fid(ctx), name: rabbit.name, rabbitId: rabbit.id } });
   }
 
   // Pesée initiale optionnelle
@@ -65,11 +79,11 @@ export function addRabbit(ctx, data) {
       createdAt: nowISO(),
     };
     ctx.state.events.unshift(ev);
-    if (fid(ctx)) trackCloudWrite(ctx, DB.upsertEvent(fid(ctx), ev));
+    if (fid(ctx)) trackCloudWrite(ctx, DB.upsertEvent(fid(ctx), ev), { type: "upsertEvent", payload: { farmId: fid(ctx), event: ev } });
   }
 
   persist(ctx);
-  if (fid(ctx)) trackCloudWrite(ctx, DB.upsertRabbit(fid(ctx), rabbit));
+  if (fid(ctx)) trackCloudWrite(ctx, DB.upsertRabbit(fid(ctx), rabbit), { type: "upsertRabbit", payload: { farmId: fid(ctx), rabbit } });
   ctx.selectedRabbitId = rabbit.id;
   ctx.render();
 }
@@ -84,17 +98,17 @@ export function updateRabbit(ctx, id, patch) {
   if (newName && newName !== oldName) {
     if (isNameFromPool(oldName)) {
       releaseRabbitName(ctx.state, oldName);
-      if (fid(ctx)) trackCloudWrite(ctx, DB.deleteUsedName(fid(ctx), oldName));
+      if (fid(ctx)) trackCloudWrite(ctx, DB.deleteUsedName(fid(ctx), oldName), { type: "deleteUsedName", payload: { farmId: fid(ctx), name: oldName } });
     }
     if (isNameFromPool(newName)) {
       lockRabbitName(ctx.state, newName, id);
-      if (fid(ctx)) trackCloudWrite(ctx, DB.setUsedName(fid(ctx), newName, id));
+      if (fid(ctx)) trackCloudWrite(ctx, DB.setUsedName(fid(ctx), newName, id), { type: "setUsedName", payload: { farmId: fid(ctx), name: newName, rabbitId: id } });
     }
   }
 
   ctx.state.rabbits[i] = { ...ctx.state.rabbits[i], ...patch, updatedAt: nowISO() };
   persist(ctx);
-  if (fid(ctx)) trackCloudWrite(ctx, DB.upsertRabbit(fid(ctx), ctx.state.rabbits[i]));
+  if (fid(ctx)) trackCloudWrite(ctx, DB.upsertRabbit(fid(ctx), ctx.state.rabbits[i]), { type: "upsertRabbit", payload: { farmId: fid(ctx), rabbit: ctx.state.rabbits[i] } });
   ctx.render();
 }
 
@@ -102,20 +116,25 @@ export function deleteRabbit(ctx, id) {
   const target = ctx.state.rabbits.find(r => r.id === id);
   if (target && isNameFromPool(target.name)) {
     releaseRabbitName(ctx.state, target.name);
-    if (fid(ctx)) trackCloudWrite(ctx, DB.deleteUsedName(fid(ctx), target.name));
+    if (fid(ctx)) trackCloudWrite(ctx, DB.deleteUsedName(fid(ctx), target.name), { type: "deleteUsedName", payload: { farmId: fid(ctx), name: target.name } });
   }
   const photosToDelete = (ctx.state.photos || []).filter((p) => p.rabbitId === id);
   photosToDelete.forEach((p) => {
     deletePhotoData(p.localPhotoKey).catch((err) => {
       console.error("[photoStorage] Suppression rabbit photo impossible:", err);
     });
+    if (fid(ctx) && p.storagePath) {
+      deletePhotoFromCloud(p.storagePath).catch((err) => {
+        console.error("[photoCloudStorage] Suppression rabbit photo cloud impossible:", err);
+      });
+    }
   });
   ctx.state.rabbits = ctx.state.rabbits.filter((r) => r.id !== id);
   ctx.state.events  = ctx.state.events.filter((e) => e.rabbitId !== id);
   if (ctx.state.photos) ctx.state.photos = ctx.state.photos.filter((p) => p.rabbitId !== id);
   if (ctx.selectedRabbitId === id) ctx.selectedRabbitId = null;
   persist(ctx);
-  if (fid(ctx)) trackCloudWrite(ctx, DB.deleteRabbit(fid(ctx), id));
+  if (fid(ctx)) trackCloudWrite(ctx, DB.deleteRabbit(fid(ctx), id), { type: "deleteRabbit", payload: { farmId: fid(ctx), rabbitId: id } });
   ctx.render();
 }
 
@@ -149,7 +168,7 @@ export function addEvent(ctx, rabbitId, data) {
   ctx.state.events.unshift(ev);
   applyEventSideEffects(ctx, ev);
   persist(ctx);
-  if (fid(ctx)) trackCloudWrite(ctx, DB.upsertEvent(fid(ctx), ev));
+  if (fid(ctx)) trackCloudWrite(ctx, DB.upsertEvent(fid(ctx), ev), { type: "upsertEvent", payload: { farmId: fid(ctx), event: ev } });
   ctx.render();
   return ev;
 }
@@ -160,24 +179,38 @@ export function deleteEvent(ctx, eventId) {
     deletePhotoData(p.localPhotoKey).catch((err) => {
       console.error("[photoStorage] Suppression event photo impossible:", err);
     });
+    if (fid(ctx) && p.storagePath) {
+      deletePhotoFromCloud(p.storagePath).catch((err) => {
+        console.error("[photoCloudStorage] Suppression event photo cloud impossible:", err);
+      });
+    }
   });
   ctx.state.events = ctx.state.events.filter((e) => e.id !== eventId);
   if (ctx.state.photos) ctx.state.photos = ctx.state.photos.filter((p) => p.eventId !== eventId);
   persist(ctx);
-  if (fid(ctx)) trackCloudWrite(ctx, DB.deleteEvent(fid(ctx), eventId));
+  if (fid(ctx)) trackCloudWrite(ctx, DB.deleteEvent(fid(ctx), eventId), { type: "deleteEvent", payload: { farmId: fid(ctx), eventId } });
   ctx.render();
 }
 
 export async function addPhoto(ctx, rabbitId, { dataUrl, date, source = "profile", eventId = null, note = "" }) {
   const { uid, nowISO } = ctx.Store.helpers;
   if (!ctx.state.photos) ctx.state.photos = [];
+  const photoId = uid("ph");
   const localPhotoKey = uid("phdat");
   if (!dataUrl) throw new Error("Image manquante.");
   await putPhotoData(localPhotoKey, dataUrl).catch((err) => {
     throw new Error(`Erreur stockage photo local (IndexedDB) : ${err?.message || err}`);
   });
+  let storagePath = null;
+  if (fid(ctx)) {
+    storagePath = await uploadPhotoToCloud({
+      farmId: fid(ctx), rabbitId, photoId, dataUrl,
+    }).catch((err) => {
+      throw new Error(`Erreur sync photo cloud : ${err?.message || err}`);
+    });
+  }
   const photo = {
-    id:       uid("ph"),
+    id:       photoId,
     rabbitId,
     date:     date || new Date().toISOString().slice(0, 10),
     source,
@@ -185,11 +218,12 @@ export async function addPhoto(ctx, rabbitId, { dataUrl, date, source = "profile
     note:     (note || "").trim(),
     createdAt: nowISO(),
     localPhotoKey,
+    storagePath,
     dataUrl,
   };
   ctx.state.photos.unshift(photo);
   persist(ctx);
-  if (fid(ctx)) trackCloudWrite(ctx, DB.upsertPhoto(fid(ctx), photo));
+  if (fid(ctx)) trackCloudWrite(ctx, DB.upsertPhoto(fid(ctx), photo), { type: "upsertPhoto", payload: { farmId: fid(ctx), photo } });
   ctx.render();
   return photo;
 }
@@ -201,7 +235,12 @@ export function deletePhoto(ctx, photoId) {
   deletePhotoData(target?.localPhotoKey).catch((err) => {
     console.error("[photoStorage] Suppression photo impossible:", err);
   });
+  if (fid(ctx) && target?.storagePath) {
+    deletePhotoFromCloud(target.storagePath).catch((err) => {
+      console.error("[photoCloudStorage] Suppression photo cloud impossible:", err);
+    });
+  }
   persist(ctx);
-  if (fid(ctx)) trackCloudWrite(ctx, DB.deletePhoto(fid(ctx), photoId));
+  if (fid(ctx)) trackCloudWrite(ctx, DB.deletePhoto(fid(ctx), photoId), { type: "deletePhoto", payload: { farmId: fid(ctx), photoId } });
   ctx.render();
 }

@@ -1,3 +1,4 @@
+import { getPhotoSignedUrl } from "./photoCloudStorage.js";
 const DB_NAME = "cuniworld_mvp_photos";
 const STORE_NAME = "photos";
 const DB_VERSION = 1;
@@ -54,7 +55,7 @@ export function deletePhotoData(localPhotoKey) {
   return run("readwrite", (store) => store.delete(localPhotoKey));
 }
 
-export async function hydrateAndMigratePhotos(state) {
+export async function hydrateAndMigratePhotos(state, farmId = null) {
   const photos = state?.photos || [];
   for (const p of photos) {
     if (!p.localPhotoKey) p.localPhotoKey = p.id;
@@ -64,6 +65,10 @@ export async function hydrateAndMigratePhotos(state) {
     }
     if (!p.dataUrl) {
       p.dataUrl = await getPhotoData(p.localPhotoKey);
+    }
+    if (!p.dataUrl && farmId && p.storagePath) {
+      p.dataUrl = await getPhotoSignedUrl(p.storagePath);
+      if (p.dataUrl) await putPhotoData(p.localPhotoKey, p.dataUrl);
     }
   }
   return photos;
