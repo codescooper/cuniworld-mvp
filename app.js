@@ -253,7 +253,7 @@ const isE2E = new URLSearchParams(window.location.search).has("e2e");
 
 // En mode E2E (tests Playwright) ou si les variables Supabase sont absentes,
 // on saute l'auth et on lance l'app directement en mode local.
-const viteEnv = import.meta?.env ?? {};
+const viteEnv = import.meta.env;
 const supabaseConfigured =
   viteEnv.VITE_SUPABASE_URL?.startsWith("https://") &&
   (viteEnv.VITE_SUPABASE_ANON_KEY?.length ?? 0) > 20;
