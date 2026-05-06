@@ -11,20 +11,9 @@ export const FarmService = {
   },
 
   async createFarm(name) {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    const { data: farm, error: farmErr } = await supabase
-      .from('farms')
-      .insert({ name: name.trim(), created_by: user.id })
-      .select()
-      .single();
-    if (farmErr) throw farmErr;
-
-    const { error: memberErr } = await supabase
-      .from('farm_members')
-      .insert({ farm_id: farm.id, user_id: user.id, role: 'owner' });
-    if (memberErr) throw memberErr;
-
+    const { data: farm, error } = await supabase
+      .rpc('create_farm_with_owner', { farm_name: name.trim() });
+    if (error) throw error;
     return farm;
   },
 
