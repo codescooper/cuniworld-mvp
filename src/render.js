@@ -35,7 +35,10 @@ export function renderDashboard(ctx) {
     .filter(x => x.daysLeft >= 0 && x.daysLeft <= 7)
     .sort((a,b) => a.daysLeft - b.daysLeft);
 
-  el.dash.innerHTML = _renderFarmActionsCard(ctx) + `
+  let farmActionsHTML = '';
+  try { farmActionsHTML = _renderFarmActionsCard(ctx); } catch (_) {}
+
+  el.dash.innerHTML = farmActionsHTML + `
     <div class="tile"><div class="n">${total}</div><div class="t">Lapins (total)</div></div>
     <div class="tile"><div class="n">${actifs}</div><div class="t">Actifs</div></div>
     <div class="tile"><div class="n">${femelles}</div><div class="t">Femelles actives</div></div>

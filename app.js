@@ -263,10 +263,11 @@ wireExtra();
 wireStatic(ctx);
 
 if (!supabaseConfigured || isE2E) {
-  // Mode hors-ligne / tests
+  // Mode hors-ligne / tests : masquer l'overlay auth de façon certaine
   const authOverlay = document.getElementById("authOverlay");
   if (authOverlay) {
-    authOverlay.classList.add("hidden");
+    authOverlay.style.display = "none";
+    authOverlay.setAttribute("aria-hidden", "true");
     authOverlay.innerHTML = "";
   }
   if (!isE2E) seedIfEmpty();
@@ -275,12 +276,13 @@ if (!supabaseConfigured || isE2E) {
 } else {
   // Mode collaboratif : auth Supabase
   import("./src/wireAuth.js").then(({ bootWithAuth }) => {
-    bootWithAuth(ctx, () => {
-      // Callback appelé une fois la ferme chargée (et re-appelé si changement de ferme)
-      ctx.render();
-    });
+    bootWithAuth(ctx, () => ctx.render());
   }).catch((err) => {
-    console.error("Impossible de charger l'auth Supabase:", err);
-    alert("Mode collaboratif indisponible. Vérifiez le build Vite et la configuration Supabase.");
+    console.error("[CuniWorld] Impossible de charger l'auth Supabase:", err);
+    // Fallback offline si le module n'a pas pu se charger
+    const authOverlay = document.getElementById("authOverlay");
+    if (authOverlay) { authOverlay.style.display = "none"; authOverlay.innerHTML = ""; }
+    seedIfEmpty();
+    ctx.render();
   });
 }

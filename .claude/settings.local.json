@@ -11,7 +11,10 @@
       "Bash(node *)",
       "Bash(grep -E \"\\\\.\\(js|html\\)$\")",
       "Bash(npm install *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(curl -s http://localhost:5174/)",
+      "Bash(curl *)",
+      "WebFetch(domain:codescooper.github.io)"
     ]
   }
 }

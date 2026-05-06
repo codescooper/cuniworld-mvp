@@ -5,9 +5,27 @@ import { escapeHTML } from './utils.js';
 
 function escAttr(s) { return String(s).replace(/"/g, '&quot;'); }
 
+// Timeout helper : rejette si la promesse prend trop longtemps
+function _withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Délai dépassé (${label})`)), ms)
+    ),
+  ]);
+}
+
 // ── Point d'entrée : appelé au boot de l'app ──────────────────────
 export async function bootWithAuth(ctx, onReady) {
-  const session = await Auth.getSession();
+  let session = null;
+  try {
+    session = await _withTimeout(Auth.getSession(), 8000, 'getSession');
+  } catch (ex) {
+    console.warn('[Auth] getSession échoué, mode hors-ligne activé :', ex.message);
+    _goOffline(ctx, onReady);
+    return;
+  }
+
   if (session) {
     ctx.currentUser = session.user;
     await _selectFarm(ctx, onReady);
@@ -24,6 +42,13 @@ export async function bootWithAuth(ctx, onReady) {
       _showAuthScreen(ctx, onReady);
     }
   });
+}
+
+// ── Fallback mode hors-ligne ──────────────────────────────────────
+function _goOffline(ctx, onReady) {
+  const overlay = document.getElementById('authOverlay');
+  if (overlay) { overlay.style.display = 'none'; overlay.innerHTML = ''; }
+  onReady();
 }
 
 // ── Écran de connexion / inscription ─────────────────────────────
@@ -95,14 +120,24 @@ function _renderAuthForm(overlay, mode, ctx, onReady) {
 // ── Sélection / création / rejoindre une ferme ────────────────────
 async function _selectFarm(ctx, onReady) {
   const overlay = document.getElementById('authOverlay');
+  overlay.style.display = '';
   overlay.classList.remove('hidden');
   overlay.innerHTML = '<div class="auth-card"><p class="auth-loading">Chargement…</p></div>';
 
   let farms = [];
   try {
-    farms = await FarmService.getUserFarms();
+    farms = await _withTimeout(FarmService.getUserFarms(), 10000, 'getUserFarms');
   } catch (ex) {
-    overlay.innerHTML = `<div class="auth-card"><p class="auth-error">${escapeHTML(ex.message)}</p><button class="btn" onclick="location.reload()" style="margin-top:12px">Réessayer</button></div>`;
+    overlay.innerHTML = `
+      <div class="auth-card">
+        <p class="auth-error">${escapeHTML(ex.message || 'Impossible de contacter le serveur.')}</p>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn" id="btnRetryFarm" style="flex:1">Réessayer</button>
+          <button class="btn secondary" id="btnOfflineFallback" style="flex:1">Mode hors-ligne</button>
+        </div>
+      </div>`;
+    overlay.querySelector('#btnRetryFarm')?.addEventListener('click', () => _selectFarm(ctx, onReady));
+    overlay.querySelector('#btnOfflineFallback')?.addEventListener('click', () => _goOffline(ctx, onReady));
     return;
   }
 
@@ -160,24 +195,33 @@ function _wireFarmSelector(overlay, ctx, onReady) {
 
 async function _loadFarm(farmId, farmName, ctx, onReady, isNew = false) {
   const overlay = document.getElementById('authOverlay');
+  overlay.style.display = '';
+  overlay.classList.remove('hidden');
   overlay.innerHTML = `<div class="auth-card"><p class="auth-loading">Chargement de <strong>${escapeHTML(farmName)}</strong>…</p></div>`;
 
   try {
     ctx.farmId   = farmId;
     ctx.farmName = farmName;
-    ctx.state    = await DB.loadFarmState(farmId);
+    ctx.state    = await _withTimeout(DB.loadFarmState(farmId), 12000, 'loadFarmState');
 
     if (isNew) await _offerMigration(ctx);
 
+    overlay.style.display = 'none';
     overlay.classList.add('hidden');
     _updateTopbar(ctx, onReady);
     DB.subscribeToFarm(farmId, ctx);
     onReady();
   } catch (ex) {
-    overlay.innerHTML = `<div class="auth-card">
-      <p class="auth-error">Erreur : ${escapeHTML(ex.message)}</p>
-      <button class="btn" onclick="location.reload()" style="margin-top:12px">Réessayer</button>
-    </div>`;
+    overlay.innerHTML = `
+      <div class="auth-card">
+        <p class="auth-error">Erreur : ${escapeHTML(ex.message)}</p>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn" id="btnRetryLoad" style="flex:1">Réessayer</button>
+          <button class="btn secondary" id="btnOfflineFallback2" style="flex:1">Mode hors-ligne</button>
+        </div>
+      </div>`;
+    overlay.querySelector('#btnRetryLoad')?.addEventListener('click', () => _loadFarm(farmId, farmName, ctx, onReady, false));
+    overlay.querySelector('#btnOfflineFallback2')?.addEventListener('click', () => _goOffline(ctx, onReady));
   }
 }
 

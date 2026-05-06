@@ -1016,6 +1016,7 @@ textarea.input { min-height: 90px; resize: vertical }
   padding: var(--space-4);
   overflow-y: auto;
 }
+.auth-overlay.hidden { display: none !important }
 
 .auth-card {
   background: #fff;
