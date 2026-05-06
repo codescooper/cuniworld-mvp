@@ -1,8 +1,15 @@
 import { escapeHTML, num } from "./utils.js";
 
+export const LOT_STATUSES = {
+  en_cours: { label: "En cours",  cls: "badge ok"      },
+  vendu:    { label: "Vendu",     cls: "badge warning"  },
+  termine:  { label: "Terminé",   cls: "badge muted"    },
+};
+
 export function buildLots(state) {
-  // 1 lot = 1 événement sevrage
   const rabbitsById = new Map(state.rabbits.map(r => [r.id, r]));
+  const statuses = state.lotStatuses || {};
+
   const lots = state.events
     .filter(e => e.type === "sevrage")
     .map(e => {
@@ -10,8 +17,9 @@ export function buildLots(state) {
       const rabbitIds = e.data?.rabbitIds || [];
       const weaned = Math.max(num(e.data?.weanedCount), rabbitIds.length, num(e.data?.weaned)) || 0;
       const cage = (e.data?.destCage || "").trim() || "—";
+      const id = `lot_${e.id}`;
       return {
-        id: `lot_${e.id}`,
+        id,
         eventId: e.id,
         doeId: e.rabbitId,
         doeName: doe?.name || "Mère inconnue",
@@ -20,14 +28,16 @@ export function buildLots(state) {
         weaned,
         rabbitIds,
         cage,
-        notes: e.notes || ""
+        notes: e.notes || "",
+        status: statuses[id] || "en_cours",
       };
     })
-    .sort((a,b) => (b.date || "").localeCompare(a.date || ""));
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
   return lots;
 }
 
 export function lotBadge(lot) {
-  return `<span class="badge ok">${escapeHTML(String(lot.weaned))} sevrés</span>`;
+  const statusMeta = LOT_STATUSES[lot.status] || LOT_STATUSES.en_cours;
+  return `<span class="badge ok">${escapeHTML(String(lot.weaned))} sevrés</span> <span class="${statusMeta.cls}">${statusMeta.label}</span>`;
 }

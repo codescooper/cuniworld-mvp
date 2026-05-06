@@ -3,7 +3,7 @@ import { getReproInfo } from "./repro.js";
 import { getBreedingStatus, breedingStatusBadge } from "./breeding.js";
 import { getRabbitWeightHistory, getCurrentWeight, getTotalHerdWeightEvolution, renderWeightSVG } from "./weightService.js";
 import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
-import { buildLots, lotBadge } from "./lots.js";
+import { buildLots, lotBadge, LOT_STATUSES } from "./lots.js";
 import { getReminders, reminderLabel } from "./health.js";
 import { getPhotoHistory, getProfilePhoto } from "./photos.js";
 import { getTodayFarmActions } from "./farmActionsService.js";
@@ -566,9 +566,11 @@ function getFilteredRabbits(ctx) {
 
 function getFilteredLots(ctx, lots) {
   const q = (ctx.el.lotQ?.value || "").toLowerCase().trim();
-  if (!q) return lots;
+  const statusFilter = ctx.el.lotStatusFilter?.value || "";
 
   return lots.filter(l => {
+    if (statusFilter && l.status !== statusFilter) return false;
+    if (!q) return true;
     const hay = [l.cage, l.doeName, l.doeCode, l.date, l.notes].join(" ").toLowerCase();
     return hay.includes(q);
   });
@@ -622,12 +624,17 @@ export function renderLots(ctx) {
         </div>`
       : `<div class="small muted">Aucun lapereau trouvé dans ce lot.</div>`;
 
+    const statusOptions = Object.entries(LOT_STATUSES)
+      .map(([k, v]) => `<option value="${k}"${k === selected.status ? " selected" : ""}>${escapeHTML(v.label)}</option>`)
+      .join("");
+
     el.lotDetails.innerHTML = `
       <div style="font-size:18px;font-weight:900">${escapeHTML(selected.cage)} <span class="badge">${escapeHTML(selected.date)}</span></div>
       <div class="sep"></div>
       <div class="kv">
         <div>Sevrés: </div><div><strong>${escapeHTML(String(selected.weaned))}</strong></div>
         <div>Mère: </div><div>${escapeHTML(selected.doeName)} (${escapeHTML(selected.doeCode)})</div>
+        <div>Statut: </div><div><select id="lotStatusSelect" class="input" style="padding:2px 6px;height:auto" data-testid="lot-status-select">${statusOptions}</select></div>
         <div>Notes: </div><div>${escapeHTML(selected.notes || "—")}</div>
       </div>
       <div class="sep"></div>

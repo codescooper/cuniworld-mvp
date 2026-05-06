@@ -139,6 +139,49 @@ function wireNav() {
       ctx.render();
     }
   });
+
+  // Raccourcis clavier globaux
+  document.addEventListener("keydown", e => {
+    const tag = document.activeElement?.tagName?.toLowerCase();
+    const inField = tag === "input" || tag === "textarea" || tag === "select" || document.activeElement?.isContentEditable;
+    const modalOpen = !ctx.el.modal?.classList.contains("hidden");
+
+    // Esc : fermer modal (déjà géré dans wire.js, mais on laisse pour sécurité)
+    if (e.key === "Escape") return;
+
+    // Toutes les autres touches sont ignorées si un champ est actif ou modal ouvert
+    if (inField || modalOpen) return;
+
+    // 1-5 : naviguer vers un panneau
+    const panelIndex = parseInt(e.key, 10);
+    if (panelIndex >= 1 && panelIndex <= PANELS.length) {
+      e.preventDefault();
+      setActivePanel(PANELS[panelIndex - 1]);
+      return;
+    }
+
+    // N : nouveau lapin
+    if (e.key === "n" || e.key === "N") {
+      e.preventDefault();
+      ctx.el.btnNewRabbit?.click();
+      return;
+    }
+
+    // / : focus la recherche du panneau actif
+    if (e.key === "/") {
+      e.preventDefault();
+      const searchIds = {
+        rabbits:   "q",
+        lots:      "lotQ",
+        genealogy: "geneQ",
+        dashboard: null,
+        actions:   null,
+      };
+      const id = searchIds[ctx.activePanel];
+      if (id) document.getElementById(id)?.focus();
+      return;
+    }
+  });
 }
 
 // ================================================================

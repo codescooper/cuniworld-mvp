@@ -12,8 +12,8 @@ import { showToast, showConfirm } from "./notifications.js";
 export function wireStatic(ctx) {
   const { el, Store } = ctx;
 
-   // recherche lots
   ctx.el.lotQ?.addEventListener("input", () => ctx.render());
+  ctx.el.lotStatusFilter?.addEventListener("change", () => ctx.render());
 
   el.btnNewRabbit.addEventListener("click", () => {
     openModal(el, "Nouveau lapin", rabbitFormHTML(null, ctx.state));
@@ -78,19 +78,28 @@ export function wireStatic(ctx) {
   });
 
   // bouton "voir la mère" depuis détails lot
-    const btnOpenDoe = document.getElementById("btnOpenDoe");
-    if (btnOpenDoe) {
-        btnOpenDoe.addEventListener("click", () => {
-        if (!ctx.selectedLotId) return;
-        const eventId = ctx.selectedLotId.replace("lot_", "");
-        const ev = ctx.state.events.find(e => e.id === eventId);
-        if (!ev) return;
-        ctx.selectedRabbitId = ev.rabbitId;
-        ctx.render();
-        });
-    }
+  const btnOpenDoe = document.getElementById("btnOpenDoe");
+  if (btnOpenDoe) {
+    btnOpenDoe.addEventListener("click", () => {
+      if (!ctx.selectedLotId) return;
+      const eventId = ctx.selectedLotId.replace("lot_", "");
+      const ev = ctx.state.events.find(e => e.id === eventId);
+      if (!ev) return;
+      ctx.selectedRabbitId = ev.rabbitId;
+      if (ctx.navigate) ctx.navigate("rabbits");
+      else ctx.render();
+    });
+  }
 
-
+  // changement de statut d'un lot
+  const lotStatusSelect = document.getElementById("lotStatusSelect");
+  if (lotStatusSelect && ctx.selectedLotId) {
+    lotStatusSelect.addEventListener("change", () => {
+      ctx.state.lotStatuses = { ...(ctx.state.lotStatuses || {}), [ctx.selectedLotId]: lotStatusSelect.value };
+      ctx.state = ctx.Store.save(ctx.state);
+      ctx.render();
+    });
+  }
 }
 
 export function wireDynamic(ctx) {

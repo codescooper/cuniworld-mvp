@@ -5,7 +5,7 @@ const KEY = "cuniworld_mvp_state";
 const BACKUPS_KEY = "cuniworld_mvp_backups";
 const MAX_BACKUPS = 5;
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 function nowISO() {
   return new Date().toISOString();
@@ -22,7 +22,8 @@ function defaultState() {
     rabbits: [],
     events: [],
     photos: [],
-    usedNames: {},   // { [name]: rabbitId } — noms Naruto actuellement attribués
+    usedNames: {},
+    lotStatuses: {},  // { [lotId]: "en_cours" | "vendu" | "termine" }
   };
 }
 
@@ -57,6 +58,10 @@ function migrate(state) {
   // v2 → v3 : ajout du dictionnaire usedNames
   if (state.version === 2) {
     state = { ...state, usedNames: {}, version: 3 };
+  }
+  // v3 → v4 : ajout du dictionnaire lotStatuses
+  if (state.version === 3) {
+    state = { ...state, lotStatuses: {}, version: 4 };
   }
   return state;
 }
