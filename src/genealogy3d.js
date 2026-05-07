@@ -1,29 +1,21 @@
 /**
- * src/genealogy3d.js
- * Arbre généalogique 3D interactif — projection manuelle, pas de dépendance.
+ * src/genealogy3d.js — Arbre généalogique 2D interactif (pan / zoom)
+ * Layout hiérarchique, bezier curves, aucune dépendance externe.
  */
-
-// ─── Utilitaires ─────────────────────────────────────────────────────────────
 
 function esc(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function pseudoRandom(str) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
-  return (h >>> 0) / 0xffffffff;
-}
-
-// ─── Construction du graphe ───────────────────────────────────────────────────
+// ─── Construction du graphe ────────────────────────────────── (API stable pour les tests)
 
 export function buildGenealogyGraph(state) {
   const rabbits = state.rabbits || [];
   if (!rabbits.length) return { nodes: [], edges: [] };
 
   const rabbitMap = new Map(rabbits.map(r => [r.id, r]));
-  const parentToChildren = new Map(); // parentId → [childId]
-  const childToParents = new Map();   // childId  → [{id, type}]
+  const parentToChildren = new Map();
+  const childToParents = new Map();
 
   rabbits.forEach(r => {
     const motherId = r.doeId || r.motherId || null;
@@ -42,7 +34,6 @@ export function buildGenealogyGraph(state) {
     if (parents.length) childToParents.set(r.id, parents);
   });
 
-  // Générations par BFS depuis les racines
   const genMap = new Map();
   const queue = [];
   rabbits.forEach(r => {
@@ -62,7 +53,6 @@ export function buildGenealogyGraph(state) {
   }
   rabbits.forEach(r => { if (!genMap.has(r.id)) genMap.set(r.id, 0); });
 
-  // Regrouper par génération, trier par fratrie pour garder les siblings adjacents
   const byGen = new Map();
   rabbits.forEach(r => {
     const g = genMap.get(r.id);
@@ -77,9 +67,16 @@ export function buildGenealogyGraph(state) {
     });
   });
 
+  // Positions 3D conservées pour compatibilité API (tests unitaires)
   const maxGen = Math.max(0, ...genMap.values());
   const centerY = (maxGen * 180) / 2;
   const SPREAD_X = 220, SPREAD_Y = 200, SPREAD_Z = 180;
+
+  function pseudoRandom(str) {
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
+    return (h >>> 0) / 0xffffffff;
+  }
 
   const nodes = rabbits.map(r => {
     const g = genMap.get(r.id) || 0;
@@ -114,190 +111,284 @@ export function buildGenealogyGraph(state) {
   return { nodes, edges };
 }
 
-// ─── Projection 3D → 2D ──────────────────────────────────────────────────────
+// ─── Constantes de layout 2D ──────────────────────────────────────
 
-function project(x, y, z, rotX, rotY, zoom) {
-  const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
-  const rx = x * cosY + z * sinY;
-  const rz1 = -x * sinY + z * cosY;
-  const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
-  const ry = y * cosX - rz1 * sinX;
-  const rz = y * sinX + rz1 * cosX;
-  const fov = 700;
-  const dist = fov + rz + 500;
-  const s = (fov / Math.max(dist, 1)) * zoom;
-  return { sx: rx * s, sy: ry * s, depth: rz, scale: s };
+const NW = 162; // largeur nœud
+const NH = 66;  // hauteur nœud
+const GX = 44;  // écart horizontal entre nœuds
+const GY = 108; // écart vertical entre générations
+const MARGIN = 48;
+
+// ─── Layout hiérarchique 2D ───────────────────────────────────────
+
+function computeLayout(nodes, edges) {
+  if (!nodes.length) return { positions: new Map(), totalW: 0, totalH: 0, maxGen: 0 };
+
+  const childrenOf = new Map(); // parentId → [childId]
+  const parentsOf  = new Map(); // childId  → [parentId]
+  edges.forEach(e => {
+    if (!childrenOf.has(e.from)) childrenOf.set(e.from, []);
+    childrenOf.get(e.from).push(e.to);
+    if (!parentsOf.has(e.to)) parentsOf.set(e.to, []);
+    parentsOf.get(e.to).push(e.from);
+  });
+
+  const maxGen = Math.max(0, ...nodes.map(n => n.generation));
+  const pos = new Map(nodes.map(n => [n.id, { x: 0, y: MARGIN + n.generation * (NH + GY) }]));
+
+  // Grouper par génération
+  const byGen = Array.from({ length: maxGen + 1 }, (_, g) =>
+    nodes.filter(n => n.generation === g)
+  );
+
+  // Tri initial par famille pour minimiser les croisements
+  for (let g = 1; g <= maxGen; g++) {
+    byGen[g].sort((a, b) => {
+      const ax = _avgParentX(parentsOf.get(a.id) || [], pos);
+      const bx = _avgParentX(parentsOf.get(b.id) || [], pos);
+      if (Math.abs(ax - bx) > 1) return ax - bx;
+      const ka = (a.rabbit?.litterId || "") + a.id;
+      const kb = (b.rabbit?.litterId || "") + b.id;
+      return ka.localeCompare(kb);
+    });
+  }
+
+  // Placement uniforme initial
+  byGen.forEach(genNodes => {
+    genNodes.forEach((n, i) => { pos.get(n.id).x = MARGIN + i * (NW + GX); });
+  });
+
+  // Convergence itérative (4 passes)
+  for (let pass = 0; pass < 4; pass++) {
+    // Top-down : centrer enfants sous leurs parents
+    for (let g = 1; g <= maxGen; g++) {
+      byGen[g].forEach(n => {
+        const ppos = (parentsOf.get(n.id) || []).map(id => pos.get(id)).filter(Boolean);
+        if (ppos.length) pos.get(n.id).x = _mean(ppos.map(p => p.x + NW / 2)) - NW / 2;
+      });
+      _resolveOverlaps(byGen[g], pos);
+    }
+    // Bottom-up : centrer parents sur leurs enfants
+    for (let g = maxGen - 1; g >= 0; g--) {
+      byGen[g].forEach(n => {
+        const cpos = (childrenOf.get(n.id) || []).map(id => pos.get(id)).filter(Boolean);
+        if (cpos.length) pos.get(n.id).x = _mean(cpos.map(c => c.x + NW / 2)) - NW / 2;
+      });
+      _resolveOverlaps(byGen[g], pos);
+    }
+  }
+
+  // Normaliser : décaler vers x=MARGIN
+  let minX = Infinity;
+  pos.forEach(p => { if (p.x < minX) minX = p.x; });
+  const shift = MARGIN - minX;
+  pos.forEach(p => { p.x += shift; });
+
+  let maxX = 0, maxY = 0;
+  nodes.forEach(n => {
+    const p = pos.get(n.id);
+    if (p.x + NW + MARGIN > maxX) maxX = p.x + NW + MARGIN;
+    if (p.y + NH + MARGIN > maxY) maxY = p.y + NH + MARGIN;
+  });
+
+  return { positions: pos, totalW: maxX, totalH: maxY, maxGen };
 }
 
-// ─── État singleton ───────────────────────────────────────────────────────────
+function _avgParentX(ids, pos) {
+  if (!ids.length) return 0;
+  return ids.reduce((s, id) => s + (pos.get(id)?.x ?? 0) + NW / 2, 0) / ids.length;
+}
+function _mean(arr) { return arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0; }
+function _resolveOverlaps(genNodes, pos) {
+  genNodes.sort((a, b) => pos.get(a.id).x - pos.get(b.id).x);
+  for (let i = 1; i < genNodes.length; i++) {
+    const prev = pos.get(genNodes[i - 1].id);
+    const curr = pos.get(genNodes[i].id);
+    if (curr.x < prev.x + NW + GX) curr.x = prev.x + NW + GX;
+  }
+}
+
+// ─── Singleton d'état ─────────────────────────────────────────────
 
 let G = null;
 
-// ─── Initialisation du moteur ─────────────────────────────────────────────────
+// ─── Initialisation ───────────────────────────────────────────────
 
 function initEngine(ctx, stageEl) {
-  // SVG overlay pour les arêtes
+  const { nodes, edges } = buildGenealogyGraph(ctx.state);
+  const nodeMap = new Map(nodes.map(n => [n.id, n]));
+  const { positions, totalW, totalH, maxGen } = computeLayout(nodes, edges);
+
+  stageEl.innerHTML = "";
+
+  // Canvas transformé (toutes coordonnées en référence à ce div)
+  const canvas = document.createElement("div");
+  canvas.className = "gene-canvas";
+  canvas.style.cssText = `position:absolute;width:${totalW}px;height:${totalH}px;transform-origin:0 0`;
+  stageEl.appendChild(canvas);
+
+  // Bandes de génération
+  for (let g = 0; g <= maxGen; g++) {
+    const y0 = MARGIN + g * (NH + GY) - GY / 2;
+    const h  = NH + GY;
+    const lane = document.createElement("div");
+    lane.className = `gene-lane${g % 2 === 1 ? " gene-lane--alt" : ""}`;
+    lane.style.cssText = `position:absolute;left:0;width:${totalW}px;top:${Math.max(0, y0)}px;height:${h}px`;
+    canvas.appendChild(lane);
+    const lbl = document.createElement("div");
+    lbl.className = "gene-gen-label";
+    lbl.textContent = `Gén. ${g}`;
+    lbl.style.cssText = `position:absolute;left:8px;top:${Math.max(4, y0 + 4)}px`;
+    canvas.appendChild(lbl);
+  }
+
+  // SVG pour les arêtes (sous les nœuds)
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "gene-svg-overlay");
+  svg.style.cssText = `position:absolute;top:0;left:0;width:${totalW}px;height:${totalH}px;overflow:visible;pointer-events:none`;
+  canvas.appendChild(svg);
 
-  // Couche des nœuds
-  const nodesLayer = document.createElement("div");
-  nodesLayer.className = "gene-nodes-layer";
+  // Arêtes bezier
+  const edgeEls = new Map();
+  edges.forEach(edge => {
+    const fp = positions.get(edge.from);
+    const tp = positions.get(edge.to);
+    if (!fp || !tp) return;
+    const x1 = fp.x + NW / 2, y1 = fp.y + NH;
+    const x2 = tp.x + NW / 2, y2 = tp.y;
+    const midY = y1 + (y2 - y1) * 0.55;
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("class", `gene-edge gene-edge--${edge.type}`);
+    path.setAttribute("fill", "none");
+    path.setAttribute("d", `M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`);
+    svg.appendChild(path);
+    edgeEls.set(`${edge.from}__${edge.to}`, path);
+  });
 
-  // Tooltip survol
+  // Nœuds
+  const nodeEls = new Map();
+  nodes.forEach(node => {
+    const p = positions.get(node.id);
+    const statusCls = node.status !== "actif" ? ` gene-status-${node.status}` : "";
+    const el = document.createElement("div");
+    el.className = `gene-node gene-sex-${node.sex.toLowerCase()}${statusCls}`;
+    el.setAttribute("tabindex", "0");
+    el.setAttribute("role", "button");
+    el.setAttribute("aria-label", `${node.label}${node.cage ? ", cage " + node.cage : ""}`);
+    el.dataset.nodeId = node.id;
+    el.style.cssText = `position:absolute;left:${p.x}px;top:${p.y}px;width:${NW}px`;
+    const breed = node.rabbit.breed ? node.rabbit.breed.substring(0, 16) : "";
+    el.innerHTML = `<div class="gene-node-inner">
+      <div class="gene-node-label">${esc(node.label)}</div>
+      <div class="gene-node-sub">${esc(node.cage)}${breed ? " · " + esc(breed) : ""}</div>
+    </div>`;
+    canvas.appendChild(el);
+    nodeEls.set(node.id, el);
+  });
+
+  // Tooltip (hors canvas pour ne pas être mis à l'échelle)
   const tooltip = document.createElement("div");
   tooltip.className = "gene-tooltip";
   tooltip.hidden = true;
   tooltip.setAttribute("aria-live", "polite");
-
-  stageEl.innerHTML = "";
-  stageEl.appendChild(svg);
-  stageEl.appendChild(nodesLayer);
   stageEl.appendChild(tooltip);
 
-  const { nodes, edges } = buildGenealogyGraph(ctx.state);
-  const nodeMap = new Map(nodes.map(n => [n.id, n]));
-
-  // Créer les éléments nœuds
-  const nodeEls = new Map();
-  nodes.forEach(node => {
-    const el = document.createElement("div");
-    el.className = `gene-node gene-sex-${node.sex.toLowerCase()}`;
-    el.setAttribute("tabindex", "0");
-    el.setAttribute("role", "button");
-    el.setAttribute("aria-label", node.label);
-    el.dataset.nodeId = node.id;
-    el.innerHTML = `<div class="gene-node-inner">
-      <div class="gene-node-label">${esc(node.label)}</div>
-      <div class="gene-node-cage">${esc(node.cage)}</div>
-    </div>`;
-    nodesLayer.appendChild(el);
-    nodeEls.set(node.id, el);
-  });
-
-  // Créer les lignes SVG
-  const lineEls = new Map();
-  edges.forEach(edge => {
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("class", `gene-edge gene-edge--${edge.type}`);
-    svg.appendChild(line);
-    lineEls.set(`${edge.from}__${edge.to}`, line);
-  });
-
   G = {
-    ctx, stageEl, svg, nodesLayer, tooltip,
-    nodes, edges, nodeMap, nodeEls, lineEls,
-    rotX: -0.25, rotY: 0, zoom: 1,
-    cx: 0, cy: 0,
+    ctx, stageEl, canvas, svg, tooltip,
+    nodes, edges, nodeMap, nodeEls, edgeEls, positions,
+    totalW, totalH, maxGen,
+    tx: 0, ty: 0, zoom: 1,
     dragging: false, lastMx: 0, lastMy: 0,
-    lastInteraction: 0,
-    raf: null,
-    focusId: null,
-    hoverId: null,
-    searchQ: "",
+    focusId: null, hoverId: null, searchQ: "",
     listeners: [],
     _dataKey: _dataKey(ctx.state),
+    _fitted: false,
   };
 
+  _fitAll(G, false);
   wireEvents(G);
-  startLoop(G);
 }
 
 function _dataKey(state) {
   return (state.rabbits || []).map(r => r.id).join(",");
 }
 
-// ─── Boucle RAF ───────────────────────────────────────────────────────────────
+// ─── Pan / Zoom ───────────────────────────────────────────────────
 
-const _isE2E = new URLSearchParams(window.location.search).has('e2e');
-
-function startLoop(g) {
-  if (g.raf) cancelAnimationFrame(g.raf);
-  function frame() {
-    if (!g.stageEl?.isConnected) { g.raf = null; return; }
-    // Auto-rotation après 3 s d'inactivité (désactivée en mode E2E)
-    if (!_isE2E && Date.now() - g.lastInteraction > 3000) g.rotY += 0.004;
-    const rect = g.stageEl.getBoundingClientRect();
-    g.cx = rect.width / 2;
-    g.cy = rect.height / 2;
-    draw(g);
-    g.raf = requestAnimationFrame(frame);
-  }
-  g.raf = requestAnimationFrame(frame);
+function _applyTransform(g, animate) {
+  g.canvas.style.transition = animate
+    ? "transform 0.28s cubic-bezier(.25,.46,.45,.94)"
+    : "none";
+  g.canvas.style.transform = `translate(${g.tx}px,${g.ty}px) scale(${g.zoom})`;
 }
 
-function draw(g) {
-  if (!g.nodes.length) return;
-  const { nodes, edges, nodeEls, lineEls, nodeMap } = g;
+function _fitAll(g, animate) {
+  const rect = g.stageEl.getBoundingClientRect();
+  if (!rect.width || !rect.height) return; // panneau pas encore visible
+  const scaleX = (rect.width  - 16) / g.totalW;
+  const scaleY = (rect.height - 16) / g.totalH;
+  g.zoom = Math.min(scaleX, scaleY, 1.4) * 0.94;
+  g.tx = (rect.width  - g.totalW * g.zoom) / 2;
+  g.ty = (rect.height - g.totalH * g.zoom) / 2;
+  _applyTransform(g, animate);
+  g._fitted = true;
+}
 
-  // Projeter tous les nœuds
-  const proj = nodes.map(node => {
-    const p = project(node.x, node.y, node.z, g.rotX, g.rotY, g.zoom);
-    return { node, ...p };
-  });
-  proj.sort((a, b) => b.depth - a.depth); // painter's algo
+function _centerOn(g, nodeId, animate = true) {
+  const p = g.positions.get(nodeId);
+  if (!p) return;
+  const rect = g.stageEl.getBoundingClientRect();
+  // Zoom confortable : entre 0.9 et 1.6
+  const z = Math.max(0.9, Math.min(g.zoom < 0.5 ? 1.2 : g.zoom, 1.6));
+  g.zoom = z;
+  g.tx = rect.width  / 2 - (p.x + NW / 2) * z;
+  g.ty = rect.height / 2 - (p.y + NH / 2) * z;
+  _applyTransform(g, animate);
+  g._fitted = true;
+}
 
-  const posMap = new Map(proj.map(p => [p.node.id, p]));
+function _zoomAt(g, factor, cx, cy) {
+  const newZoom = Math.max(0.12, Math.min(4, g.zoom * factor));
+  g.tx = cx - (cx - g.tx) * (newZoom / g.zoom);
+  g.ty = cy - (cy - g.ty) * (newZoom / g.zoom);
+  g.zoom = newZoom;
+  _applyTransform(g, false);
+}
 
-  // Mettre à jour le viewBox du SVG
-  g.svg.setAttribute("viewBox", `0 0 ${g.cx * 2 || 1} ${g.cy * 2 || 1}`);
+// ─── Highlight / recherche ────────────────────────────────────────
 
-  // Focus relatives
-  const focusNode = g.focusId ? nodeMap.get(g.focusId) : null;
+function _updateHighlight(g) {
+  const focusNode = g.focusId ? g.nodeMap.get(g.focusId) : null;
   const focusSet = focusNode
     ? new Set([g.focusId, ...focusNode.parentIds, ...focusNode.childIds, ...focusNode.siblingIds])
     : null;
+  const q = (g.searchQ || "").toLowerCase().trim();
 
-  // Recherche
-  const q = g.searchQ.toLowerCase().trim();
-
-  // Arêtes
-  edges.forEach(edge => {
-    const key = `${edge.from}__${edge.to}`;
-    const line = lineEls.get(key);
-    if (!line) return;
-    const fp = posMap.get(edge.from), tp = posMap.get(edge.to);
-    if (!fp || !tp) { line.setAttribute("visibility", "hidden"); return; }
-    line.setAttribute("visibility", "visible");
-    line.setAttribute("x1", g.cx + fp.sx);
-    line.setAttribute("y1", g.cy + fp.sy);
-    line.setAttribute("x2", g.cx + tp.sx);
-    line.setAttribute("y2", g.cy + tp.sy);
-    const dimmed = focusSet && !focusSet.has(edge.from) && !focusSet.has(edge.to);
-    line.style.opacity = dimmed ? "0.04" : "";
-  });
-
-  // Nœuds
-  proj.forEach(({ node, sx, sy, depth, scale }) => {
-    const el = nodeEls.get(node.id);
+  g.nodes.forEach(node => {
+    const el = g.nodeEls.get(node.id);
     if (!el) return;
     const isFocus = node.id === g.focusId;
-    const isHover = node.id === g.hoverId;
-    const dimmed = focusSet ? !focusSet.has(node.id) : false;
-    const matched = q && (node.label.toLowerCase().includes(q) || node.cage.toLowerCase().includes(q) ||
-      (node.rabbit.code || "").toLowerCase().includes(q));
-
-    const baseScale = node.isParent ? 1.1 : 0.85;
-    const ns = scale * baseScale * (isFocus ? 1.5 : isHover ? 1.25 : matched ? 1.3 : 1);
-    const clamped = Math.max(0.25, Math.min(3.5, ns));
-
-    el.style.left = `${g.cx + sx}px`;
-    el.style.top = `${g.cy + sy}px`;
-    el.style.zIndex = Math.round(500 + (500 - Math.min(depth, 500)));
-    el.style.setProperty("--ns", clamped);
-    el.style.opacity = dimmed ? "0.07" : matched ? "1" : isFocus || isHover ? "1" : "0.88";
-    el.classList.toggle("gene-node--focus", isFocus);
-    el.classList.toggle("gene-node--hovered", isHover);
+    const dimmed  = focusSet ? !focusSet.has(node.id) : false;
+    const matched = q && (
+      node.label.toLowerCase().includes(q) ||
+      node.cage.toLowerCase().includes(q) ||
+      (node.rabbit.code  || "").toLowerCase().includes(q) ||
+      (node.rabbit.breed || "").toLowerCase().includes(q)
+    );
+    el.classList.toggle("gene-node--focus",   isFocus);
+    el.classList.toggle("gene-node--dimmed",  dimmed);
     el.classList.toggle("gene-node--matched", !!matched && !dimmed);
-    el.classList.toggle("gene-node--dimmed", dimmed);
+  });
+
+  g.edges.forEach(edge => {
+    const path = g.edgeEls.get(`${edge.from}__${edge.to}`);
+    if (!path) return;
+    const dimmed = focusSet && !focusSet.has(edge.from) && !focusSet.has(edge.to);
+    path.style.opacity = dimmed ? "0.04" : "";
   });
 }
 
-// ─── Câblage événements ───────────────────────────────────────────────────────
-
-function markInteraction(g) {
-  g.lastInteraction = Date.now();
-}
+// ─── Câblage événements ───────────────────────────────────────────
 
 function on(g, el, type, fn, opts) {
   el.addEventListener(type, fn, opts);
@@ -305,96 +396,112 @@ function on(g, el, type, fn, opts) {
 }
 
 function wireEvents(g) {
-  const c = g.stageEl;
+  const stage = g.stageEl;
+  let _dragMoved = false;
 
-  // ── Rotation drag souris ──
-  on(g, c, "mousedown", e => {
+  // ── Pan souris ──
+  on(g, stage, "mousedown", e => {
     if (e.button !== 0) return;
-    g.dragging = true; g.lastMx = e.clientX; g.lastMy = e.clientY;
-    markInteraction(g);
+    g.dragging = true; _dragMoved = false;
+    g.lastMx = e.clientX; g.lastMy = e.clientY;
+    stage.style.cursor = "grabbing";
   });
   on(g, window, "mousemove", e => {
     if (!g.dragging) return;
-    g.rotY += (e.clientX - g.lastMx) * 0.008;
-    g.rotX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, g.rotX + (e.clientY - g.lastMy) * 0.006));
+    const dx = e.clientX - g.lastMx, dy = e.clientY - g.lastMy;
+    if (Math.abs(dx) + Math.abs(dy) > 3) _dragMoved = true;
+    g.tx += dx; g.ty += dy;
     g.lastMx = e.clientX; g.lastMy = e.clientY;
-    markInteraction(g);
+    _applyTransform(g, false);
   });
-  on(g, window, "mouseup", () => { g.dragging = false; });
+  on(g, window, "mouseup", () => { g.dragging = false; stage.style.cursor = ""; });
 
-  // ── Zoom molette ──
-  on(g, c, "wheel", e => {
+  // ── Zoom molette (centré sur le pointeur) ──
+  on(g, stage, "wheel", e => {
     e.preventDefault();
-    g.zoom = Math.max(0.2, Math.min(5, g.zoom * (e.deltaY > 0 ? 0.92 : 1.09)));
-    markInteraction(g);
+    const rect = stage.getBoundingClientRect();
+    _zoomAt(g, e.deltaY > 0 ? 0.9 : 1.11, e.clientX - rect.left, e.clientY - rect.top);
   }, { passive: false });
 
-  // ── Tactile ──
-  let prevDist = 0;
-  on(g, c, "touchstart", e => {
-    markInteraction(g);
+  // ── Tactile : 1 doigt = pan, 2 doigts = pinch-zoom ──
+  let prevDist = 0, prevMidX = 0, prevMidY = 0;
+  on(g, stage, "touchstart", e => {
     if (e.touches.length === 1) {
-      g.dragging = true; g.lastMx = e.touches[0].clientX; g.lastMy = e.touches[0].clientY;
-    } else if (e.touches.length === 2) {
-      prevDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-    }
-  }, { passive: true });
-  on(g, c, "touchmove", e => {
-    markInteraction(g);
-    if (e.touches.length === 1 && g.dragging) {
-      g.rotY += (e.touches[0].clientX - g.lastMx) * 0.008;
-      g.rotX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, g.rotX + (e.touches[0].clientY - g.lastMy) * 0.006));
+      g.dragging = true; _dragMoved = false;
       g.lastMx = e.touches[0].clientX; g.lastMy = e.touches[0].clientY;
     } else if (e.touches.length === 2) {
-      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      if (prevDist > 0) g.zoom = Math.max(0.2, Math.min(5, g.zoom * d / prevDist));
-      prevDist = d;
+      g.dragging = false;
+      const [t0, t1] = e.touches;
+      prevDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+      prevMidX = (t0.clientX + t1.clientX) / 2;
+      prevMidY = (t0.clientY + t1.clientY) / 2;
     }
   }, { passive: true });
-  on(g, c, "touchend", () => { g.dragging = false; prevDist = 0; });
+  on(g, stage, "touchmove", e => {
+    if (e.touches.length === 1 && g.dragging) {
+      const dx = e.touches[0].clientX - g.lastMx, dy = e.touches[0].clientY - g.lastMy;
+      if (Math.abs(dx) + Math.abs(dy) > 3) _dragMoved = true;
+      g.tx += dx; g.ty += dy;
+      g.lastMx = e.touches[0].clientX; g.lastMy = e.touches[0].clientY;
+      _applyTransform(g, false);
+    } else if (e.touches.length === 2 && prevDist > 0) {
+      const [t0, t1] = e.touches;
+      const d = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+      const midX = (t0.clientX + t1.clientX) / 2;
+      const midY = (t0.clientY + t1.clientY) / 2;
+      const rect = stage.getBoundingClientRect();
+      const cx = midX - rect.left, cy = midY - rect.top;
+      _zoomAt(g, d / prevDist, cx, cy);
+      g.tx += midX - prevMidX; g.ty += midY - prevMidY;
+      prevDist = d; prevMidX = midX; prevMidY = midY;
+    }
+  }, { passive: true });
+  on(g, stage, "touchend", e => {
+    if (e.touches.length === 0) { g.dragging = false; prevDist = 0; }
+  });
 
-  // ── Survol nœud ──
-  on(g, c, "mouseover", e => {
+  // ── Survol nœud : tooltip ──
+  on(g, stage, "mouseover", e => {
     const nodeEl = e.target.closest("[data-node-id]");
     if (!nodeEl) return;
     const id = nodeEl.dataset.nodeId;
     if (id !== g.hoverId) { g.hoverId = id; showTooltip(g, id, nodeEl); }
   });
-  on(g, c, "mouseout", e => {
+  on(g, stage, "mouseout", e => {
     const nodeEl = e.target.closest("[data-node-id]");
     if (!nodeEl) return;
     if (!e.relatedTarget?.closest?.("[data-node-id]")) {
       g.hoverId = null;
-      // délai court pour ne pas clignoter si on va sur le tooltip
       setTimeout(() => { if (!g.tooltip.matches?.(":hover")) g.tooltip.hidden = true; }, 120);
     }
   });
-  on(g, c, "mousemove", e => { if (!g.dragging && g.hoverId) positionTooltip(g, e); });
+  on(g, stage, "mousemove", e => { if (g.hoverId && !g.dragging) positionTooltip(g, e); });
 
-  // ── Clics nœud ──
+  // ── Clics nœuds ──
   let clickTimer = null, pendingClickId = null;
-  on(g, c, "click", e => {
-    if (g.dragging) return;
+  on(g, stage, "click", e => {
+    if (_dragMoved) { _dragMoved = false; return; }
     const nodeEl = e.target.closest("[data-node-id]");
     if (!nodeEl) { hideSideCard(); return; }
-    if (e.detail >= 2) return; // laisse dblclick gérer
+    if (e.detail >= 2) return;
     pendingClickId = nodeEl.dataset.nodeId;
     clearTimeout(clickTimer);
     clickTimer = setTimeout(() => { if (pendingClickId) showSideCard(g, pendingClickId); pendingClickId = null; }, 220);
-    markInteraction(g);
   });
-  on(g, c, "dblclick", e => {
+  on(g, stage, "dblclick", e => {
     clearTimeout(clickTimer); pendingClickId = null;
     const nodeEl = e.target.closest("[data-node-id]");
     if (!nodeEl) return;
     e.preventDefault();
     focusGeneRabbit(g.ctx, nodeEl.dataset.nodeId);
-    markInteraction(g);
   });
 
-  // ── Clavier nœud ──
-  on(g, c, "keydown", e => {
+  // ── Clavier : navigation et raccourcis ──
+  on(g, stage, "keydown", e => {
     if (e.key === "Escape") { resetGenealogyFocus(g.ctx); g.tooltip.hidden = true; hideSideCard(); return; }
+    if (e.key === "+" || e.key === "=") { e.preventDefault(); _zoomBy(g,  1.2); return; }
+    if (e.key === "-")                   { e.preventDefault(); _zoomBy(g, 0.83); return; }
+    if (e.key === "0")                   { e.preventDefault(); _fitAll(g, true); return; }
     const nodeEl = e.target.closest("[data-node-id]");
     if (!nodeEl) return;
     const id = nodeEl.dataset.nodeId;
@@ -402,56 +509,61 @@ function wireEvents(g) {
     if (e.key === "f" || e.key === "F") focusGeneRabbit(g.ctx, id);
   });
 
-  // ── Bouton Réinitialiser ──
+  // ── Bouton Réinitialiser / Tout afficher ──
   const resetBtn = document.getElementById("geneResetView");
   if (resetBtn) on(g, resetBtn, "click", () => resetGenealogyFocus(g.ctx));
 
   // ── Recherche ──
   const qInput = document.getElementById("geneQ");
   if (qInput) {
-    on(g, qInput, "input", () => { g.searchQ = qInput.value || ""; markInteraction(g); });
+    on(g, qInput, "input", () => { g.searchQ = qInput.value || ""; _updateHighlight(g); });
     g.searchQ = qInput.value || "";
   }
 
-  // ── Délégation : "Voir plus" dans tooltip et sidecard ──
+  // ── Délégation globale (sidecard / tooltip boutons) ──
   on(g, document, "click", e => {
-    const btn = e.target.closest("[data-gene-show-card]");
-    if (btn) { e.stopPropagation(); showSideCard(g, btn.dataset.geneShowCard); return; }
-    const openBtn = e.target.closest("[data-gene-open-rabbit]");
-    if (openBtn) {
-      const rid = openBtn.dataset.geneOpenRabbit;
+    const showCard = e.target.closest("[data-gene-show-card]");
+    if (showCard) { e.stopPropagation(); showSideCard(g, showCard.dataset.geneShowCard); return; }
+    const openRabbit = e.target.closest("[data-gene-open-rabbit]");
+    if (openRabbit) {
+      const rid = openRabbit.dataset.geneOpenRabbit;
       if (rid && g.ctx.navigate) { g.ctx.selectedRabbitId = rid; g.ctx.navigate("rabbits"); }
     }
+    const centerRabbit = e.target.closest("[data-gene-center]");
+    if (centerRabbit) { e.stopPropagation(); _centerOn(g, centerRabbit.dataset.geneCenter); }
   });
 }
 
-// ─── Tooltip ─────────────────────────────────────────────────────────────────
+function _zoomBy(g, factor) {
+  const rect = g.stageEl.getBoundingClientRect();
+  _zoomAt(g, factor, rect.width / 2, rect.height / 2);
+  g.canvas.style.transition = "transform 0.18s ease";
+}
+
+// ─── Tooltip ─────────────────────────────────────────────────────
 
 function showTooltip(g, id, anchorEl) {
   const node = g.nodeMap.get(id);
   if (!node) return;
   const r = node.rabbit;
-  const state = g.ctx.state;
-  const mother = state.rabbits.find(x => x.id === (r.doeId || r.motherId));
-  const father = state.rabbits.find(x => x.id === (r.buckId || r.fatherId));
-  const descCount = node.childIds.length;
-
+  const rabbits = g.ctx.state.rabbits;
+  const mother = rabbits.find(x => x.id === (r.doeId || r.motherId));
+  const father = rabbits.find(x => x.id === (r.buckId || r.fatherId));
   const sexLabel = { F: "Femelle", M: "Mâle", U: "Inconnu" }[r.sex] || r.sex;
 
   g.tooltip.innerHTML = `
-    <div class="gene-tooltip-title">${esc(r.name)} <span class="badge">${esc(r.code)}</span></div>
+    <div class="gene-tooltip-title">${esc(r.name)} <span class="badge">${esc(r.code || "")}</span></div>
     <div class="gene-tooltip-grid">
       <span>Sexe</span><span>${esc(sexLabel)}</span>
       <span>Cage</span><span>${esc(r.cage || "—")}</span>
       <span>Race</span><span>${esc(r.breed || "—")}</span>
-      <span>Statut</span><span>${esc(r.status || "—")}</span>
       <span>Naissance</span><span>${esc(r.birthDate || "—")}</span>
-      <span>Mère</span><span>${mother ? esc(`${mother.name} (${mother.code})`) : "—"}</span>
-      <span>Père</span><span>${father ? esc(`${father.name} (${father.code})`) : "—"}</span>
-      <span>Descendants</span><span>${descCount}</span>
+      <span>Statut</span><span>${esc(r.status || "—")}</span>
+      <span>Mère</span><span>${mother ? esc(mother.name) : "—"}</span>
+      <span>Père</span><span>${father ? esc(father.name) : "—"}</span>
+      <span>Descendants</span><span>${node.childIds.length}</span>
     </div>
-    <button class="btn gene-tooltip-btn" data-gene-show-card="${esc(id)}">Voir plus</button>
-  `;
+    <button class="btn gene-tooltip-btn" data-gene-show-card="${esc(id)}">Voir plus</button>`;
   g.tooltip.hidden = false;
   positionTooltip(g, anchorEl.getBoundingClientRect());
 }
@@ -466,36 +578,45 @@ function positionTooltip(g, eOrRect) {
     cx = (eOrRect.left + eOrRect.right) / 2 - stage.left;
     cy = eOrRect.top - stage.top;
   } else return;
-
-  const tw = t.offsetWidth || 230, th = t.offsetHeight || 180;
-  const pw = stage.width, ph = stage.height;
-  let left = cx + 16, top = cy - 12;
-  if (left + tw > pw - 8) left = cx - tw - 16;
-  if (top + th > ph - 8) top = ph - th - 8;
-  if (top < 4) top = 4;
+  const tw = t.offsetWidth || 230, th = t.offsetHeight || 200;
+  let left = cx + 18, top = cy - 14;
+  if (left + tw > stage.width  - 8) left = cx - tw - 18;
+  if (top  + th > stage.height - 8) top  = stage.height - th - 8;
   t.style.left = `${Math.max(4, left)}px`;
-  t.style.top = `${Math.max(4, top)}px`;
+  t.style.top  = `${Math.max(4, top)}px`;
 }
 
-// ─── Side card ────────────────────────────────────────────────────────────────
+// ─── Side card ───────────────────────────────────────────────────
 
 function showSideCard(g, id) {
   const node = g.nodeMap.get(id);
   if (!node) return;
   const r = node.rabbit;
-  const state = g.ctx.state;
-  const mother = state.rabbits.find(x => x.id === (r.doeId || r.motherId));
-  const father = state.rabbits.find(x => x.id === (r.buckId || r.fatherId));
-  const descCount = node.childIds.length;
+  const rabbits = g.ctx.state.rabbits;
+  const mother = rabbits.find(x => x.id === (r.doeId || r.motherId));
+  const father = rabbits.find(x => x.id === (r.buckId || r.fatherId));
+  const children = node.childIds.map(cid => rabbits.find(x => x.id === cid)).filter(Boolean);
   const sexLabel = { F: "Femelle 🐇", M: "Mâle 🐇", U: "Inconnu" }[r.sex] || r.sex;
   const statusBadge = r.status === "actif" ? "ok" : r.status === "vendu" ? "warning" : "muted";
+
+  const parentLink = p =>
+    p ? `<span class="gene-sidecard-link" data-gene-show-card="${esc(p.id)}">${esc(p.name)}</span>` : "—";
+
+  const childrenHTML = children.length
+    ? children.map(c => `
+        <div class="gene-sidecard-child">
+          <span data-gene-show-card="${esc(c.id)}" style="cursor:pointer">${esc(c.name)}</span>
+          <span class="badge">${esc(c.code || "")}</span>
+          <button class="btn ghost" style="margin-left:auto;padding:2px 8px;font-size:11px" data-gene-center="${esc(c.id)}">↗</button>
+        </div>`).join("")
+    : "";
 
   const card = document.getElementById("geneSideCard");
   if (!card) return;
   card.innerHTML = `
     <div class="gene-sidecard-header">
       <div class="gene-sidecard-name">${esc(r.name)}</div>
-      <div><span class="badge">${esc(r.code)}</span> <span class="badge ${statusBadge}">${esc(r.status || "—")}</span></div>
+      <div><span class="badge">${esc(r.code || "")}</span> <span class="badge ${statusBadge}">${esc(r.status || "—")}</span></div>
     </div>
     <div class="gene-sidecard-body">
       <div class="kv">
@@ -503,31 +624,21 @@ function showSideCard(g, id) {
         <div>Race</div><div>${esc(r.breed || "—")}</div>
         <div>Cage</div><div>${esc(r.cage || "—")}</div>
         <div>Naissance</div><div>${esc(r.birthDate || "—")}</div>
-        <div>Statut</div><div>${esc(r.status || "—")}</div>
-        <div>Mère</div><div>${mother ? esc(`${mother.name} (${mother.code})`) : "—"}</div>
-        <div>Père</div><div>${father ? esc(`${father.name} (${father.code})`) : "—"}</div>
-        <div>Descendants</div><div>${descCount}</div>
+        <div>Mère</div><div>${parentLink(mother)}</div>
+        <div>Père</div><div>${parentLink(father)}</div>
         ${r.notes ? `<div>Notes</div><div>${esc(r.notes)}</div>` : ""}
       </div>
+      ${children.length ? `<div class="gene-sidecard-section">Descendants (${children.length})</div>${childrenHTML}` : ""}
     </div>
     <div class="gene-sidecard-actions">
       <button class="btn" data-gene-open-rabbit="${esc(id)}">Ouvrir la fiche</button>
-      <button class="btn secondary" data-gene-focus-mode="${esc(id)}">Focus arbre</button>
+      <button class="btn secondary" id="_geneFocusBtn">Focus arbre</button>
       <button class="btn ghost gene-sidecard-close">×</button>
-    </div>
-  `;
+    </div>`;
   card.hidden = false;
 
-  // Bouton focus mode depuis sidecard
-  const focusBtn = card.querySelector("[data-gene-focus-mode]");
-  if (focusBtn) {
-    focusBtn.addEventListener("click", () => focusGeneRabbit(g.ctx, id));
-  }
-  const closeBtn = card.querySelector(".gene-sidecard-close");
-  if (closeBtn) closeBtn.addEventListener("click", hideSideCard);
-
-  // Mettre en évidence dans le graphe
-  g.focusId = null; // ne pas activer le focus, juste la sidecard
+  card.querySelector("#_geneFocusBtn")?.addEventListener("click", () => focusGeneRabbit(g.ctx, id));
+  card.querySelector(".gene-sidecard-close")?.addEventListener("click", hideSideCard);
 }
 
 function hideSideCard() {
@@ -535,39 +646,32 @@ function hideSideCard() {
   if (card) card.hidden = true;
 }
 
-// ─── API publique ─────────────────────────────────────────────────────────────
+// ─── API publique ─────────────────────────────────────────────────
 
 export function focusGeneRabbit(ctx, rabbitId) {
   if (!G) return;
   G.focusId = rabbitId;
   hideSideCard();
-  // Orienter la caméra vers le nœud
-  const node = G.nodeMap.get(rabbitId);
-  if (node) {
-    // Lerp rapide vers la position du nœud (simplifiée : reset à une vue centrée)
-    G.rotX = -0.2;
-    G.rotY = 0;
-    G.zoom = 1.2;
-    markInteraction(G);
-  }
-  // Afficher le badge de mode focus
+  _centerOn(G, rabbitId, true);
+  _updateHighlight(G);
   const badge = document.getElementById("geneFocusBadge");
-  if (badge) { badge.hidden = false; badge.textContent = `Mode focus : ${ctx.state.rabbits.find(r => r.id === rabbitId)?.name || ""}`; }
+  const name = ctx.state.rabbits.find(r => r.id === rabbitId)?.name || "";
+  if (badge) { badge.hidden = false; badge.textContent = `Focus : ${name} · double-clic ou F sur un nœud`; }
 }
 
 export function resetGenealogyFocus(ctx) {
   if (!G) return;
   G.focusId = null;
   hideSideCard();
-  G.rotX = -0.25; G.rotY = 0; G.zoom = 1;
-  markInteraction(G);
+  G.tooltip.hidden = true;
+  _fitAll(G, true);
+  _updateHighlight(G);
   const badge = document.getElementById("geneFocusBadge");
   if (badge) badge.hidden = true;
 }
 
 export function destroyGenealogy3D() {
   if (!G) return;
-  if (G.raf) cancelAnimationFrame(G.raf);
   G.listeners.forEach(({ el, type, fn }) => el.removeEventListener(type, fn));
   if (G.stageEl) G.stageEl.innerHTML = "";
   G = null;
@@ -579,7 +683,7 @@ export function renderGenealogy3D(ctx) {
 
   if (!ctx.state.rabbits.length) {
     destroyGenealogy3D();
-    stageEl.innerHTML = `<div class="muted" style="padding:24px;text-align:center">Ajoute des lapins pour voir la généalogie 3D.</div>`;
+    stageEl.innerHTML = `<div class="muted" style="padding:32px;text-align:center">Ajoutez des lapins pour voir l'arbre généalogique.</div>`;
     hideSideCard();
     return;
   }
@@ -587,12 +691,15 @@ export function renderGenealogy3D(ctx) {
   const key = _dataKey(ctx.state);
 
   if (G && G.stageEl === stageEl && G._dataKey === key) {
-    // Données inchangées — mettre à jour ctx et la recherche uniquement
     G.ctx = ctx;
+    // Ajuster la vue si le panneau vient de devenir visible
+    if (!G._fitted) {
+      const rect = stageEl.getBoundingClientRect();
+      if (rect.width > 0) _fitAll(G, false);
+    }
     return;
   }
 
-  // Reconstruire si data a changé ou premier init
   destroyGenealogy3D();
   initEngine(ctx, stageEl);
 }

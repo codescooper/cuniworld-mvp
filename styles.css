@@ -706,10 +706,10 @@ textarea.input { min-height: 90px; resize: vertical }
 @media (max-width: 900px) { .two-col { grid-template-columns: 1fr } }
 
 /* ================================================================
-   GENEALOGY 3D
+   GÉNÉALOGIE — Arbre 2D interactif (pan / zoom)
    ================================================================ */
 
-/* Layout du panneau */
+/* Layout panneau */
 .gene-panel-body {
   display: flex;
   flex-direction: column;
@@ -721,6 +721,8 @@ textarea.input { min-height: 90px; resize: vertical }
   display: flex;
   gap: var(--space-2);
   flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
 }
 .gene-viewport {
   display: flex;
@@ -730,121 +732,144 @@ textarea.input { min-height: 90px; resize: vertical }
   position: relative;
 }
 
-/* Stage 3D */
+/* Zone de rendu */
 .gene-3d-stage {
   flex: 1;
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  background:
-    radial-gradient(ellipse at 50% 30%, rgba(99,102,241,.06) 0%, transparent 65%),
-    linear-gradient(180deg, #0b0f1a 0%, #111827 100%);
+  background: linear-gradient(180deg, #07101f 0%, #0e1a2e 100%);
   cursor: grab;
   user-select: none;
   min-height: 380px;
+  touch-action: none;
 }
 .gene-3d-stage:active { cursor: grabbing; }
 
-/* Grille de fond subtile */
-.gene-3d-stage::before {
-  content: "";
+/* Canvas transformé (pan + zoom) */
+.gene-canvas {
   position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
-  background-size: 48px 48px;
-  pointer-events: none;
+  transform-origin: 0 0;
+  will-change: transform;
 }
 
-/* SVG overlay (arêtes) */
+/* Bandes de génération */
+.gene-lane {
+  position: absolute;
+  pointer-events: none;
+}
+.gene-lane--alt {
+  background: rgba(255,255,255,.022);
+}
+.gene-gen-label {
+  position: absolute;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: rgba(100,116,139,.4);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Arêtes SVG (bezier) */
 .gene-svg-overlay {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  top: 0; left: 0;
   pointer-events: none;
   overflow: visible;
 }
 .gene-edge {
-  stroke-width: 1.5;
-  stroke: rgba(148,163,184,.25);
-  stroke-linecap: round;
+  fill: none;
+  stroke-width: 1.8;
+  stroke: rgba(148,163,184,.18);
+  transition: opacity .2s;
 }
-.gene-edge--mother { stroke: rgba(244,114,182,.35); }
-.gene-edge--father { stroke: rgba(96,165,250,.35); }
-
-/* Couche nœuds */
-.gene-nodes-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
+.gene-edge--mother { stroke: rgba(244,114,182,.45); }
+.gene-edge--father { stroke: rgba(96,165,250,.45); }
 
 /* Nœud */
 .gene-node {
   position: absolute;
   pointer-events: auto;
-  transform: translate(-50%, -50%) scale(var(--ns, 1));
-  transition: opacity .15s ease;
+  cursor: pointer;
+  user-select: none;
   outline: none;
 }
 .gene-node-inner {
-  background: rgba(15,23,42,.82);
-  border: 1.5px solid rgba(148,163,184,.3);
-  border-radius: 32px;
-  padding: 6px 14px 5px;
-  text-align: center;
-  backdrop-filter: blur(6px);
-  white-space: nowrap;
-  box-shadow: 0 0 0 0 transparent, 0 2px 12px rgba(0,0,0,.4);
-  transition: box-shadow .2s ease, border-color .2s ease;
+  background: rgba(12,20,40,.93);
+  border: 1.5px solid rgba(148,163,184,.22);
+  border-radius: 12px;
+  padding: 10px 14px 9px;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 10px rgba(0,0,0,.45);
+  transition: box-shadow .15s ease, border-color .15s ease, transform .15s ease;
 }
 .gene-node:hover .gene-node-inner,
-.gene-node--hovered .gene-node-inner {
-  border-color: rgba(255,255,255,.6);
-  box-shadow: 0 0 18px 4px rgba(255,255,255,.12), 0 2px 12px rgba(0,0,0,.4);
+.gene-node:focus-visible .gene-node-inner {
+  border-color: rgba(255,255,255,.48);
+  box-shadow: 0 0 18px 3px rgba(255,255,255,.09), 0 4px 18px rgba(0,0,0,.5);
+  transform: translateY(-2px);
 }
 .gene-node--focus .gene-node-inner {
   border-color: var(--color-accent);
-  box-shadow: 0 0 28px 6px rgba(99,102,241,.4), 0 2px 12px rgba(0,0,0,.4);
+  box-shadow: 0 0 22px 5px rgba(99,102,241,.42), 0 4px 16px rgba(0,0,0,.5);
+  transform: translateY(-2px);
 }
 .gene-node--matched .gene-node-inner {
-  border-color: rgba(251,191,36,.7);
-  box-shadow: 0 0 18px 4px rgba(251,191,36,.25);
+  border-color: rgba(251,191,36,.72);
+  box-shadow: 0 0 16px 3px rgba(251,191,36,.2);
+}
+.gene-node--dimmed {
+  opacity: 0.1;
+  pointer-events: none;
+  transition: opacity .2s;
 }
 
 /* Couleurs par sexe */
-.gene-sex-f .gene-node-inner { border-color: rgba(244,114,182,.5); }
+.gene-sex-f .gene-node-inner { border-color: rgba(244,114,182,.52); }
 .gene-sex-f .gene-node-label { color: #f9a8d4; }
-.gene-sex-m .gene-node-inner { border-color: rgba(96,165,250,.5); }
+.gene-sex-m .gene-node-inner { border-color: rgba(96,165,250,.52); }
 .gene-sex-m .gene-node-label { color: #93c5fd; }
-.gene-sex-u .gene-node-inner { border-color: rgba(167,139,250,.4); }
+.gene-sex-u .gene-node-inner { border-color: rgba(167,139,250,.42); }
 .gene-sex-u .gene-node-label { color: #c4b5fd; }
 
+/* Statuts */
+.gene-status-vendu .gene-node-inner { opacity: .7; }
+.gene-status-mort  .gene-node-inner { opacity: .4; filter: grayscale(.65); }
+
+/* Textes nœud */
 .gene-node-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.25;
   color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 134px;
 }
-.gene-node-cage {
-  font-size: 9px;
-  color: rgba(148,163,184,.75);
-  margin-top: 2px;
+.gene-node-sub {
+  font-size: 10px;
+  color: rgba(148,163,184,.68);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 134px;
 }
 
 /* Tooltip survol */
 .gene-tooltip {
   position: absolute;
   z-index: 200;
-  background: rgba(15,23,42,.96);
+  background: rgba(8,14,28,.97);
   border: 1px solid rgba(148,163,184,.25);
   border-radius: var(--radius-md);
   padding: 12px 14px 10px;
   min-width: 210px;
   max-width: 270px;
-  box-shadow: 0 8px 32px rgba(0,0,0,.6);
+  box-shadow: 0 8px 32px rgba(0,0,0,.72);
   backdrop-filter: blur(8px);
   pointer-events: auto;
 }
@@ -867,26 +892,22 @@ textarea.input { min-height: 90px; resize: vertical }
   margin-bottom: 10px;
 }
 .gene-tooltip-grid span:nth-child(odd) { color: rgba(100,116,139,.8); }
-.gene-tooltip-btn {
-  width: 100%;
-  font-size: 12px;
-  padding: 5px 10px;
-}
+.gene-tooltip-btn { width: 100%; font-size: 12px; padding: 5px 10px; }
 
-/* Badge focus mode */
+/* Badge focus */
 .gene-focus-badge {
-  background: rgba(99,102,241,.15);
+  background: rgba(99,102,241,.14);
   border: 1px solid rgba(99,102,241,.3);
   border-radius: var(--radius-sm);
   color: #a5b4fc;
-  font-size: 12px;
+  font-size: 11px;
   padding: 4px 12px;
   flex-shrink: 0;
 }
 
-/* Side card (panneau détail latéral) */
+/* Side card */
 .gene-sidecard {
-  width: 260px;
+  width: 268px;
   flex-shrink: 0;
   background: var(--color-surface);
   border: 1.5px solid var(--color-border);
@@ -903,15 +924,33 @@ textarea.input { min-height: 90px; resize: vertical }
   flex-direction: column;
   gap: 4px;
 }
-.gene-sidecard-name {
-  font-size: 16px;
-  font-weight: 800;
+.gene-sidecard-name { font-size: 16px; font-weight: 800; }
+.gene-sidecard-body { flex: 1; overflow-y: auto; padding: 10px 14px; }
+.gene-sidecard-section {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--color-muted);
+  margin: 10px 0 5px;
 }
-.gene-sidecard-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px 14px;
+.gene-sidecard-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  cursor: default;
 }
+.gene-sidecard-child:hover { background: var(--color-bg); }
+.gene-sidecard-link {
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.gene-sidecard-link:hover { color: var(--color-accent); }
 .gene-sidecard-actions {
   padding: 8px 14px;
   border-top: 1px solid var(--color-border);
@@ -920,27 +959,12 @@ textarea.input { min-height: 90px; resize: vertical }
   flex-wrap: wrap;
   align-items: center;
 }
-.gene-sidecard-close {
-  margin-left: auto;
-  font-size: 16px;
-  padding: 4px 10px;
-}
-
-/* Fallback : ancien .gene-graph conservé si besoin */
-.gene-graph {
-  margin-top: var(--space-3);
-  border: 1.5px dashed var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  min-height: 100px;
-}
-.gene-svg     { width: 100%; height: auto }
-.gene-line    { stroke: var(--color-border); stroke-width: 2 }
+.gene-sidecard-close { margin-left: auto; font-size: 16px; padding: 4px 10px; }
 
 @media (max-width: 700px) {
   .gene-viewport { flex-direction: column; }
   .gene-sidecard { width: 100%; max-height: 240px; }
-  .gene-3d-stage { min-height: 300px; }
+  .gene-3d-stage { min-height: 280px; }
 }
 
 
