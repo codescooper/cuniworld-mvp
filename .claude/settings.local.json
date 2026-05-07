@@ -21,7 +21,11 @@
       "Bash(Remove-Item *)",
       "Bash(kill %1)",
       "Bash(npm --version)",
-      "Bash(Get-Content C:\\\\Users\\\\USER\\\\cuniworld-mvp\\\\.gitignore)"
+      "Bash(Get-Content C:\\\\Users\\\\USER\\\\cuniworld-mvp\\\\.gitignore)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(Get-ChildItem C:\\\\Users\\\\USER\\\\cuniworld-mvp -Filter \"*.js\" -Depth 0)",
+      "Bash(Select-Object Name)",
+      "Bash(dir C:\\\\Users\\\\USER\\\\cuniworld-mvp\\\\test-results *)"
     ]
   }
 }
