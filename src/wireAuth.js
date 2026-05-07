@@ -7,7 +7,8 @@ import { showToast, showConfirm } from './notifications.js';
 
 function escAttr(s) { return String(s).replace(/"/g, '&quot;'); }
 
-// Timeout helper : rejette si la promesse prend trop longtemps
+const SESSION_JOIN_KEY = 'cuniworld_pending_join';
+
 function _withTimeout(promise, ms, label) {
   return Promise.race([
     promise,
@@ -17,8 +18,25 @@ function _withTimeout(promise, ms, label) {
   ]);
 }
 
+// Extrait un UUID farm depuis un UUID brut ou une URL contenant ?join=UUID
+function _extractFarmId(input) {
+  const trimmed = input.trim();
+  // UUID brut : 8-4-4-4-12
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+    return trimmed;
+  }
+  // URL avec paramètre ?join=
+  const m = trimmed.match(/[?&]join=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+  return m ? m[1] : trimmed; // retourne tel quel si non reconnu (laisse le serveur rejeter)
+}
+
 // ── Point d'entrée : appelé au boot de l'app ──────────────────────
 export async function bootWithAuth(ctx, onReady, joinFarmId = null) {
+  // Récupère un joinFarmId mis en sessionStorage lors d'une inscription
+  // (l'utilisateur a dû confirmer son email et est revenu sans le ?join= dans l'URL)
+  const pendingJoin = sessionStorage.getItem(SESSION_JOIN_KEY);
+  const effectiveJoinId = joinFarmId || (pendingJoin ? pendingJoin : null);
+
   let session = null;
   try {
     session = await _withTimeout(Auth.getSession(), 8000, 'getSession');
@@ -30,9 +48,9 @@ export async function bootWithAuth(ctx, onReady, joinFarmId = null) {
 
   if (session) {
     ctx.currentUser = session.user;
-    await _selectFarm(ctx, onReady, joinFarmId);
+    await _selectFarm(ctx, onReady, effectiveJoinId);
   } else {
-    _showAuthScreen(ctx, onReady, joinFarmId);
+    _showAuthScreen(ctx, onReady, effectiveJoinId);
   }
 
   // Réagit aux changements d'état auth (déconnexion autre onglet, expiration)
@@ -41,6 +59,7 @@ export async function bootWithAuth(ctx, onReady, joinFarmId = null) {
       DB.unsubscribeAll();
       ctx.farmId = null;
       ctx.currentUser = null;
+      sessionStorage.removeItem(SESSION_JOIN_KEY);
       _showAuthScreen(ctx, onReady, null);
     }
   });
@@ -101,6 +120,8 @@ function _renderAuthForm(overlay, mode, ctx, onReady, joinFarmId = null) {
         ctx.currentUser = user;
         // Supabase peut demander une confirmation email selon la config
         if (!user?.email_confirmed_at) {
+          // Conserver l'invitation en sessionStorage — l'utilisateur reviendra sans le ?join= dans l'URL
+          if (joinFarmId) sessionStorage.setItem(SESSION_JOIN_KEY, joinFarmId);
           errEl.style.color = 'var(--color-primary)';
           errEl.textContent = 'Vérifiez votre email puis reconnectez-vous.';
           btn.disabled = false;
@@ -130,8 +151,10 @@ async function _selectFarm(ctx, onReady, joinFarmId = null) {
   if (joinFarmId) {
     try {
       const farm = await _withTimeout(FarmService.joinFarm(joinFarmId), 10000, 'joinFarm');
+      sessionStorage.removeItem(SESSION_JOIN_KEY);
       _clearJoinParam();
-      await _loadFarm(farm.id, farm.name, ctx, onReady);
+      // isNew=true pour proposer la migration de données locales au membre rejoignant
+      await _loadFarm(farm.id, farm.name, ctx, onReady, true);
     } catch (ex) {
       overlay.innerHTML = `
         <div class="auth-card">
@@ -142,7 +165,11 @@ async function _selectFarm(ctx, onReady, joinFarmId = null) {
           </div>
         </div>`;
       overlay.querySelector('#btnRetryJoin')?.addEventListener('click', () => _selectFarm(ctx, onReady, joinFarmId));
-      overlay.querySelector('#btnSkipJoin')?.addEventListener('click', () => { _clearJoinParam(); _selectFarm(ctx, onReady, null); });
+      overlay.querySelector('#btnSkipJoin')?.addEventListener('click', () => {
+        sessionStorage.removeItem(SESSION_JOIN_KEY);
+        _clearJoinParam();
+        _selectFarm(ctx, onReady, null);
+      });
     }
     return;
   }
@@ -198,17 +225,19 @@ function _wireFarmSelector(overlay, ctx, onReady) {
     }
   });
 
-  // Rejoindre une ferme
+  // Rejoindre une ferme (accepte UUID brut ou URL complète avec ?join=)
   overlay.querySelector('#joinFarmForm')?.addEventListener('submit', async e => {
     e.preventDefault();
-    const farmId = e.target.querySelector('[name=farmCode]').value.trim();
+    const raw = e.target.querySelector('[name=farmCode]').value;
+    const farmId = _extractFarmId(raw);
     const btn = e.target.querySelector('button[type=submit]');
     const err = overlay.querySelector('#farmError');
     btn.disabled = true;
     err.textContent = '';
     try {
       const farm = await FarmService.joinFarm(farmId);
-      await _loadFarm(farm.id, farm.name, ctx, onReady);
+      // Proposer migration si des données locales existent
+      await _loadFarm(farm.id, farm.name, ctx, onReady, true);
     } catch (ex) {
       err.textContent = _friendlyError(ex);
       btn.disabled = false;
@@ -285,7 +314,12 @@ async function _offerMigration(ctx) {
 }
 
 // ── Topbar : affichage ferme + utilisateur ────────────────────────
+let _dropdownCleanup = null;
+
 function _updateTopbar(ctx, onReady) {
+  // Nettoyer les anciens listeners de dropdown pour éviter les doublons
+  if (_dropdownCleanup) { _dropdownCleanup(); _dropdownCleanup = null; }
+
   const info = document.getElementById('userInfo');
   if (!info) return;
 
@@ -337,9 +371,14 @@ function _updateTopbar(ctx, onReady) {
       `Je t'invite à rejoindre ma ferme « ${ctx.farmName} » sur CuniWorld, l'application de gestion d'élevage de lapins.\n\n` +
       `Clique sur ce lien pour rejoindre (ou crée un compte gratuitement si tu n'en as pas) :\n` +
       `${link}\n\nÀ bientôt !`;
-    navigator.clipboard?.writeText(msg).then(() =>
-      alert('Message d\'invitation copié !\nColle-le dans un email ou WhatsApp.')
-    );
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(msg)
+        .then(() => showToast("Message d'invitation copié ! Colle-le dans un email ou WhatsApp.", 'success'))
+        .catch(() => _showInviteModal(msg));
+    } else {
+      _showInviteModal(msg);
+    }
   });
 
   // Avatar — ouvrir / fermer le dropdown
@@ -353,15 +392,17 @@ function _updateTopbar(ctx, onReady) {
     btnMenu.setAttribute('aria-expanded', String(!isOpen));
   });
 
-  // Fermer en cliquant ailleurs
   const closeDropdown = () => {
     if (!dropdown.hidden) {
       dropdown.hidden = true;
       btnMenu?.setAttribute('aria-expanded', 'false');
     }
   };
-  document.addEventListener('click', closeDropdown);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDropdown(); });
+
+  const onDocClick = () => closeDropdown();
+  const onDocKey   = (e) => { if (e.key === 'Escape') closeDropdown(); };
+  document.addEventListener('click', onDocClick);
+  document.addEventListener('keydown', onDocKey);
 
   // Switch farm
   document.getElementById('ddSwitchFarm')?.addEventListener('click', async () => {
@@ -381,6 +422,34 @@ function _updateTopbar(ctx, onReady) {
     await Auth.signOut();
     location.reload();
   });
+
+  _dropdownCleanup = () => {
+    document.removeEventListener('click', onDocClick);
+    document.removeEventListener('keydown', onDocKey);
+  };
+}
+
+// Fallback quand le clipboard est bloqué : modale avec texte sélectionnable
+function _showInviteModal(text) {
+  const existing = document.getElementById('_inviteModal');
+  if (existing) existing.remove();
+
+  const wrap = document.createElement('div');
+  wrap.id = '_inviteModal';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+  wrap.innerHTML = `
+    <div style="background:var(--color-surface,#fff);border-radius:12px;padding:24px;max-width:480px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+      <h3 style="margin:0 0 12px;font-size:1rem">Message d'invitation</h3>
+      <p style="margin:0 0 10px;font-size:.85rem;color:var(--color-muted,#666)">Copiez ce texte et collez-le dans un email ou WhatsApp :</p>
+      <textarea readonly style="width:100%;height:140px;font-size:.82rem;border:1px solid var(--color-border,#ddd);border-radius:8px;padding:10px;resize:none;box-sizing:border-box">${escapeHTML(text)}</textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px">
+        <button id="_inviteModalClose" class="btn">Fermer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  wrap.querySelector('textarea')?.select();
+  wrap.querySelector('#_inviteModalClose')?.addEventListener('click', () => wrap.remove());
+  wrap.addEventListener('click', e => { if (e.target === wrap) wrap.remove(); });
 }
 
 // ── HTML templates ────────────────────────────────────────────────
@@ -429,7 +498,7 @@ function _farmSelectorHTML(farms, email) {
 
       <div class="farm-sep"><span>ou rejoindre</span></div>
       <form id="joinFarmForm" class="auth-form">
-        <input name="farmCode" class="input" placeholder="Identifiant de ferme (UUID)" required />
+        <input name="farmCode" class="input" placeholder="Lien d'invitation ou identifiant de ferme" required />
         <button type="submit" class="btn secondary auth-btn">Rejoindre</button>
       </form>
 
