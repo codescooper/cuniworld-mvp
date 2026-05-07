@@ -4,6 +4,7 @@ import { getBreedingStatus, breedingStatusBadge } from "./breeding.js";
 import { getRabbitWeightHistory, getCurrentWeight, getTotalHerdWeightEvolution, renderWeightSVG } from "./weightService.js";
 import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
 import { buildLots, lotBadge, LOT_STATUSES } from "./lots.js";
+import { renderGenealogy3D } from "./genealogy3d.js";
 import { getReminders, reminderLabel } from "./health.js";
 import { getPhotoHistory, getProfilePhoto } from "./photos.js";
 import { getTodayFarmActions } from "./farmActionsService.js";
@@ -409,12 +410,12 @@ export function renderEventsPanel(ctx) {
 }
 
 export function renderAll(ctx) {
-  renderDashboard(ctx);
-  renderRabbitList(ctx);
-  renderRabbitDetails(ctx);
-  renderEventsPanel(ctx);
-  renderLots(ctx);
-  renderGenealogy(ctx);
+  try { renderDashboard(ctx); } catch(e) { console.error("[renderDashboard]", e); }
+  try { renderRabbitList(ctx); } catch(e) { console.error("[renderRabbitList]", e); }
+  try { renderRabbitDetails(ctx); } catch(e) { console.error("[renderRabbitDetails]", e); }
+  try { renderEventsPanel(ctx); } catch(e) { console.error("[renderEventsPanel]", e); }
+  try { renderLots(ctx); } catch(e) { console.error("[renderLots]", e); }
+  try { renderGenealogy3D(ctx); } catch(e) { console.error("[renderGenealogy3D]", e); }
 }
 
 function _buildWeightSection(r, history, todayISO) {

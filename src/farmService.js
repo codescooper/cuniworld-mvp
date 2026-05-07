@@ -18,22 +18,31 @@ export const FarmService = {
   },
 
   async joinFarm(farmId) {
-    const { data: farm, error: farmErr } = await supabase
-      .from('farms')
-      .select('id, name')
-      .eq('id', farmId.trim())
-      .single();
-    if (farmErr) throw new Error("Ferme introuvable. Vérifiez l'identifiant.");
-
+    const trimmedId = farmId.trim();
     const { data: { user } } = await supabase.auth.getUser();
 
+    // Insert membership first — if the farm doesn't exist the FK constraint
+    // (or a missing-rows error) will bubble up as a clear error. Doing the
+    // SELECT first would fail for new users who aren't members yet (RLS).
     const { error: memberErr } = await supabase
       .from('farm_members')
       .upsert(
-        { farm_id: farm.id, user_id: user.id, role: 'member' },
+        { farm_id: trimmedId, user_id: user.id, role: 'member' },
         { onConflict: 'farm_id,user_id', ignoreDuplicates: true }
       );
-    if (memberErr) throw memberErr;
+    if (memberErr) {
+      // FK violation → farm doesn't exist
+      if (memberErr.code === '23503') throw new Error("Ferme introuvable. Vérifiez l'identifiant.");
+      throw memberErr;
+    }
+
+    // Now the user is a member, RLS allows reading the farm
+    const { data: farm, error: farmErr } = await supabase
+      .from('farms')
+      .select('id, name')
+      .eq('id', trimmedId)
+      .single();
+    if (farmErr || !farm) throw new Error("Ferme introuvable. Vérifiez l'identifiant.");
 
     return farm;
   },

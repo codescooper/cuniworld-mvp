@@ -158,15 +158,20 @@
         <div class="panel-header">
           <div class="panel-title-group">
             <span class="panel-icon">🌳</span>
-            <span class="panel-title">Généalogie</span>
+            <span class="panel-title">Généalogie 3D</span>
           </div>
         </div>
-        <div class="panel-body">
-          <div class="row">
-            <input id="geneQ" class="input" placeholder="Rechercher un lapin (code, nom…)" data-testid="gene-search" />
+        <div class="panel-body gene-panel-body">
+          <div class="gene-controls">
+            <input id="geneQ" class="input" placeholder="Rechercher un lapin (code, nom, cage…)" data-testid="gene-search" style="flex:1" />
+            <button id="geneResetView" class="btn secondary" data-testid="gene-reset-view">Réinitialiser la vue</button>
           </div>
-          <div id="geneList" class="list" data-testid="gene-list"></div>
-          <div id="geneGraph" class="gene-graph" data-testid="gene-graph"></div>
+          <div id="geneFocusBadge" class="gene-focus-badge" hidden></div>
+          <div class="gene-viewport">
+            <div id="geneGraph" class="gene-3d-stage" data-testid="gene-graph"></div>
+            <div id="geneSideCard" class="gene-sidecard" hidden></div>
+          </div>
+          <div id="geneList" class="list" data-testid="gene-list" style="display:none"></div>
         </div>
       </div>
 

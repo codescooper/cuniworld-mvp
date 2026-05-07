@@ -706,20 +706,242 @@ textarea.input { min-height: 90px; resize: vertical }
 @media (max-width: 900px) { .two-col { grid-template-columns: 1fr } }
 
 /* ================================================================
-   GENEALOGY
+   GENEALOGY 3D
    ================================================================ */
+
+/* Layout du panneau */
+.gene-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow: hidden;
+  height: 100%;
+}
+.gene-controls {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+.gene-viewport {
+  display: flex;
+  gap: var(--space-3);
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+/* Stage 3D */
+.gene-3d-stage {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(99,102,241,.06) 0%, transparent 65%),
+    linear-gradient(180deg, #0b0f1a 0%, #111827 100%);
+  cursor: grab;
+  user-select: none;
+  min-height: 380px;
+}
+.gene-3d-stage:active { cursor: grabbing; }
+
+/* Grille de fond subtile */
+.gene-3d-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+}
+
+/* SVG overlay (arêtes) */
+.gene-svg-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.gene-edge {
+  stroke-width: 1.5;
+  stroke: rgba(148,163,184,.25);
+  stroke-linecap: round;
+}
+.gene-edge--mother { stroke: rgba(244,114,182,.35); }
+.gene-edge--father { stroke: rgba(96,165,250,.35); }
+
+/* Couche nœuds */
+.gene-nodes-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Nœud */
+.gene-node {
+  position: absolute;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(var(--ns, 1));
+  transition: opacity .15s ease;
+  outline: none;
+}
+.gene-node-inner {
+  background: rgba(15,23,42,.82);
+  border: 1.5px solid rgba(148,163,184,.3);
+  border-radius: 32px;
+  padding: 6px 14px 5px;
+  text-align: center;
+  backdrop-filter: blur(6px);
+  white-space: nowrap;
+  box-shadow: 0 0 0 0 transparent, 0 2px 12px rgba(0,0,0,.4);
+  transition: box-shadow .2s ease, border-color .2s ease;
+}
+.gene-node:hover .gene-node-inner,
+.gene-node--hovered .gene-node-inner {
+  border-color: rgba(255,255,255,.6);
+  box-shadow: 0 0 18px 4px rgba(255,255,255,.12), 0 2px 12px rgba(0,0,0,.4);
+}
+.gene-node--focus .gene-node-inner {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 28px 6px rgba(99,102,241,.4), 0 2px 12px rgba(0,0,0,.4);
+}
+.gene-node--matched .gene-node-inner {
+  border-color: rgba(251,191,36,.7);
+  box-shadow: 0 0 18px 4px rgba(251,191,36,.25);
+}
+
+/* Couleurs par sexe */
+.gene-sex-f .gene-node-inner { border-color: rgba(244,114,182,.5); }
+.gene-sex-f .gene-node-label { color: #f9a8d4; }
+.gene-sex-m .gene-node-inner { border-color: rgba(96,165,250,.5); }
+.gene-sex-m .gene-node-label { color: #93c5fd; }
+.gene-sex-u .gene-node-inner { border-color: rgba(167,139,250,.4); }
+.gene-sex-u .gene-node-label { color: #c4b5fd; }
+
+.gene-node-label {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #e2e8f0;
+}
+.gene-node-cage {
+  font-size: 9px;
+  color: rgba(148,163,184,.75);
+  margin-top: 2px;
+}
+
+/* Tooltip survol */
+.gene-tooltip {
+  position: absolute;
+  z-index: 200;
+  background: rgba(15,23,42,.96);
+  border: 1px solid rgba(148,163,184,.25);
+  border-radius: var(--radius-md);
+  padding: 12px 14px 10px;
+  min-width: 210px;
+  max-width: 270px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.6);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+.gene-tooltip-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.gene-tooltip-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  font-size: 11px;
+  color: rgba(148,163,184,.9);
+  margin-bottom: 10px;
+}
+.gene-tooltip-grid span:nth-child(odd) { color: rgba(100,116,139,.8); }
+.gene-tooltip-btn {
+  width: 100%;
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+/* Badge focus mode */
+.gene-focus-badge {
+  background: rgba(99,102,241,.15);
+  border: 1px solid rgba(99,102,241,.3);
+  border-radius: var(--radius-sm);
+  color: #a5b4fc;
+  font-size: 12px;
+  padding: 4px 12px;
+  flex-shrink: 0;
+}
+
+/* Side card (panneau détail latéral) */
+.gene-sidecard {
+  width: 260px;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.gene-sidecard[hidden] { display: none; }
+.gene-sidecard-header {
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gene-sidecard-name {
+  font-size: 16px;
+  font-weight: 800;
+}
+.gene-sidecard-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+}
+.gene-sidecard-actions {
+  padding: 8px 14px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.gene-sidecard-close {
+  margin-left: auto;
+  font-size: 16px;
+  padding: 4px 10px;
+}
+
+/* Fallback : ancien .gene-graph conservé si besoin */
 .gene-graph {
   margin-top: var(--space-3);
   border: 1.5px dashed var(--color-border);
   border-radius: var(--radius-md);
-  padding: var(--space-3); min-height: 100px;
+  padding: var(--space-3);
+  min-height: 100px;
 }
 .gene-svg     { width: 100%; height: auto }
 .gene-line    { stroke: var(--color-border); stroke-width: 2 }
-.gene-node rect { fill: var(--color-surface); stroke: var(--color-border) }
-.gene-node text { font-size: 12px; fill: var(--color-text) }
-.gene-node.focus rect  { stroke: var(--color-accent); stroke-width: 2 }
-.gene-node.muted rect  { fill: rgba(120,120,120,0.06) }
+
+@media (max-width: 700px) {
+  .gene-viewport { flex-direction: column; }
+  .gene-sidecard { width: 100%; max-height: 240px; }
+  .gene-3d-stage { min-height: 300px; }
+}
 
 
 /* ================================================================
