@@ -12,10 +12,18 @@ import { createSyncManager } from "./src/syncManager.js";
 import { getPendingMutationCount, replayMutationQueue } from "./src/mutationQueue.js";
 import { showToast, showConfirm } from "./src/notifications.js";
 import { supabaseConfigured } from "./src/supabase.js";
+import {
+  registerServiceWorker,
+  requestNotificationPermission,
+  checkAndFireNotifications,
+  notificationsGranted,
+  notificationsSupported,
+  permissionAlreadyAsked,
+} from "./src/pushNotifications.js";
 
 const el = getEls();
 
-const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "actions"];
+const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "stats", "actions"];
 
 const ctx = {
   Store,
@@ -288,6 +296,44 @@ function wireExtra() {
     showToast(`Synchronisation relancée : ${replayed} rejouée(s), ${remaining} en attente.`, "success");
   });
 
+  // ── Notifications ────────────────────────────────────────────────────────────
+  function _updateNotifLabel() {
+    const label = document.getElementById('notifStatusLabel');
+    if (!label) return;
+    if (!notificationsSupported()) {
+      label.textContent = 'Non supporté par ce navigateur';
+    } else if (Notification.permission === 'granted') {
+      label.textContent = 'Notifications actives — Vérifier maintenant';
+    } else if (Notification.permission === 'denied') {
+      label.textContent = 'Bloquées dans les paramètres du navigateur';
+    } else {
+      label.textContent = 'Activer les alertes élevage';
+    }
+  }
+  _updateNotifLabel();
+
+  document.getElementById('moreNotifications')?.addEventListener('click', async () => {
+    if (!notificationsSupported()) {
+      showToast('Les notifications ne sont pas supportées par ce navigateur.', 'error');
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      showToast('Notifications bloquées. Modifiez les permissions dans les paramètres du navigateur.', 'error');
+      return;
+    }
+    if (!notificationsGranted()) {
+      const granted = await requestNotificationPermission();
+      _updateNotifLabel();
+      if (!granted) {
+        showToast('Permission refusée. Les notifications restent désactivées.', 'error');
+        return;
+      }
+      showToast('Notifications activées !', 'success');
+    }
+    checkAndFireNotifications(ctx.state);
+    showToast('Vérification des alertes effectuée.', 'info');
+  });
+
   document.getElementById("moreGuideToggle")?.addEventListener("change", e => {
     const master = document.getElementById("guideToggle");
     if (master) { master.checked = e.target.checked; master.dispatchEvent(new Event("change")); }
@@ -367,6 +413,7 @@ const savedPanel = (() => {
 })();
 
 async function initApp() {
+  registerServiceWorker().catch(() => {});
   wireNav();
   wireExtra();
   wireStatic(ctx);
@@ -390,6 +437,7 @@ async function initApp() {
     if (!isE2E) {
       seedIfEmpty();
       setActivePanel(savedPanel);
+      if (notificationsGranted()) checkAndFireNotifications(ctx.state);
     } else {
       setActivePanel("dashboard");
     }
@@ -397,7 +445,10 @@ async function initApp() {
     ctx.setSyncStatus("synced");
     replayMutationQueue().then(() => ctx.updatePendingMutations()).catch(() => {});
     import("./src/wireAuth.js").then(({ bootWithAuth }) => {
-      bootWithAuth(ctx, () => setActivePanel(savedPanel), joinFarmId);
+      bootWithAuth(ctx, () => {
+        setActivePanel(savedPanel);
+        if (notificationsGranted()) checkAndFireNotifications(ctx.state);
+      }, joinFarmId);
     }).catch((err) => {
       console.error("[CuniWorld] Impossible de charger l'auth Supabase:", err);
       const authOverlay = document.getElementById("authOverlay");

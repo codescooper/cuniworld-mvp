@@ -8,6 +8,7 @@ import { renderGenealogy3D } from "./genealogy3d.js";
 import { getReminders, reminderLabel } from "./health.js";
 import { getPhotoHistory, getProfilePhoto } from "./photos.js";
 import { getTodayFarmActions } from "./farmActionsService.js";
+import { renderStats } from "./stats.js";
 
 
 
@@ -416,6 +417,7 @@ export function renderAll(ctx) {
   try { renderEventsPanel(ctx); } catch(e) { console.error("[renderEventsPanel]", e); }
   try { renderLots(ctx); } catch(e) { console.error("[renderLots]", e); }
   try { renderGenealogy3D(ctx); } catch(e) { console.error("[renderGenealogy3D]", e); }
+  try { renderStats(ctx); } catch(e) { console.error("[renderStats]", e); }
 }
 
 function _buildWeightSection(r, history, todayISO) {
