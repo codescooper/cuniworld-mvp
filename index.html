@@ -67,6 +67,11 @@
         <span class="nav-label">Généalogie</span>
         <span class="nav-badge" id="badge-genealogy"></span>
       </button>
+      <button class="nav-item" data-panel="magasin" data-testid="nav-magasin">
+        <span class="nav-icon">🏪</span>
+        <span class="nav-label">Magasin</span>
+        <span class="nav-badge" id="badge-magasin"></span>
+      </button>
       <button class="nav-item" data-panel="stats" data-testid="nav-stats">
         <span class="nav-icon">📈</span>
         <span class="nav-label">Statistiques</span>
@@ -181,6 +186,22 @@
         </div>
       </div>
 
+      <!-- Panneau : Magasin -->
+      <div class="section-panel" id="panel-magasin" data-panel="magasin">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-icon">🏪</span>
+            <span class="panel-title">Magasin</span>
+          </div>
+          <div class="panel-header-actions">
+            <button class="btn" id="btnAddStock">+ Ajouter article</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="stockDash"></div>
+        </div>
+      </div>
+
       <!-- Panneau : Statistiques -->
       <div class="section-panel" id="panel-stats" data-panel="stats">
         <div class="panel-header">
@@ -281,6 +302,14 @@
               <span class="tile-body">
                 <span class="tile-title">Réinitialiser les données</span>
                 <span class="tile-sub">Supprime tous les lapins et événements</span>
+              </span>
+            </button>
+
+            <button id="moreTournee" class="more-action-tile" type="button">
+              <span class="tile-icon">📋</span>
+              <span class="tile-body">
+                <span class="tile-title">Tournée du jour</span>
+                <span class="tile-sub" id="tourneeStatusLabel">Eau · Nourriture · Nettoyage</span>
               </span>
             </button>
 

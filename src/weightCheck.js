@@ -10,6 +10,7 @@ import { getRabbitWeightHistory } from './weightService.js';
 import { daysBetween, formatDate, escapeHTML, escapeAttr } from './utils.js';
 import { addEvent } from './actions.js';
 import { openModal } from './modal.js';
+import { sortByCage } from './cageSort.js';
 
 // ── Calcul des lapins à peser ────────────────────────────────────
 
@@ -22,7 +23,7 @@ export function getRabbitsDueForWeightCheck(state, thresholdHours = 48) {
   const today        = new Date().toISOString().slice(0, 10);
   const thresholdDays = thresholdHours / 24;
 
-  return (state.rabbits || [])
+  const items = (state.rabbits || [])
     .filter(r => r.status === 'actif')
     .map(r => {
       const history   = getRabbitWeightHistory(state, r.id);
@@ -31,13 +32,9 @@ export function getRabbitsDueForWeightCheck(state, thresholdHours = 48) {
     })
     .filter(({ lastEntry }) =>
       !lastEntry || daysBetween(lastEntry.date, today) >= thresholdDays
-    )
-    .sort((a, b) => {
-      if (!a.lastEntry && b.lastEntry)  return -1;
-      if (a.lastEntry && !b.lastEntry)  return  1;
-      if (!a.lastEntry && !b.lastEntry) return 0;
-      return a.lastEntry.date.localeCompare(b.lastEntry.date);
-    });
+    );
+  // Sort by cage order (A1, A2…B1, B2…)
+  return sortByCage(items, x => x.rabbit.cage);
 }
 
 // ── Modal assisté ────────────────────────────────────────────────
@@ -103,9 +100,11 @@ function _renderStep(ctx, queue, cursor, setCursor) {
       <div class="wc-name">${escapeHTML(r.name)}
         <span class="badge">${r.sex === 'F' ? 'Femelle' : r.sex === 'M' ? 'Mâle' : '?'}</span>
       </div>
-      <div class="wc-meta">
+      <div class="wc-id-row">
+        <span class="wc-code">📋 ${escapeHTML(r.code || '—')}</span>
+        <span class="wc-cage">🏠 Cage <strong>${escapeHTML(r.cage || '—')}</strong></span>
+        ${r.breed ? `<span class="wc-breed">🐰 ${escapeHTML(r.breed)}</span>` : ''}
         ${ageLine ? `<span>🎂 ${escapeHTML(ageLine)}</span>` : ''}
-        <span>🏠 ${escapeHTML(r.cage || '—')}</span>
       </div>
       <div class="wc-last">
         <span>Dernier poids : <strong>${lastW}</strong></span>

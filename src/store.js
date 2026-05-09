@@ -5,7 +5,7 @@ const KEY = "cuniworld_mvp_state";
 const BACKUPS_KEY = "cuniworld_mvp_backups";
 const MAX_BACKUPS = 5;
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 function nowISO() {
   return new Date().toISOString();
@@ -24,6 +24,9 @@ function defaultState() {
     photos: [],
     usedNames: {},
     lotStatuses: {},  // { [lotId]: "en_cours" | "vendu" | "termine" }
+    stock: [],        // inventory items
+    stockMovements: [], // stock in/out/adjust history
+    rounds: [],       // daily farm rounds
   };
 }
 
@@ -62,6 +65,10 @@ function migrate(state) {
   // v3 → v4 : ajout du dictionnaire lotStatuses
   if (state.version === 3) {
     state = { ...state, lotStatuses: {}, version: 4 };
+  }
+  // v4 → v5 : ajout stock, stockMovements, rounds
+  if (state.version === 4) {
+    state = { ...state, stock: [], stockMovements: [], rounds: [], version: 5 };
   }
   return state;
 }

@@ -7,10 +7,16 @@
  *   openSinglePhotoModal(ctx, rabbitId)
  */
 
-import { getRabbitsDueForPhotoCheck, getPhotoHistory, compressImage } from './photos.js';
+import { getRabbitsDueForPhotoCheck as _getDue, getPhotoHistory, compressImage } from './photos.js';
 import { daysBetween, formatDate, escapeHTML, escapeAttr } from './utils.js';
 import { addPhoto } from './actions.js';
 import { openModal } from './modal.js';
+import { sortByCage } from './cageSort.js';
+
+function getRabbitsDueForPhotoCheck(state, thresholdDays) {
+  const raw = _getDue(state, thresholdDays);
+  return sortByCage(raw, x => x.rabbit.cage);
+}
 
 export { getRabbitsDueForPhotoCheck };
 
@@ -130,9 +136,11 @@ function _renderStepContent(ctx, r, lastPhoto, { showProgress, current, total, o
       <div class="wc-name">${escapeHTML(r.name)}
         <span class="badge">${r.sex === 'F' ? 'Femelle' : r.sex === 'M' ? 'Mâle' : '?'}</span>
       </div>
-      <div class="wc-meta">
+      <div class="wc-id-row">
+        <span class="wc-code">📋 ${escapeHTML(r.code || '—')}</span>
+        <span class="wc-cage">🏠 Cage <strong>${escapeHTML(r.cage || '—')}</strong></span>
+        ${r.breed ? `<span class="wc-breed">🐰 ${escapeHTML(r.breed)}</span>` : ''}
         ${ageText ? `<span>🎂 ${escapeHTML(ageText)}</span>` : ''}
-        <span>🏠 ${escapeHTML(r.cage || '—')}</span>
       </div>
       ${thumbHTML}
     </div>

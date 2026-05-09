@@ -513,6 +513,18 @@ function wireEvents(g) {
   const resetBtn = document.getElementById("geneResetView");
   if (resetBtn) on(g, resetBtn, "click", () => resetGenealogyFocus(g.ctx));
 
+  // ── Badge focus cliquable pour quitter ──
+  const focusBadge = document.getElementById("geneFocusBadge");
+  if (focusBadge) on(g, focusBadge, "click", () => resetGenealogyFocus(g.ctx));
+
+  // ── Escape global (ne nécessite pas de focus sur le stage) ──
+  on(g, document, "keydown", e => {
+    if (e.key !== "Escape") return;
+    const panelActive = document.getElementById("panel-genealogy")?.classList.contains("panel-active");
+    if (!panelActive) return;
+    if (g.focusId) { resetGenealogyFocus(g.ctx); g.tooltip.hidden = true; hideSideCard(); }
+  });
+
   // ── Recherche ──
   const qInput = document.getElementById("geneQ");
   if (qInput) {
@@ -656,7 +668,11 @@ export function focusGeneRabbit(ctx, rabbitId) {
   _updateHighlight(G);
   const badge = document.getElementById("geneFocusBadge");
   const name = ctx.state.rabbits.find(r => r.id === rabbitId)?.name || "";
-  if (badge) { badge.hidden = false; badge.textContent = `Focus : ${name} · double-clic ou F sur un nœud`; }
+  if (badge) {
+    badge.hidden = false;
+    badge.innerHTML = `<span>Focus : <strong>${esc(name)}</strong> · double-clic ou <kbd>F</kbd> pour changer · <kbd>Esc</kbd> ou clic ici pour quitter</span> <span class="gene-focus-close" aria-label="Quitter le focus">✕</span>`;
+    badge.style.cursor = "pointer";
+  }
 }
 
 export function resetGenealogyFocus(ctx) {

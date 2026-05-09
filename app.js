@@ -20,10 +20,12 @@ import {
   notificationsSupported,
   permissionAlreadyAsked,
 } from "./src/pushNotifications.js";
+import { openAddStockModal } from "./src/renderStock.js";
+import { openTourneeModal, _updateTourneeLabel } from "./src/renderTournee.js";
 
 const el = getEls();
 
-const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "stats", "actions"];
+const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "magasin", "stats", "actions"];
 
 const ctx = {
   Store,
@@ -47,6 +49,8 @@ const ctx = {
     updateNavBadges(ctx);
     updateSyncBadge(ctx);
     renderBackupList(ctx);
+    try { _updateTourneeLabel(ctx.state); } catch(_) {}
+    updateStockBadge(ctx);
   },
   setSyncStatus: (status) => {
     const allowed = new Set(["local", "syncing", "synced", "error"]);
@@ -111,6 +115,18 @@ function updateNavBadges(ctx) {
     const { overdue } = getReminders(ctx.state, { windowDays: 7 });
     const badge = document.getElementById("badge-dashboard");
     if (badge) badge.textContent = overdue.length > 0 ? String(overdue.length) : "";
+  } catch (_) {}
+}
+
+function updateStockBadge(ctx) {
+  try {
+    const { getLowStockItems } = ctx._stockService || {};
+    // Dynamic import-free check via the already-loaded state
+    const lowCount = (ctx.state.stock || []).filter(
+      item => item.minQuantity > 0 && item.quantity <= item.minQuantity
+    ).length;
+    const badge = document.getElementById("badge-magasin");
+    if (badge) badge.textContent = lowCount > 0 ? String(lowCount) : "";
   } catch (_) {}
 }
 
@@ -285,6 +301,8 @@ function wireExtra() {
     } finally { e.target.value = ""; }
   });
 
+  document.getElementById("moreTournee")?.addEventListener("click", () => openTourneeModal(ctx));
+  document.getElementById("btnAddStock")?.addEventListener("click", () => openAddStockModal(ctx));
   document.getElementById("morePhotoCheck")?.addEventListener("click", () => openPhotoCheckModal(ctx));
   document.getElementById("moreWeightCheck")?.addEventListener("click", () => openWeightCheckModal(ctx));
   document.getElementById("moreReset")?.addEventListener("click", () => ctx.el.btnReset?.click());
