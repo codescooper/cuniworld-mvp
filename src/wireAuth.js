@@ -18,6 +18,17 @@ function _withTimeout(promise, ms, label) {
   ]);
 }
 
+// Fields stored only in localStorage (no Supabase tables); must survive a farm reload.
+const LOCAL_ONLY_FIELDS = ['buildings', 'lodges', 'lodgeDefects', 'lodgeEvents', 'stock', 'stockMovements', 'rounds', 'lotStatuses'];
+
+function _mergeLocalFields(farmState, localState) {
+  const merged = { ...farmState, version: 6 };
+  for (const key of LOCAL_ONLY_FIELDS) {
+    merged[key] = localState?.[key] ?? (key === 'lotStatuses' ? {} : []);
+  }
+  return merged;
+}
+
 // Extrait un UUID farm depuis un UUID brut ou une URL contenant ?join=UUID
 function _extractFarmId(input) {
   const trimmed = input.trim();
@@ -257,10 +268,14 @@ async function _loadFarm(farmId, farmName, ctx, onReady, isNew = false) {
   overlay.classList.remove('hidden');
   overlay.innerHTML = `<div class="auth-card"><p class="auth-loading">Chargement de <strong>${escapeHTML(farmName)}</strong>…</p></div>`;
 
+  // Snapshot local-only data before Supabase load replaces ctx.state
+  const preLoadLocal = ctx.state;
+
   try {
     ctx.farmId   = farmId;
     ctx.farmName = farmName;
-    ctx.state    = await _withTimeout(DB.loadFarmState(farmId), 12000, 'loadFarmState');
+    const farmState = await _withTimeout(DB.loadFarmState(farmId), 12000, 'loadFarmState');
+    ctx.state = _mergeLocalFields(farmState, preLoadLocal);
     await hydrateAndMigratePhotos(ctx.state, farmId);
 
     if (isNew) await _offerMigration(ctx);
@@ -308,7 +323,8 @@ async function _offerMigration(ctx) {
     for (const [n, rid] of Object.entries(local.usedNames || {})) await DB.setUsedName(ctx.farmId, n, rid).catch(() => {});
 
     await new Promise(r => setTimeout(r, 800));
-    ctx.state = await DB.loadFarmState(ctx.farmId);
+    const afterImport = await DB.loadFarmState(ctx.farmId);
+    ctx.state = _mergeLocalFields(afterImport, ctx.state);
     showToast(`Import terminé : ${rCount} lapin(s) importé(s).`, 'success');
   } catch (_) {}
 }
