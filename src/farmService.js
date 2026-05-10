@@ -7,7 +7,17 @@ export const FarmService = {
       .select('role, joined_at, farms(id, name, created_at)')
       .order('joined_at', { ascending: false });
     if (error) throw error;
-    return (data || []).map(m => ({ ...m.farms, role: m.role }));
+    // Deduplicate by farm ID — duplicate rows can appear when a user has multiple
+    // membership records for the same farm (e.g. race condition on join, or missing
+    // UNIQUE constraint on the DB side).
+    const seen = new Set();
+    return (data || [])
+      .map(m => ({ ...m.farms, role: m.role }))
+      .filter(f => {
+        if (!f?.id || seen.has(f.id)) return false;
+        seen.add(f.id);
+        return true;
+      });
   },
 
   async createFarm(name) {

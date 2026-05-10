@@ -27,7 +27,10 @@
       "Bash(Select-Object Name)",
       "Bash(dir C:\\\\Users\\\\USER\\\\cuniworld-mvp\\\\test-results *)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\USER\\\\cuniworld-mvp\\\\dist\" -Recurse | ForEach-Object { $_.FullName })",
-      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\USER\\\\cuniworld-mvp\\\\dist\" -Recurse | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\Users\\\\USER\\\\cuniworld-mvp\\\\dist\\\\\", \"\"\\) })"
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\USER\\\\cuniworld-mvp\\\\dist\" -Recurse | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\Users\\\\USER\\\\cuniworld-mvp\\\\dist\\\\\", \"\"\\) })",
+      "Bash(npx plugins *)",
+      "Bash(grep -rn \"innerHTML.*\\\\${\" C:/Users/USER/cuniworld-mvp/src/ --include=\"*.js\")",
+      "Bash(grep -v \"^.*//.*innerHTML\")"
     ]
   }
 }

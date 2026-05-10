@@ -26,7 +26,7 @@ import { openAddBuildingModal, openQuickSetupModal } from "./src/renderBuildings
 
 const el = getEls();
 
-const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "batiments", "magasin", "stats", "actions"];
+const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "batiments", "magasin", "stats", "actions", "aide"];
 
 const ctx = {
   Store,
@@ -442,8 +442,24 @@ const savedPanel = (() => {
   } catch (_) { return "dashboard"; }
 })();
 
+function wireBetaBanner() {
+  const banner = document.getElementById('betaBanner');
+  const close  = document.getElementById('betaBannerClose');
+  if (!banner || !close) return;
+  // Persist dismissal across sessions
+  if (localStorage.getItem('betaBannerDismissed') === '1') {
+    banner.classList.add('hidden');
+    return;
+  }
+  close.addEventListener('click', () => {
+    banner.classList.add('hidden');
+    try { localStorage.setItem('betaBannerDismissed', '1'); } catch (_) {}
+  });
+}
+
 async function initApp() {
   registerServiceWorker().catch(() => {});
+  wireBetaBanner();
   wireNav();
   wireExtra();
   wireStatic(ctx);

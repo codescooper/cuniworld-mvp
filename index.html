@@ -13,6 +13,12 @@
 </head>
 <body>
 
+  <!-- ===== BÊTA BANNER ===== -->
+  <div class="beta-banner" id="betaBanner">
+    <span>🧪 Bêta fermée — vos données sont sauvegardées localement. Signalez tout problème à <strong>codescooper@gmail.com</strong></span>
+    <button class="beta-banner-close" id="betaBannerClose" aria-label="Fermer">✕</button>
+  </div>
+
   <!-- ===== TOPBAR ===== -->
   <header class="topbar">
     <div class="brand">
@@ -86,6 +92,11 @@
         <span class="nav-icon">⚙️</span>
         <span class="nav-label">Actions</span>
         <span class="nav-badge" id="badge-actions"></span>
+      </button>
+      <button class="nav-item" data-panel="aide" data-testid="nav-aide">
+        <span class="nav-icon">📖</span>
+        <span class="nav-label">Documentation</span>
+        <span class="nav-badge" id="badge-aide"></span>
       </button>
     </nav>
 
@@ -357,6 +368,432 @@
             <div style="font-weight:700;margin-bottom:8px">Sauvegardes locales</div>
             <div id="backupList" class="list"></div>
           </div>
+        </div>
+      </div>
+
+      <!-- Panneau : Documentation -->
+      <div class="section-panel" id="panel-aide" data-panel="aide">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-icon">📖</span>
+            <span class="panel-title">Documentation</span>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="doc-wrap">
+
+            <!-- ── TABLE DES MATIÈRES ─────────────────── -->
+            <nav class="doc-toc" aria-label="Table des matières">
+              <div class="doc-toc-title">Sommaire</div>
+              <a href="#doc-intro">🚀 Démarrage rapide</a>
+              <a href="#doc-lapins">🐇 Mes Lapins</a>
+              <a href="#doc-evenements">📅 Événements</a>
+              <a href="#doc-lots">📦 Lots &amp; Jeunes</a>
+              <a href="#doc-genealogie">🌳 Généalogie 3D</a>
+              <a href="#doc-batiments">🏗️ Bâtiments &amp; Loges</a>
+              <a href="#doc-magasin">🏪 Magasin</a>
+              <a href="#doc-tournee">📋 Tournée du jour</a>
+              <a href="#doc-stats">📈 Statistiques</a>
+              <a href="#doc-actions">⚙️ Actions &amp; Données</a>
+              <a href="#doc-cloud">☁️ Mode cloud collaboratif</a>
+              <a href="#doc-raccourcis">⌨️ Raccourcis clavier</a>
+              <a href="#doc-astuces">💡 Astuces pro</a>
+            </nav>
+
+            <!-- ── CONTENU ────────────────────────────── -->
+            <div class="doc-content">
+
+              <!-- INTRO -->
+              <section class="doc-section" id="doc-intro">
+                <h2 class="doc-h2">🚀 Démarrage rapide</h2>
+                <p class="doc-p"><strong>CuniWorld</strong> est une application de gestion d'élevage de lapins conçue pour les éleveurs professionnels et amateurs. Elle fonctionne <strong>100 % hors-ligne</strong> — vos données restent sur votre appareil — avec une synchronisation cloud optionnelle pour travailler à plusieurs.</p>
+
+                <div class="doc-tip">
+                  <strong>Offline-first :</strong> l'application fonctionne sans connexion internet. Toutes les données sont sauvegardées dans le navigateur. Le cloud est un bonus, pas une obligation.
+                </div>
+
+                <h3 class="doc-h3">5 premières étapes</h3>
+                <ol class="doc-steps">
+                  <li>Allez dans <strong>Bâtiments</strong> et configurez vos bâtiments et loges (ou utilisez la ⚡ Config. rapide).</li>
+                  <li>Allez dans <strong>Mes Lapins</strong> et créez chacun de vos animaux avec leur cage, sexe et race.</li>
+                  <li>Ajoutez les <strong>événements</strong> passés importants (saillies en cours, vaccins à renouveler).</li>
+                  <li>Revenez au <strong>Tableau de bord</strong> — les alertes et actions prioritaires apparaissent automatiquement.</li>
+                  <li>Faites votre première <strong>Tournée du jour</strong> pour valider eau, nourriture et nettoyage.</li>
+                </ol>
+
+                <h3 class="doc-h3">Deux modes de fonctionnement</h3>
+                <div class="doc-grid">
+                  <div class="doc-card">
+                    <div class="doc-card-title">🖥️ Mode local</div>
+                    <p>Pas de compte requis. Données stockées dans le navigateur. Idéal pour un éleveur seul. Export JSON pour sauvegarder.</p>
+                  </div>
+                  <div class="doc-card">
+                    <div class="doc-card-title">☁️ Mode cloud</div>
+                    <p>Compte gratuit requis. Données synchronisées sur tous vos appareils. Permet d'inviter des collaborateurs à rejoindre votre ferme.</p>
+                  </div>
+                </div>
+              </section>
+
+              <!-- LAPINS -->
+              <section class="doc-section" id="doc-lapins">
+                <h2 class="doc-h2">🐇 Mes Lapins</h2>
+                <p class="doc-p">Le cœur de l'application. Chaque lapin est une fiche complète avec son historique complet.</p>
+
+                <h3 class="doc-h3">Créer un lapin</h3>
+                <p class="doc-p">Cliquez sur <strong>+ Nouveau lapin</strong> (bouton en haut à droite, ou touche <kbd>N</kbd>). Renseignez :</p>
+                <ul class="doc-list">
+                  <li><strong>Code</strong> — généré automatiquement (CW-F001, CW-M002…). Modifiable.</li>
+                  <li><strong>Nom</strong> — optionnel. Les noms sont tirés d'un pool de noms de personnages Naruto pour rester uniques.</li>
+                  <li><strong>Sexe</strong> — Femelle (F), Mâle (M), ou Inconnu (U).</li>
+                  <li><strong>Race</strong> — ex : Néo-zélandais, Rex, Californien.</li>
+                  <li><strong>Date de naissance</strong> — détermine l'âge et le stade (lapereau / jeune / adulte).</li>
+                  <li><strong>Cage / Loge</strong> — sélecteur parmi vos loges configurées (ou texte libre si pas de bâtiments).</li>
+                  <li><strong>Poids initial</strong> — optionnel, créé comme premier événement de pesée.</li>
+                  <li><strong>Disponibilité reproduction</strong> — Auto (calculée), Forcé disponible, ou Forcé indisponible.</li>
+                </ul>
+
+                <h3 class="doc-h3">Statuts</h3>
+                <div class="doc-grid">
+                  <div class="doc-card"><div class="doc-card-title">✅ Actif</div><p>Animal présent dans l'élevage.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">💰 Vendu</div><p>Animal cédé. Reste dans l'historique.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">💀 Mort</div><p>Animal décédé. Tracé pour la mortalité.</p></div>
+                </div>
+
+                <h3 class="doc-h3">Fiche détaillée</h3>
+                <p class="doc-p">Cliquez sur un lapin dans la liste pour ouvrir sa fiche. Elle contient :</p>
+                <ul class="doc-list">
+                  <li><strong>Infos de base</strong> — race, naissance, âge, stade, cage, statut.</li>
+                  <li><strong>Reproduction</strong> — statut de disponibilité, raison, date disponible.</li>
+                  <li><strong>Gestation</strong> — si enceinte : mâle, date de terme, jours restants.</li>
+                  <li><strong>Descendance</strong> — lapereaux actifs, portées, fratrie.</li>
+                  <li><strong>Généalogie</strong> — mère, père, avec liens cliquables.</li>
+                  <li><strong>Poids</strong> — courbe d'évolution avec graphique SVG.</li>
+                  <li><strong>Photos</strong> — galerie chronologique, photo de profil.</li>
+                  <li><strong>Événements</strong> — historique complet de tous les événements.</li>
+                </ul>
+
+                <h3 class="doc-h3">Recherche et filtres</h3>
+                <p class="doc-p">La barre de recherche filtre par code, nom, race ou cage. Les filtres Sexe et Statut permettent d'affiner la liste. Les lapins inactifs (vendus, morts) sont masqués par défaut — changez le filtre Statut pour les voir.</p>
+              </section>
+
+              <!-- ÉVÉNEMENTS -->
+              <section class="doc-section" id="doc-evenements">
+                <h2 class="doc-h2">📅 Événements</h2>
+                <p class="doc-p">Tout ce qui arrive à un lapin est enregistré comme événement. L'historique est permanent et traçable.</p>
+
+                <h3 class="doc-h3">Types d'événements</h3>
+                <div class="doc-event-grid">
+                  <div class="doc-event-row"><span class="doc-event-icon">💕</span><span><strong>Saillie</strong> — Accouplement avec un mâle sélectionné. Déclenche le calcul de gestation (terme prévu J+28).</span></div>
+                  <div class="doc-event-row"><span class="doc-event-icon">🐣</span><span><strong>Mise-bas</strong> — Enregistre nés total, vivants, morts. Crée automatiquement les lapereaux avec filiation.</span></div>
+                  <div class="doc-event-row"><span class="doc-event-icon">🔓</span><span><strong>Sevrage</strong> — Sèvre la portée. Crée un lot avec cage de destination. Les lapereaux changent de statut.</span></div>
+                  <div class="doc-event-row"><span class="doc-event-icon">💉</span><span><strong>Vaccin</strong> — Produit, dose, prochain rappel. Alerte automatique à l'approche de la date.</span></div>
+                  <div class="doc-event-row"><span class="doc-event-icon">💊</span><span><strong>Traitement</strong> — Vermifuge, antibiotique, etc. Même suivi que le vaccin.</span></div>
+                  <div class="doc-event-row"><span class="doc-event-icon">⚖️</span><span><strong>Pesée</strong> — Poids en kg + photo optionnelle. Alimente la courbe de croissance.</span></div>
+                  <div class="doc-event-row"><span class="doc-event-icon">💰</span><span><strong>Vente</strong> — Marque le lapin comme vendu.</span></div>
+                  <div class="doc-event-row"><span class="doc-event-icon">💀</span><span><strong>Décès</strong> — Marque le lapin comme mort.</span></div>
+                  <div class="doc-event-row"><span class="doc-event-icon">📝</span><span><strong>Autre</strong> — Note libre pour tout autre événement.</span></div>
+                </div>
+
+                <h3 class="doc-h3">Cycle de reproduction</h3>
+                <div class="doc-tip">
+                  <strong>Flux optimal :</strong> Saillie → attendre 28 jours → Mise-bas → attendre 28-35 jours → Sevrage → Lot créé automatiquement.
+                </div>
+                <p class="doc-p">Le tableau de bord calcule automatiquement les dates et vous alerte à chaque étape clé : saillie possible, terme proche, sevrage en retard.</p>
+              </section>
+
+              <!-- LOTS -->
+              <section class="doc-section" id="doc-lots">
+                <h2 class="doc-h2">📦 Lots &amp; Jeunes</h2>
+                <p class="doc-p">Un lot regroupe les lapereaux d'une même portée après le sevrage. Il permet de suivre la destinée d'un groupe (engraissement, vente, sélection).</p>
+
+                <h3 class="doc-h3">Création automatique</h3>
+                <p class="doc-p">Quand vous enregistrez un <strong>sevrage</strong> avec une cage de destination, un lot est créé automatiquement avec tous les lapereaux de la portée.</p>
+
+                <h3 class="doc-h3">Informations d'un lot</h3>
+                <ul class="doc-list">
+                  <li>Mère, père, date de sevrage</li>
+                  <li>Nombre de lapereaux, poids moyen</li>
+                  <li>Cage de destination</li>
+                  <li>Liste des individus avec liens vers leur fiche</li>
+                </ul>
+
+                <h3 class="doc-h3">Statuts d'un lot</h3>
+                <div class="doc-grid">
+                  <div class="doc-card"><div class="doc-card-title">🟡 En cours</div><p>Lapereaux en élevage.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">✅ Vendu</div><p>Lot cédé.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">⬜ Terminé</div><p>Cycle terminé (intégration cheptel, etc.).</p></div>
+                </div>
+              </section>
+
+              <!-- GÉNÉALOGIE -->
+              <section class="doc-section" id="doc-genealogie">
+                <h2 class="doc-h2">🌳 Généalogie 3D</h2>
+                <p class="doc-p">Visualisation interactive de l'arbre généalogique complet de votre élevage en pseudo-3D.</p>
+
+                <h3 class="doc-h3">Navigation</h3>
+                <ul class="doc-list">
+                  <li><strong>Glisser</strong> — déplacer le graphe</li>
+                  <li><strong>Molette / pincer</strong> — zoomer/dézoomer</li>
+                  <li><strong>Clic simple</strong> — ouvrir la carte de détail d'un lapin</li>
+                  <li><strong>Double-clic</strong> — mettre ce lapin en focus (centre le graphe sur lui et ses descendants directs)</li>
+                  <li><strong>Touche F</strong> — changer de lapin en focus</li>
+                  <li><strong>Touche Échap</strong> — quitter le mode focus</li>
+                </ul>
+
+                <h3 class="doc-h3">Carte de détail</h3>
+                <p class="doc-p">Un panneau latéral affiche les infos du lapin sélectionné : photo, race, cage, statut reproduction, poids actuel. Cliquez sur le code pour aller à la fiche complète.</p>
+
+                <div class="doc-tip">
+                  <strong>Utilisation avancée :</strong> utilisez le mode focus pour identifier rapidement les liens de parenté et éviter la consanguinité. Deux lapins partageant un ancêtre commun sur moins de 3 générations ne devraient pas être accouplés.
+                </div>
+
+                <h3 class="doc-h3">Recherche</h3>
+                <p class="doc-p">La barre de recherche filtre les nœuds visibles par code, nom ou cage. Les résultats sont mis en évidence dans le graphe.</p>
+              </section>
+
+              <!-- BÂTIMENTS -->
+              <section class="doc-section" id="doc-batiments">
+                <h2 class="doc-h2">🏗️ Bâtiments &amp; Loges</h2>
+                <p class="doc-p">Représentation numérique de votre infrastructure physique. Chaque bâtiment contient des loges identifiées par un code unique (A1, B3, C10…).</p>
+
+                <h3 class="doc-h3">Créer un bâtiment</h3>
+                <p class="doc-p">Cliquez sur <strong>+ Bâtiment</strong> et renseignez :</p>
+                <ul class="doc-list">
+                  <li><strong>Lettre</strong> — identifiant du bâtiment (A, B, C…). Unique.</li>
+                  <li><strong>Nombre de loges</strong> — total de loges dans ce bâtiment.</li>
+                  <li><strong>Loges par rangée</strong> — pour la disposition visuelle (0 = une seule rangée).</li>
+                  <li><strong>Intervalle d'inspection (jours)</strong> — alerte si une loge dépasse cet intervalle sans inspection.</li>
+                  <li><strong>Notes</strong> — informations libres sur le bâtiment.</li>
+                </ul>
+
+                <h3 class="doc-h3">Configuration rapide ⚡</h3>
+                <p class="doc-p">Entrez votre configuration en une seule zone de texte, une ligne par bâtiment :</p>
+                <div class="doc-code">A:10:5<br>B:5:0<br>C:8:4</div>
+                <p class="doc-p">Format : <code>LETTRE:nb_loges:loges_par_rangée</code></p>
+
+                <h3 class="doc-h3">Grille visuelle</h3>
+                <p class="doc-p">Chaque bâtiment affiche une grille de ses loges. La couleur indique l'état :</p>
+                <div class="doc-legend">
+                  <span class="doc-legend-dot" style="background:#4f7942"></span> Occupée (lapin présent)
+                  <span class="doc-legend-dot" style="background:#e07b39;margin-left:12px"></span> Défaut signalé
+                  <span class="doc-legend-dot" style="background:#c0392b;margin-left:12px"></span> Inspection en retard
+                  <span class="doc-legend-dot" style="background:#ccc;margin-left:12px"></span> Vide
+                </div>
+
+                <h3 class="doc-h3">Détail d'une loge</h3>
+                <p class="doc-p">Cliquez sur une cellule pour ouvrir la fiche de la loge :</p>
+                <ul class="doc-list">
+                  <li><strong>Lapins actuels</strong> — animaux présents avec leurs infos</li>
+                  <li><strong>Historique</strong> — tous les lapins qui y ont séjourné</li>
+                  <li><strong>Défauts</strong> — problèmes signalés avec leur statut</li>
+                  <li><strong>Entretien</strong> — historique des inspections, nettoyages, réparations</li>
+                  <li><strong>Notes</strong> — remarques libres sur la loge</li>
+                </ul>
+
+                <h3 class="doc-h3">Événements de loge</h3>
+                <div class="doc-grid">
+                  <div class="doc-card"><div class="doc-card-title">🔍 Inspection</div><p>Visite de contrôle. Réinitialise le compteur d'intervalle.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">🧹 Nettoyage</div><p>Nettoyage de la loge. Compte aussi comme inspection.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">🔧 Réparation</div><p>Intervention technique.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">💧 Désinfection</div><p>Traitement sanitaire complet.</p></div>
+                </div>
+
+                <h3 class="doc-h3">Signaler un défaut</h3>
+                <p class="doc-p">Un défaut peut être signalé sur une loge ou un bâtiment entier. Niveaux de sévérité : <strong>Mineur</strong> (jaune) ou <strong>Majeur</strong> (rouge). Les défauts ouverts apparaissent dans le badge de navigation et dans les Actions prioritaires du tableau de bord.</p>
+
+                <div class="doc-tip">
+                  <strong>Migration automatique :</strong> si vous aviez des lapins avec des codes cage (A1, B3…) avant de configurer les bâtiments, l'application crée automatiquement les bâtiments correspondants au premier démarrage.
+                </div>
+              </section>
+
+              <!-- MAGASIN -->
+              <section class="doc-section" id="doc-magasin">
+                <h2 class="doc-h2">🏪 Magasin</h2>
+                <p class="doc-p">Gestion des stocks de votre élevage : aliments, médicaments, équipements, et fournitures diverses.</p>
+
+                <h3 class="doc-h3">Ajouter un article</h3>
+                <p class="doc-p">Cliquez sur <strong>+ Ajouter article</strong> et renseignez :</p>
+                <ul class="doc-list">
+                  <li><strong>Nom</strong> — ex : Granulés lapin adulte, Ivermectine, Seringues</li>
+                  <li><strong>Catégorie</strong> — Aliment, Médicament, Équipement, Autre</li>
+                  <li><strong>Quantité initiale</strong> et <strong>unité</strong> (kg, L, pcs…)</li>
+                  <li><strong>Stock minimal</strong> — alerte si la quantité descend en dessous</li>
+                  <li><strong>Notes</strong> — fournisseur, dosage, remarques</li>
+                </ul>
+
+                <h3 class="doc-h3">Mouvements de stock</h3>
+                <div class="doc-grid">
+                  <div class="doc-card"><div class="doc-card-title">📥 Entrée</div><p>Réception de marchandise. Augmente la quantité.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">📤 Sortie</div><p>Consommation ou utilisation. Diminue la quantité.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">🔧 Ajustement</div><p>Correction manuelle (inventaire physique).</p></div>
+                </div>
+
+                <h3 class="doc-h3">Alertes de stock bas</h3>
+                <p class="doc-p">Si la quantité d'un article est inférieure ou égale au stock minimal, une alerte orange apparaît en haut du magasin et un badge rouge s'affiche sur l'icône de navigation.</p>
+              </section>
+
+              <!-- TOURNÉE -->
+              <section class="doc-section" id="doc-tournee">
+                <h2 class="doc-h2">📋 Tournée du jour</h2>
+                <p class="doc-p">Enregistrement quotidien des soins de base : eau, nourriture par lapin, nettoyage. Accessible depuis le panneau <strong>Actions</strong>.</p>
+
+                <h3 class="doc-h3">Comment faire sa tournée</h3>
+                <ol class="doc-steps">
+                  <li>Ouvrez <strong>Actions → Tournée du jour</strong>.</li>
+                  <li>Cochez <strong>Eau reçue</strong> si vous avez fourni de l'eau.</li>
+                  <li>Cochez <strong>Nettoyage fait</strong> si les cages ont été nettoyées.</li>
+                  <li>Pour chaque lapin actif, sélectionnez la portion donnée : <strong>Aucune</strong>, <strong>Petit</strong>, <strong>Moyen</strong>, ou <strong>Full</strong>.</li>
+                  <li>Utilisez les boutons <em>Appliquer à tous</em> pour aller vite.</li>
+                  <li>Validez. La tournée est sauvegardée avec la date du jour.</li>
+                </ol>
+
+                <div class="doc-tip">
+                  Une seule tournée par jour est conservée. Si vous rouvrez la tournée du même jour, vous modifiez la tournée existante.
+                </div>
+
+                <p class="doc-p">Les lapins sont affichés dans l'ordre des cages (A1, A2… B1, B2…) pour correspondre à l'ordre physique de votre élevage.</p>
+              </section>
+
+              <!-- STATISTIQUES -->
+              <section class="doc-section" id="doc-stats">
+                <h2 class="doc-h2">📈 Statistiques globales</h2>
+                <p class="doc-p">Vue d'ensemble chiffrée de votre élevage. Toutes les stats sont calculées à partir de vos données réelles.</p>
+
+                <div class="doc-grid">
+                  <div class="doc-card"><div class="doc-card-title">KPIs cheptel</div><p>Total lapins, actifs, mâles, femelles, morts. Taux de mortalité global.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">Mises-bas / mois</div><p>Graphique barres des portées par mois sur les 12 derniers mois.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">Meilleures reproductrices</div><p>Top 5 femelles par nombre de portées réussies.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">Mortalité par race</div><p>Taux de mortalité calculé par race pour identifier les races fragiles.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">Gain moyen / portée</div><p>GDQ moyen des lapereaux de chaque femelle (poids semaine 1 vs semaine 4).</p></div>
+                  <div class="doc-card"><div class="doc-card-title">Couverture pesée</div><p>% de lapins actifs ayant une pesée récente (≤7 jours).</p></div>
+                </div>
+              </section>
+
+              <!-- ACTIONS -->
+              <section class="doc-section" id="doc-actions">
+                <h2 class="doc-h2">⚙️ Actions &amp; Données</h2>
+                <p class="doc-p">Toutes les opérations sur les données de l'application.</p>
+
+                <h3 class="doc-h3">Export &amp; Import</h3>
+                <div class="doc-grid">
+                  <div class="doc-card">
+                    <div class="doc-card-title">⬇ Export JSON</div>
+                    <p>Sauvegarde complète de votre élevage dans un fichier <code>.json</code>. Contient lapins, événements, lots, stock, bâtiments. <strong>Faites un export régulier comme sauvegarde externe.</strong></p>
+                  </div>
+                  <div class="doc-card">
+                    <div class="doc-card-title">⬆ Import JSON</div>
+                    <p>Restaure depuis un fichier JSON exporté précédemment. Une sauvegarde automatique est créée avant l'import.</p>
+                  </div>
+                  <div class="doc-card">
+                    <div class="doc-card-title">🧾 Export CSV</div>
+                    <p>Exporte lapins ou événements au format CSV, compatible Excel et Google Sheets.</p>
+                  </div>
+                </div>
+
+                <h3 class="doc-h3">Sauvegardes locales</h3>
+                <p class="doc-p">L'application conserve automatiquement jusqu'à <strong>5 sauvegardes</strong> de votre état (avant chaque reset ou import). Vous pouvez restaurer n'importe quelle sauvegarde ou l'exporter en JSON.</p>
+
+                <h3 class="doc-h3">Réinitialisation</h3>
+                <div class="doc-tip doc-tip--danger">
+                  <strong>⚠️ Attention :</strong> la réinitialisation supprime toutes vos données lapins et événements. Une sauvegarde automatique est créée avant, mais préférez faire un export JSON manuellement d'abord.
+                </div>
+
+                <h3 class="doc-h3">Notifications push</h3>
+                <p class="doc-p">Activez les notifications pour recevoir des alertes sur votre appareil même quand l'application est fermée :</p>
+                <ul class="doc-list">
+                  <li>Mise-bas imminente ou en retard</li>
+                  <li>Sevrage en retard</li>
+                  <li>Vaccin / traitement à renouveler</li>
+                  <li>Loges en retard d'inspection</li>
+                </ul>
+
+                <h3 class="doc-h3">Synchronisation cloud</h3>
+                <p class="doc-p">Si vous utilisez le mode cloud et que des opérations ont échoué (pas de connexion), elles sont mises en file d'attente. Cliquez sur <strong>Réessayer la synchronisation</strong> pour les rejouer quand la connexion est rétablie.</p>
+
+                <h3 class="doc-h3">Guide interactif</h3>
+                <p class="doc-p">Le mode Guide pas-à-pas vous accompagne pour votre première configuration. Activez-le via le toggle dans ce panneau.</p>
+              </section>
+
+              <!-- CLOUD -->
+              <section class="doc-section" id="doc-cloud">
+                <h2 class="doc-h2">☁️ Mode cloud collaboratif</h2>
+                <p class="doc-p">Travaillez à plusieurs sur la même ferme depuis différents appareils.</p>
+
+                <h3 class="doc-h3">Créer un compte</h3>
+                <p class="doc-p">Entrez votre email et un mot de passe. Si la confirmation email est activée, vérifiez votre boîte avant de vous connecter.</p>
+
+                <h3 class="doc-h3">Créer une ferme</h3>
+                <p class="doc-p">Après connexion, créez votre ferme et donnez-lui un nom. Vos données locales peuvent être migrées vers le cloud à cette étape.</p>
+
+                <h3 class="doc-h3">Inviter des collaborateurs</h3>
+                <ol class="doc-steps">
+                  <li>Cliquez sur le <strong>nom de votre ferme</strong> dans la barre du haut.</li>
+                  <li>Le message d'invitation est copié dans votre presse-papier.</li>
+                  <li>Collez-le dans un email ou WhatsApp.</li>
+                  <li>Le destinataire clique sur le lien, crée un compte (ou se connecte) et rejoint automatiquement votre ferme.</li>
+                </ol>
+
+                <h3 class="doc-h3">Synchronisation temps réel</h3>
+                <p class="doc-p">Toute modification faite par un membre de la ferme est visible en temps réel chez les autres membres connectés (lapins, événements, photos). Les données de bâtiments, stock, tournées et lots restent locales sur chaque appareil.</p>
+
+                <div class="doc-tip">
+                  <strong>Offline-first :</strong> si vous perdez la connexion, continuez à travailler normalement. Les modifications seront synchronisées automatiquement au retour de la connexion.
+                </div>
+
+                <h3 class="doc-h3">Changer de ferme</h3>
+                <p class="doc-p">Cliquez sur votre avatar en haut à droite → <strong>Changer de ferme</strong>. Vous pouvez appartenir à plusieurs fermes.</p>
+              </section>
+
+              <!-- RACCOURCIS -->
+              <section class="doc-section" id="doc-raccourcis">
+                <h2 class="doc-h2">⌨️ Raccourcis clavier</h2>
+                <p class="doc-p">Disponibles en dehors des champs de texte et modales.</p>
+                <table class="doc-table">
+                  <thead><tr><th>Touche</th><th>Action</th></tr></thead>
+                  <tbody>
+                    <tr><td><kbd>1</kbd> à <kbd>8</kbd></td><td>Naviguer vers le panneau correspondant (Tableau de bord → Documentation)</td></tr>
+                    <tr><td><kbd>N</kbd></td><td>Ouvrir le formulaire Nouveau lapin</td></tr>
+                    <tr><td><kbd>/</kbd></td><td>Mettre le focus sur la barre de recherche du panneau actif</td></tr>
+                    <tr><td><kbd>Échap</kbd></td><td>Fermer la modale ouverte, quitter le focus généalogie</td></tr>
+                    <tr><td><kbd>F</kbd></td><td>En généalogie : changer le lapin en focus</td></tr>
+                    <tr><td><kbd>Entrée</kbd></td><td>Dans une modale de confirmation : valider</td></tr>
+                  </tbody>
+                </table>
+              </section>
+
+              <!-- ASTUCES -->
+              <section class="doc-section" id="doc-astuces">
+                <h2 class="doc-h2">💡 Astuces pro</h2>
+
+                <h3 class="doc-h3">Nomenclature des cages</h3>
+                <p class="doc-p">Utilisez toujours le format <strong>LETTRE + CHIFFRE</strong> (A1, B3, C10). La lettre identifie le bâtiment, le chiffre la loge. Cette convention est reconnue partout dans l'application pour trier, filtrer et associer.</p>
+
+                <h3 class="doc-h3">Optimiser la pesée assistée</h3>
+                <p class="doc-p">La pesée assistée (<strong>Actions → Prise de poids</strong>) liste tous les lapins en attente de pesée, triés par cage. Préparez votre balance et parcourez les fiches dans l'ordre — ça correspond à l'ordre physique de vos rangées.</p>
+
+                <h3 class="doc-h3">Éviter la consanguinité</h3>
+                <p class="doc-p">Avant une saillie, vérifiez en <strong>Généalogie 3D</strong> que la femelle et le mâle n'ont pas d'ancêtre commun dans les 3 dernières générations. Utilisez le mode focus sur l'un, puis cherchez l'autre dans le graphe.</p>
+
+                <h3 class="doc-h3">Sauvegarde régulière</h3>
+                <p class="doc-p">En mode local, exportez un JSON chaque semaine. Stockez-le dans Google Drive ou votre email. Les sauvegardes automatiques de l'application sont utiles pour annuler une erreur, pas pour remplacer une vraie sauvegarde externe.</p>
+
+                <h3 class="doc-h3">Ajouter au bureau (PWA)</h3>
+                <p class="doc-p">CuniWorld est une <strong>Progressive Web App</strong>. Sur mobile, votre navigateur vous proposera d'ajouter l'application à l'écran d'accueil — elle se comportera alors comme une app native, avec accès hors-ligne.</p>
+                <ul class="doc-list">
+                  <li><strong>Chrome / Android</strong> : menu ⋮ → Ajouter à l'écran d'accueil</li>
+                  <li><strong>Safari / iPhone</strong> : bouton Partager → Sur l'écran d'accueil</li>
+                </ul>
+
+                <h3 class="doc-h3">Données des photos</h3>
+                <p class="doc-p">Les photos sont compressées automatiquement et stockées dans le navigateur (IndexedDB). En mode cloud, elles sont aussi uploadées sur le serveur. Si vous changez de navigateur, les photos locales ne seront pas transférées — seules les photos cloud sont accessibles depuis un autre appareil.</p>
+
+                <div class="doc-tip">
+                  <strong>Contact :</strong> vous avez un problème ou une suggestion ? Écrivez à <a href="mailto:codescooper@gmail.com">codescooper@gmail.com</a>. En bêta, chaque retour compte.
+                </div>
+              </section>
+
+            </div><!-- /doc-content -->
+          </div><!-- /doc-wrap -->
         </div>
       </div>
 

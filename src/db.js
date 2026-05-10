@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { getPhotoData } from './photoStorage.js';
 
 function _throwIfError(tag, error) {
   if (!error) return;
@@ -102,6 +103,12 @@ export const DB = {
 
   // ── Realtime ─────────────────────────────────────────────────────
   subscribeToFarm(farmId, ctx) {
+    // Always clean up the previous channel before creating a new one
+    // to prevent subscription leaks on farm switch or retry.
+    if (_channel) {
+      supabase.removeChannel(_channel);
+      _channel = null;
+    }
     if (!ctx.state.photos) ctx.state.photos = [];
     if (!ctx.state.usedNames || typeof ctx.state.usedNames !== 'object') ctx.state.usedNames = {};
     _channel = supabase
@@ -120,9 +127,16 @@ export const DB = {
       })
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'photos', filter: `farm_id=eq.${farmId}`,
-      }, payload => {
+      }, async payload => {
         if (!ctx.state.photos) ctx.state.photos = [];
         _applyChange(ctx.state.photos, payload, row => ({ id: row.id, rabbitId: row.rabbit_id, ...row.data }));
+        // Hydrate dataUrl from IndexedDB for newly received/updated photos
+        if (payload.eventType !== 'DELETE' && payload.new?.id) {
+          const photo = ctx.state.photos.find(p => p.id === payload.new.id);
+          if (photo && !photo.dataUrl) {
+            photo.dataUrl = await getPhotoData(photo.localPhotoKey || photo.id).catch(() => null);
+          }
+        }
         _scheduleRender(ctx);
       })
       .on('postgres_changes', {
