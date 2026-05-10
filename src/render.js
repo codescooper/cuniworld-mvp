@@ -10,6 +10,7 @@ import { getPhotoHistory, getProfilePhoto } from "./photos.js";
 import { getTodayFarmActions } from "./farmActionsService.js";
 import { renderStats } from "./stats.js";
 import { renderStock } from "./renderStock.js";
+import { renderBuildings } from "./renderBuildings.js";
 
 
 
@@ -300,7 +301,13 @@ export function renderRabbitDetails(ctx) {
       <div>Naissance: </div><div>${escapeHTML(formatDate(r.birthDate))}</div>
       ${r.birthDate ? `<div>Âge:</div><div>${_ageText(r.birthDate, todayISO)}</div>` : ""}
       <div>Stade: </div><div>${escapeHTML(stage)}</div>
-      <div>Cage: </div><div>${escapeHTML(r.cage || "—")}</div>
+      <div>Cage: </div><div>${(() => {
+        const lodge = (state.lodges || []).find(l => l.code === r.cage);
+        const building = lodge ? (state.buildings || []).find(b => b.id === lodge.buildingId) : null;
+        if (!r.cage) return '—';
+        if (building) return `${escapeHTML(r.cage)} <span class="small" style="color:var(--color-muted)">· Bâtiment ${escapeHTML(building.letter)}</span>`;
+        return escapeHTML(r.cage);
+      })()}</div>
       <div>Statut: </div><div>${escapeHTML(r.status)}</div>
       <div>Notes: </div><div>${escapeHTML(r.notes || "—")}</div>
     </div>
@@ -420,6 +427,7 @@ export function renderAll(ctx) {
   try { renderGenealogy3D(ctx); } catch(e) { console.error("[renderGenealogy3D]", e); }
   try { renderStats(ctx); } catch(e) { console.error("[renderStats]", e); }
   try { renderStock(ctx); } catch(e) { console.error("[renderStock]", e); }
+  try { renderBuildings(ctx); } catch(e) { console.error("[renderBuildings]", e); }
 }
 
 function _buildWeightSection(r, history, todayISO) {

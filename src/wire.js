@@ -312,9 +312,44 @@ function wireFarmActions(ctx) {
         } else {
           ctx.render();
         }
+      } else if (action === 'openBatiments') {
+        if (ctx.navigate) ctx.navigate("batiments");
       }
     });
   });
+}
+
+/* -------- Cage select helper -------- */
+
+function cageSelectHTML(state, currentValue = '', fieldName = 'cage', { optional = false } = {}) {
+  const buildings = (state?.buildings || []).slice().sort((a, b) => a.letter.localeCompare(b.letter));
+  const lodges    = state?.lodges   || [];
+  const rabbits   = state?.rabbits  || [];
+
+  if (!buildings.length) {
+    return `<input class="input" name="${escapeAttr(fieldName)}" placeholder="ex: A1" value="${escapeAttr(currentValue)}">`;
+  }
+
+  const groups = buildings.map(b => {
+    const bLodges = lodges
+      .filter(l => l.buildingId === b.id)
+      .sort((x, y) => x.number - y.number);
+
+    const options = bLodges.map(l => {
+      const occupants = rabbits.filter(r => r.cage === l.code && r.status === 'actif');
+      const suffix    = occupants.length
+        ? occupants.map(r => escapeHTML(r.name || r.code)).join(', ')
+        : 'vide';
+      const sel = l.code === currentValue ? ' selected' : '';
+      return `<option value="${escapeAttr(l.code)}"${sel}>${escapeHTML(l.code)} — ${suffix}</option>`;
+    }).join('');
+
+    return `<optgroup label="Bâtiment ${escapeHTML(b.letter)}">${options}</optgroup>`;
+  }).join('');
+
+  const emptyLabel  = optional ? '— Aucune —' : '— Choisir une loge —';
+  const emptySelect = !currentValue ? ' selected' : '';
+  return `<select class="input" name="${escapeAttr(fieldName)}"><option value=""${emptySelect}>${emptyLabel}</option>${groups}</select>`;
 }
 
 /* -------- Forms HTML + wiring -------- */
@@ -365,7 +400,7 @@ function rabbitFormHTML(rabbit=null, state=null) {
         </div>
         <div class="field">
           <div class="label">Cage</div>
-          <input class="input" name="cage" placeholder="ex: A-03" value="${escapeAttr(r.cage || "")}">
+          ${cageSelectHTML(state, r.cage || '', 'cage')}
         </div>
       </div>
 
@@ -710,7 +745,7 @@ function renderEventExtra(ctx, type) {
         </div>
         <div class="field">
           <div class="label">Cage destination (optionnel)</div>
-          <input class="input" name="destCage" placeholder="ex: C-04">
+          ${cageSelectHTML(ctx.state, '', 'destCage', { optional: true })}
         </div>
       </div>
     `;

@@ -375,6 +375,7 @@ body {
 .section-panel[data-panel="rabbits"]   .panel-header { border-left: 4px solid var(--color-primary) }
 .section-panel[data-panel="lots"]      .panel-header { border-left: 4px solid #9c27b0 }
 .section-panel[data-panel="genealogy"] .panel-header { border-left: 4px solid var(--color-accent) }
+.section-panel[data-panel="batiments"] .panel-header { border-left: 4px solid #b45309 }
 .section-panel[data-panel="magasin"]   .panel-header { border-left: 4px solid #059669 }
 .section-panel[data-panel="stats"]     .panel-header { border-left: 4px solid #7c3aed }
 .section-panel[data-panel="actions"]   .panel-header { border-left: 4px solid #607d8b }
@@ -2023,3 +2024,171 @@ textarea.input { min-height: 90px; resize: vertical }
 .tournee-name { font-weight: var(--font-weight-semibold); font-size: var(--font-size-sm) }
 .tournee-code { font-size: var(--font-size-xs); font-family: monospace }
 .tournee-breed { font-size: var(--font-size-xs) }
+
+/* ================================================================
+   BÂTIMENTS & LOGES
+   ================================================================ */
+.bld-empty {
+  text-align: center;
+  padding: 48px 24px;
+}
+.bld-empty-icon   { font-size: 3rem; margin-bottom: 12px }
+.bld-empty-title  { font-size: 1.2rem; font-weight: 700; margin-bottom: 8px }
+.bld-empty-sub    { color: var(--color-muted); line-height: 1.6 }
+
+.bld-alert {
+  display: flex; align-items: center; gap: 10px;
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+.bld-alert--danger { background: var(--color-danger-light); border: 1px solid rgba(198,40,40,.2); color: var(--color-danger) }
+.bld-alert--warn   { background: var(--color-accent-light); border: 1px solid rgba(212,146,11,.2); color: var(--color-accent) }
+
+.bld-card {
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.bld-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap; gap: 8px;
+}
+.bld-card-title {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: var(--font-weight-semibold);
+  flex-wrap: wrap;
+}
+.bld-letter {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: var(--font-weight-bold);
+  flex-shrink: 0;
+}
+.bld-meta { font-weight: 400 }
+.bld-defect-badge {
+  background: var(--color-danger); color: #fff;
+  font-size: .7rem; font-weight: 700;
+  padding: 1px 7px; border-radius: 999px;
+}
+.bld-inspect-badge {
+  background: var(--color-accent); color: #fff;
+  font-size: .7rem; font-weight: 700;
+  padding: 1px 7px; border-radius: 999px;
+}
+.bld-card-actions {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.bld-card-actions .btn { font-size: .8rem; padding: 4px 10px }
+
+/* Grid */
+.bld-grid { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px }
+.bld-row  { display: flex; align-items: center; gap: 8px }
+.bld-row-label {
+  width: 32px; font-size: .72rem; color: var(--color-muted);
+  text-align: right; flex-shrink: 0;
+}
+.bld-lodges-row {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+
+/* Lodge cell */
+.bld-lodge {
+  position: relative;
+  width: 72px; min-height: 64px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center;
+  background: var(--color-surface);
+  transition: border-color 150ms, box-shadow 150ms, transform 100ms;
+}
+.bld-lodge:hover { border-color: var(--color-primary); box-shadow: var(--shadow-sm); transform: translateY(-1px) }
+.bld-lodge:active { transform: scale(.97) }
+
+.bld-lodge--occupied { background: var(--color-primary-light); border-color: var(--color-primary) }
+.bld-lodge--defect   { border-color: var(--color-danger)!important; background: var(--color-danger-light) }
+.bld-lodge--overdue  { border-style: dashed }
+.bld-lodge--empty    { opacity: .7 }
+
+.bld-lodge-code {
+  font-size: .68rem; font-weight: 700;
+  color: var(--color-muted-strong);
+  text-align: center; line-height: 1;
+  margin-bottom: 3px;
+}
+.bld-lodge--occupied .bld-lodge-code { color: var(--color-primary-dark) }
+
+.bld-lodge-content {
+  flex: 1; width: 100%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 1px;
+}
+.bld-lodge-rabbit {
+  font-size: .63rem; font-weight: 600;
+  color: var(--color-primary-dark);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  width: 100%; text-align: center;
+}
+.bld-lodge-more  { font-size: .6rem; color: var(--color-muted) }
+.bld-lodge-empty-icon { font-size: 1.1rem; color: var(--color-muted); opacity: .5 }
+
+.bld-lodge-badge {
+  position: absolute; top: 2px; right: 2px;
+  width: 14px; height: 14px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: .55rem; font-weight: 800;
+}
+.bld-lodge-badge--def  { background: var(--color-danger); color: #fff }
+.bld-lodge-badge--insp { background: var(--color-accent); color: #fff; font-size: .6rem }
+
+/* Lodge detail modal */
+.lodge-detail-sections { display: flex; flex-direction: column; gap: 16px }
+.lodge-detail-section  { padding: 12px; background: var(--color-bg); border-radius: var(--radius-md); border: 1px solid var(--color-border) }
+.lodge-detail-section-title {
+  font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold);
+  text-transform: uppercase; letter-spacing: .04em;
+  color: var(--color-muted); margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.lodge-detail-rabbit {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.lodge-detail-rabbit:last-child { border-bottom: none }
+.lodge-rabbit-name { font-weight: var(--font-weight-semibold) }
+.lodge-detail-actions { display: flex; gap: 8px }
+
+.lodge-defect-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+}
+.lodge-defect-row:last-child { border-bottom: none }
+.defect-resolved { opacity: .55 }
+.defect-sev-majeur { flex-shrink: 0 }
+.defect-sev-mineur { flex-shrink: 0 }
+
+/* Radio group */
+.radio-group { display: flex; gap: 16px; flex-wrap: wrap }
+.radio-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: var(--font-size-sm) }
+.radio-label input { accent-color: var(--color-primary) }
+
+@media (max-width: 640px) {
+  .bld-lodge { width: 58px; min-height: 52px }
+  .bld-card-header { flex-direction: column; align-items: flex-start }
+  .bld-card-actions { flex-wrap: wrap }
+}

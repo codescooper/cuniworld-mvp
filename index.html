@@ -67,6 +67,11 @@
         <span class="nav-label">Généalogie</span>
         <span class="nav-badge" id="badge-genealogy"></span>
       </button>
+      <button class="nav-item" data-panel="batiments" data-testid="nav-batiments">
+        <span class="nav-icon">🏗️</span>
+        <span class="nav-label">Bâtiments</span>
+        <span class="nav-badge" id="badge-batiments"></span>
+      </button>
       <button class="nav-item" data-panel="magasin" data-testid="nav-magasin">
         <span class="nav-icon">🏪</span>
         <span class="nav-label">Magasin</span>
@@ -183,6 +188,23 @@
             <div id="geneSideCard" class="gene-sidecard" hidden></div>
           </div>
           <div id="geneList" class="list" data-testid="gene-list" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- Panneau : Bâtiments -->
+      <div class="section-panel" id="panel-batiments" data-panel="batiments">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-icon">🏗️</span>
+            <span class="panel-title">Bâtiments &amp; Loges</span>
+          </div>
+          <div class="panel-header-actions">
+            <button class="btn secondary" id="btnQuickSetup">⚡ Config. rapide</button>
+            <button class="btn" id="btnAddBuilding">+ Bâtiment</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="buildingsDash"></div>
         </div>
       </div>
 

@@ -22,10 +22,11 @@ import {
 } from "./src/pushNotifications.js";
 import { openAddStockModal } from "./src/renderStock.js";
 import { openTourneeModal, _updateTourneeLabel } from "./src/renderTournee.js";
+import { openAddBuildingModal, openQuickSetupModal } from "./src/renderBuildings.js";
 
 const el = getEls();
 
-const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "magasin", "stats", "actions"];
+const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "batiments", "magasin", "stats", "actions"];
 
 const ctx = {
   Store,
@@ -51,6 +52,7 @@ const ctx = {
     renderBackupList(ctx);
     try { _updateTourneeLabel(ctx.state); } catch(_) {}
     updateStockBadge(ctx);
+    updateBuildingsBadge(ctx);
   },
   setSyncStatus: (status) => {
     const allowed = new Set(["local", "syncing", "synced", "error"]);
@@ -115,6 +117,14 @@ function updateNavBadges(ctx) {
     const { overdue } = getReminders(ctx.state, { windowDays: 7 });
     const badge = document.getElementById("badge-dashboard");
     if (badge) badge.textContent = overdue.length > 0 ? String(overdue.length) : "";
+  } catch (_) {}
+}
+
+function updateBuildingsBadge(ctx) {
+  try {
+    const openDefects = (ctx.state.lodgeDefects || []).filter(d => d.status === 'ouvert').length;
+    const badge = document.getElementById("badge-batiments");
+    if (badge) badge.textContent = openDefects > 0 ? String(openDefects) : "";
   } catch (_) {}
 }
 
@@ -303,6 +313,8 @@ function wireExtra() {
 
   document.getElementById("moreTournee")?.addEventListener("click", () => openTourneeModal(ctx));
   document.getElementById("btnAddStock")?.addEventListener("click", () => openAddStockModal(ctx));
+  document.getElementById("btnAddBuilding")?.addEventListener("click", () => openAddBuildingModal(ctx));
+  document.getElementById("btnQuickSetup")?.addEventListener("click", () => openQuickSetupModal(ctx));
   document.getElementById("morePhotoCheck")?.addEventListener("click", () => openPhotoCheckModal(ctx));
   document.getElementById("moreWeightCheck")?.addEventListener("click", () => openWeightCheckModal(ctx));
   document.getElementById("moreReset")?.addEventListener("click", () => ctx.el.btnReset?.click());

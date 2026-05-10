@@ -1,11 +1,12 @@
 import { saveData, loadData } from "./storage.js";
 import { migrateRabbitWeightData } from "./weightService.js";
+import { autoMigrateFromCages } from "./buildingService.js";
 
 const KEY = "cuniworld_mvp_state";
 const BACKUPS_KEY = "cuniworld_mvp_backups";
 const MAX_BACKUPS = 5;
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 function nowISO() {
   return new Date().toISOString();
@@ -27,6 +28,10 @@ function defaultState() {
     stock: [],        // inventory items
     stockMovements: [], // stock in/out/adjust history
     rounds: [],       // daily farm rounds
+    buildings: [],    // farm buildings (bâtiments)
+    lodges: [],       // individual lodges (loges)
+    lodgeDefects: [], // reported lodge/building defects
+    lodgeEvents: [],  // lodge inspection/cleaning history
   };
 }
 
@@ -70,6 +75,10 @@ function migrate(state) {
   if (state.version === 4) {
     state = { ...state, stock: [], stockMovements: [], rounds: [], version: 5 };
   }
+  // v5 → v6 : ajout buildings, lodges, lodgeDefects, lodgeEvents
+  if (state.version === 5) {
+    state = { ...state, buildings: [], lodges: [], lodgeDefects: [], lodgeEvents: [], version: 6 };
+  }
   return state;
 }
 
@@ -86,9 +95,12 @@ function stripPhotoPayloads(state) {
 export const Store = {
   load() {
     const raw = loadData(KEY, null);
-    const state = migrate(raw ?? defaultState());
+    let state = migrate(raw ?? defaultState());
     // Migration one-shot : champs weight/currentWeight → événements pesée
     if (migrateRabbitWeightData(state)) saveData(KEY, state);
+    // Auto-create buildings from existing rabbit cage codes (one-shot)
+    const migrated = autoMigrateFromCages(state);
+    if (migrated !== state) { state = migrated; saveData(KEY, state); }
     return state;
   },
 

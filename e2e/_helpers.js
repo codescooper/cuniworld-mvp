@@ -152,7 +152,14 @@ export async function addSevrage(page, { date = "2026-02-28", weaned = "6", dest
   await page.locator("#evType").selectOption("sevrage");
   await page.locator('input[name="date"]').fill(date);
   await page.locator('input[name="weaned"]').fill(String(weaned));
-  await page.locator('input[name="destCage"]').fill(String(destCage));
+  // destCage is a select when buildings configured, text input otherwise
+  const destCageSelect = page.locator('select[name="destCage"]');
+  const destCageInput  = page.locator('input[name="destCage"]');
+  if (await destCageSelect.count() > 0) {
+    await destCageSelect.selectOption(String(destCage));
+  } else if (await destCageInput.count() > 0) {
+    await destCageInput.fill(String(destCage));
+  }
   await submitEventForm(page);
   await closeModalHard(page);
 }

@@ -3,6 +3,7 @@ import { getRabbitWeightHistory } from './weightService.js';
 import { getPhotoHistory } from './photos.js';
 import { getReproInfo } from './repro.js';
 import { getBreedingStatus } from './breeding.js';
+import { getOverdueInspections, getOpenDefects } from './buildingService.js';
 
 const DISMISSED_KEY = 'dismissedTodayActions';
 
@@ -35,6 +36,7 @@ export function getTodayFarmActions(state, currentDate) {
     ...getBreedingActions(state, today),
     ...getWeightActions(state, today),
     ...getPhotoActions(state, today),
+    ...getBuildingActions(state, today),
   ].filter(a => !isActionDismissedToday(a.id, today));
 
   const urgent       = all.filter(a => a.priority === 'urgent');
@@ -260,6 +262,46 @@ export function getWeaningActions(state, currentDate) {
         action: 'openRabbit',
       });
     }
+  }
+
+  return actions;
+}
+
+// ── Buildings ─────────────────────────────────────────────────────────────────
+
+export function getBuildingActions(state, currentDate) {
+  const today   = currentDate || new Date().toISOString().slice(0, 10);
+  const actions = [];
+
+  for (const { lodge, building, daysSince } of getOverdueInspections(state)) {
+    const label   = daysSince === null ? 'Jamais inspecté' : `Inspecté il y a ${daysSince} j`;
+    const priority = daysSince === null || daysSince >= building.inspectionDays * 2 ? 'urgent' : 'today';
+    actions.push({
+      id: `inspect_${lodge.id}`,
+      type: 'building',
+      priority,
+      icon: '🔍',
+      label: `Inspecter loge ${lodge.code}`,
+      meta: `Bâtiment ${building.letter} · ${label}`,
+      action: 'openBatiments',
+    });
+  }
+
+  for (const defect of getOpenDefects(state)) {
+    const isBuilding = defect.targetType === 'batiment';
+    const target     = isBuilding
+      ? (state.buildings || []).find(b => b.id === defect.targetId)
+      : (state.lodges    || []).find(l => l.id === defect.targetId);
+    const targetLabel = target ? (isBuilding ? `Bâtiment ${target.letter}` : `Loge ${target.code}`) : 'Inconnu';
+    actions.push({
+      id: `defect_${defect.id}`,
+      type: 'building',
+      priority: defect.severity === 'critique' ? 'urgent' : 'today',
+      icon: '⚠️',
+      label: `Défaut : ${defect.description.slice(0, 40)}${defect.description.length > 40 ? '…' : ''}`,
+      meta: `${targetLabel} · Signalé le ${defect.reportedAt.slice(0, 10)}`,
+      action: 'openBatiments',
+    });
   }
 
   return actions;
