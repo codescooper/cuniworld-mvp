@@ -42,7 +42,8 @@ export function renderDashboard(ctx) {
   let farmActionsHTML = '';
   try { farmActionsHTML = _renderFarmActionsCard(ctx); } catch (_) {}
 
-  el.dash.innerHTML = farmActionsHTML + `
+  // KPI tiles d'abord (vue d'ensemble immédiate), actions ferme ensuite (déroulables).
+  el.dash.innerHTML = `
     <div class="tile"><div class="n">${total}</div><div class="t">Lapins (total)</div></div>
     <div class="tile"><div class="n">${actifs}</div><div class="t">Actifs</div></div>
     <div class="tile"><div class="n">${femelles}</div><div class="t">Femelles actives</div></div>
@@ -52,7 +53,7 @@ export function renderDashboard(ctx) {
     <div class="tile"><div class="n">${upcoming.length}</div><div class="t">Rappels (≤7j)</div></div>
     <div class="tile"><div class="n">${overdue.length}</div><div class="t">Rappels en retard</div></div>
     <div class="tile"><div class="n">${state.rabbits.filter(r=>r.status==="mort").length}</div><div class="t">Morts</div></div>
-  `;
+  ` + farmActionsHTML;
 
   // Liste mise-bas bientôt
   if (dueSoon.length > 0) {
@@ -156,11 +157,25 @@ export function renderRabbitDetails(ctx) {
   panel?.classList.toggle("rabbit-selected", !!ctx.selectedRabbitId);
 
   if (!ctx.selectedRabbitId) {
+    const rabbitCount = (state.rabbits || []).length;
+    const hint = rabbitCount === 0
+      ? `<div class="rl-empty-actions">
+          <button class="btn" id="rlEmptyNew">+ Nouveau lapin</button>
+          <div class="small muted" style="text-align:center">Aucun lapin enregistré. Démarrez par créer votre premier reproducteur.</div>
+        </div>`
+      : `<ul class="rl-empty-tips">
+          <li>🔍 Rechercher par nom, code ou cage</li>
+          <li>📅 Filtrer par sexe ou statut</li>
+          <li>➕ Ajouter un événement en un clic depuis la liste</li>
+          <li>🏗️ Visualiser les loges depuis le panneau Bâtiments</li>
+        </ul>`;
     el.rabbitDetails.innerHTML = `
       <div class="rl-empty-state">
         <div class="rl-empty-icon">🐇</div>
-        <div class="rl-empty-text">Sélectionne un lapin dans la liste<br>pour voir ses détails.</div>
+        <div class="rl-empty-text">${rabbitCount === 0 ? "Bienvenue !" : "Sélectionnez un lapin dans la liste"}</div>
+        ${hint}
       </div>`;
+    document.getElementById("rlEmptyNew")?.addEventListener("click", () => el.btnNewRabbit?.click());
     return;
   }
   const r = state.rabbits.find(x => x.id === ctx.selectedRabbitId);
@@ -256,9 +271,11 @@ export function renderRabbitDetails(ctx) {
   const profilePhoto = getProfilePhoto(state, r.id);
   const allPhotos = getPhotoHistory(state, r.id);
 
-  const avatarHTML = profilePhoto
+  const avatarHTML = profilePhoto && profilePhoto.dataUrl
     ? `<img class="rabbit-avatar-img" src="${escapeAttr(profilePhoto.dataUrl)}" alt="Photo de ${escapeHTML(r.name)}">`
-    : `<div class="rabbit-avatar-placeholder">🐇</div>`;
+    : profilePhoto
+      ? `<div class="rabbit-avatar-placeholder" title="Photo en attente de synchronisation">⏳</div>`
+      : `<div class="rabbit-avatar-placeholder">🐇</div>`;
 
   // Photos triées chronologiquement pour l'"évolution visuelle" (ASC)
   const photosAsc = [...allPhotos].reverse();
@@ -266,7 +283,9 @@ export function renderRabbitDetails(ctx) {
     ? `<div class="photo-grid">
         ${photosAsc.map(p => `
           <div class="photo-grid-item">
-            <img class="photo-grid-img" src="${escapeAttr(p.dataUrl)}" alt="${escapeHTML(p.date)}" loading="lazy">
+            ${p.dataUrl
+              ? `<img class="photo-grid-img" src="${escapeAttr(p.dataUrl)}" alt="${escapeHTML(p.date)}" loading="lazy">`
+              : `<div class="photo-grid-img photo-grid-pending" title="Photo en attente de synchronisation">⏳</div>`}
             <div class="photo-grid-overlay">
               <div class="photo-grid-label">${escapeHTML(p.date)}</div>
               ${p.note ? `<div class="photo-grid-note">${escapeHTML(p.note)}</div>` : ""}
@@ -396,9 +415,11 @@ export function renderEventsPanel(ctx) {
     <div class="list">
       ${events.map(e => {
         const linkedPhoto = (state.photos || []).find(p => p.eventId === e.id);
-        const thumbHTML = linkedPhoto
+        const thumbHTML = linkedPhoto && linkedPhoto.dataUrl
           ? `<img class="event-photo-thumb" src="${escapeAttr(linkedPhoto.dataUrl)}" alt="Photo" loading="lazy" title="Photo du ${escapeHTML(linkedPhoto.date)}">`
-          : "";
+          : linkedPhoto
+            ? `<span class="event-photo-thumb event-photo-pending" title="Photo en attente">⏳</span>`
+            : "";
         return `
           <div class="item">
             <div style="flex:1">
@@ -538,14 +559,22 @@ function _renderFarmActionsCard(ctx) {
   `;
 }
 
+const FARM_SECTION_DEFAULT_LIMIT = 5;
+
 function _farmSectionHTML(key, title, actions, open) {
+  const limit = FARM_SECTION_DEFAULT_LIMIT;
+  const hasMore = actions.length > limit;
+  const visible = hasMore ? actions.slice(0, limit) : actions;
+  const hidden  = hasMore ? actions.slice(limit) : [];
   return `
     <details class="farm-section farm-section-${key}" ${open ? 'open' : ''}>
       <summary class="farm-section-header">
         ${escapeHTML(title)} <span class="farm-section-count">${actions.length}</span>
       </summary>
-      <div class="farm-section-list">
-        ${actions.map(_farmActionCardHTML).join('')}
+      <div class="farm-section-list" data-farm-section="${escapeAttr(key)}">
+        ${visible.map(_farmActionCardHTML).join('')}
+        ${hasMore ? `<div class="farm-section-extra" hidden>${hidden.map(_farmActionCardHTML).join('')}</div>` : ''}
+        ${hasMore ? `<button class="btn ghost farm-section-toggle" type="button" data-farm-section-toggle="${escapeAttr(key)}">Voir les ${hidden.length} autre(s) ▾</button>` : ''}
       </div>
     </details>
   `;

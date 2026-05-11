@@ -1,5 +1,5 @@
 import { uploadPhotoToCloud } from "./photoCloudStorage.js";
-import { getPhotoData } from "./photoStorage.js";
+import { getPhotoData, hydrateCloudPhoto } from "./photoStorage.js";
 import { DB } from "./db.js";
 
 const KEY = "cuniworld_mvp_photo_upload_queue";
@@ -40,6 +40,8 @@ export function getPendingPhotoUploadCount() {
 async function uploadOne(entry, ctx) {
   const dataUrl = await getPhotoData(entry.localPhotoKey);
   if (!dataUrl) throw new Error("Image locale introuvable (IndexedDB).");
+  // Upload puis upsert SQL : on ne crée jamais une ligne `photos` cloud sans
+  // `storagePath` (sinon les autres appareils auraient des photos invisibles).
   const storagePath = await uploadPhotoToCloud({
     farmId: entry.farmId, rabbitId: entry.rabbitId, photoId: entry.photoId, dataUrl,
   });
@@ -47,8 +49,22 @@ async function uploadOne(entry, ctx) {
     const photo = ctx.state.photos.find(p => p.id === entry.photoId);
     if (photo) {
       photo.storagePath = storagePath;
+      photo.dataUrl = dataUrl; // assure que la fiche se ré-affiche aussitôt
+      photo.syncWarning = null;
       ctx.state = ctx.Store.save(ctx.state);
       await DB.upsertPhoto(entry.farmId, photo);
+      // Hydratation centralisée pour conserver l'invariant final.
+      await hydrateCloudPhoto(photo);
+    } else {
+      // Photo absente du state (reload après offline) : on upsert quand même
+      // pour que le cloud reflète l'upload et que les autres appareils la voient.
+      await DB.upsertPhoto(entry.farmId, {
+        id: entry.photoId, rabbitId: entry.rabbitId,
+        localPhotoKey: entry.localPhotoKey, storagePath,
+        date: new Date().toISOString().slice(0, 10),
+        createdAt: new Date().toISOString(),
+        source: "profile",
+      });
     }
   }
   return storagePath;

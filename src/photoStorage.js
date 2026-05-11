@@ -55,6 +55,51 @@ export function deletePhotoData(localPhotoKey) {
   return run("readwrite", (store) => store.delete(localPhotoKey));
 }
 
+// Source de vérité unique pour matérialiser le `dataUrl` d'une photo, qu'elle
+// vienne d'un upload local, d'un payload realtime, d'un load initial ou d'un
+// replay offline. Stratégie : IndexedDB (cache durable) → téléchargement
+// Storage (bytes mis en cache à leur tour) → signed URL transitoire pour
+// affichage. Si rien ne réussit, ajoute `syncWarning` pour que l'UI puisse
+// signaler la photo en attente sans afficher d'image cassée.
+export async function hydrateCloudPhoto(photo) {
+  if (!photo) return photo;
+  if (!photo.localPhotoKey) photo.localPhotoKey = photo.id;
+
+  // Un dataUrl `data:` est sûr. Un dataUrl `https:` est probablement une signed
+  // URL expirée laissée en mémoire — on l'écarte pour forcer un refresh.
+  if (photo.dataUrl && !/^https?:/i.test(photo.dataUrl)) return photo;
+  if (photo.dataUrl) photo.dataUrl = null;
+
+  const localKey = photo.localPhotoKey || photo.id;
+  const local = await getPhotoData(localKey).catch(() => null);
+  if (local) {
+    photo.dataUrl = local;
+    photo.syncWarning = null;
+    return photo;
+  }
+
+  if (photo.storagePath) {
+    const bytes = await downloadPhotoAsDataUrl(photo.storagePath).catch(() => null);
+    if (bytes) {
+      photo.dataUrl = bytes;
+      photo.syncWarning = null;
+      putPhotoData(localKey, bytes).catch(() => {});
+      return photo;
+    }
+    const signed = await getPhotoSignedUrl(photo.storagePath).catch(() => null);
+    if (signed) {
+      photo.dataUrl = signed;
+      photo.syncWarning = null;
+      return photo;
+    }
+  }
+
+  // Aucun moyen d'afficher la photo pour l'instant — marquage explicite.
+  photo.dataUrl = null;
+  photo.syncWarning = "photo_unavailable";
+  return photo;
+}
+
 export async function hydrateAndMigratePhotos(state, farmId = null) {
   const photos = state?.photos || [];
   for (const p of photos) {
@@ -67,19 +112,12 @@ export async function hydrateAndMigratePhotos(state, farmId = null) {
       // An expired signed URL leaked into state — drop it; reload below.
       delete p.dataUrl;
     }
-    if (!p.dataUrl) {
-      p.dataUrl = await getPhotoData(p.localPhotoKey);
-    }
-    if (!p.dataUrl && farmId && p.storagePath) {
-      // Prefer downloading the actual bytes so the cached value is durable.
-      const downloaded = await downloadPhotoAsDataUrl(p.storagePath).catch(() => null);
-      if (downloaded) {
-        p.dataUrl = downloaded;
-        await putPhotoData(p.localPhotoKey, downloaded).catch(() => {});
-      } else {
-        // Transient fallback for display only; not cached.
-        p.dataUrl = await getPhotoSignedUrl(p.storagePath).catch(() => null);
-      }
+    // Sans farmId on est en pré-auth : seul l'IDB est consultable. Avec farmId
+    // on délègue au pipeline central qui couvre IDB → Storage → signed URL.
+    if (farmId) {
+      await hydrateCloudPhoto(p);
+    } else {
+      p.dataUrl = await getPhotoData(p.localPhotoKey).catch(() => null);
     }
   }
   return photos;

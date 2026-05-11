@@ -234,10 +234,11 @@ async function _uploadAndSyncPhoto(ctx, photo) {
     trackCloudWrite(ctx, DB.upsertPhoto(farmId, photo), { type: "upsertPhoto", payload: { farmId, photo } });
   } catch (err) {
     console.warn("[photoUploadQueue] Upload différé:", err?.message || err);
+    // Pas d'upsert SQL ici : pousser une ligne `photos` sans `storagePath` la
+    // rendrait inaccessible aux autres appareils. Le photoUploadQueue effectue
+    // upload + upsert atomiquement à la prochaine connexion réussie, ce qui
+    // garantit que la ligne cloud n'apparaît qu'avec un `storagePath` valide.
     enqueuePhotoUpload({ farmId, rabbitId: photo.rabbitId, photoId: photo.id, localPhotoKey: photo.localPhotoKey }, err);
-    // Record exists locally; still register the DB mutation so metadata syncs
-    // even before storage upload succeeds (storagePath will be filled by replay).
-    enqueueMutation("upsertPhoto", { farmId, photo }, err);
     ctx.updatePendingMutations?.();
   }
 }

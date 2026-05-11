@@ -1,6 +1,5 @@
 import { supabase } from './supabase.js';
-import { getPhotoData, putPhotoData } from './photoStorage.js';
-import { getPhotoSignedUrl, downloadPhotoAsDataUrl } from './photoCloudStorage.js';
+import { hydrateCloudPhoto } from './photoStorage.js';
 import { Store } from './store.js';
 
 function _throwIfError(tag, error) {
@@ -283,26 +282,16 @@ export const DB = {
       }, async payload => {
         if (!ctx.state.photos) ctx.state.photos = [];
         _applyChange(ctx.state.photos, payload, row => ({ id: row.id, rabbitId: row.rabbit_id, ...row.data }));
+        // Premier rendu immédiat avec l'état brut (l'utilisateur voit qu'une
+        // nouvelle photo arrive) puis hydratation asynchrone des bytes.
+        _scheduleRender(ctx);
         if (payload.eventType !== 'DELETE' && payload.new?.id) {
           const photo = ctx.state.photos.find(p => p.id === payload.new.id);
-          if (photo && !photo.dataUrl) {
-            // Device B may not have the bytes locally — try IndexedDB first,
-            // then download the actual bytes from Supabase Storage (cache-safe,
-            // no expiry), with a signed URL as a last-resort transient fallback.
-            const localKey = photo.localPhotoKey || photo.id;
-            photo.dataUrl = await getPhotoData(localKey).catch(() => null);
-            if (!photo.dataUrl && photo.storagePath) {
-              const downloaded = await downloadPhotoAsDataUrl(photo.storagePath).catch(() => null);
-              if (downloaded) {
-                photo.dataUrl = downloaded;
-                putPhotoData(localKey, downloaded).catch(() => {});
-              } else {
-                photo.dataUrl = await getPhotoSignedUrl(photo.storagePath).catch(() => null);
-              }
-            }
+          if (photo) {
+            await hydrateCloudPhoto(photo);
+            _scheduleRender(ctx);
           }
         }
-        _scheduleRender(ctx);
       })
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'used_names', filter: `farm_id=eq.${farmId}`,

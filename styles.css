@@ -743,8 +743,10 @@ textarea.input { min-height: 90px; resize: vertical }
 .rl-empty-state .rl-empty-icon { font-size: 2.5rem; opacity: .4 }
 .rl-empty-state .rl-empty-text { font-size: var(--font-size-sm) }
 
-/* ─── Mobile : affichage alternatif liste / détail ─── */
-@media (max-width: 900px) {
+/* ─── Tablette + mobile : split lapins stacke à ≤1100px ───
+   En-dessous, la sidebar prend déjà 220 px ; la colonne détail à droite
+   serait trop étroite (~200 px) si la liste 340 px restait en row. */
+@media (max-width: 1100px) {
   .rl-body { flex-direction: column }
 
   .rl-left {
@@ -759,10 +761,39 @@ textarea.input { min-height: 90px; resize: vertical }
     padding: var(--space-3);
   }
 
-  /* Quand un lapin est sélectionné sur mobile → cache la liste, montre le détail */
+  /* Quand un lapin est sélectionné sur tablette/mobile → cache la liste, montre le détail */
   #panel-rabbits.rabbit-selected .rl-left { display: none }
   #panel-rabbits:not(.rabbit-selected) .rl-right { display: none }
+
+  /* Transition douce liste ↔ détail */
+  #panel-rabbits .rl-left,
+  #panel-rabbits .rl-right {
+    animation: rlSlide 180ms ease;
+  }
 }
+
+/* Desktop ≥ 1101px : la liste et le détail cohabitent, donc le ← Retour
+   du panneau détail est inutile. */
+@media (min-width: 1101px) {
+  #panel-rabbits #btnBack { display: none; }
+}
+
+@keyframes rlSlide {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ─── État vide du panneau détail : exploiter l'espace ─── */
+.rl-empty-tips {
+  list-style: none;
+  margin: 0; padding: 0;
+  display: grid; gap: 8px;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-strong);
+  max-width: 340px;
+}
+.rl-empty-tips li { padding: 8px 12px; background: var(--color-surface); border-radius: var(--radius-md); border: 1px solid var(--color-border); }
+.rl-empty-actions { display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 280px; }
 
 /* ================================================================
    TWO COLUMNS (Détails + Événements) [conservé pour autres usages]
@@ -1245,6 +1276,14 @@ textarea.input { min-height: 90px; resize: vertical }
   transition: transform 220ms ease;
 }
 .photo-grid-item:hover .photo-grid-img { transform: scale(1.06) }
+.photo-grid-pending,
+.event-photo-pending {
+  display: grid; place-items: center;
+  background: repeating-linear-gradient(45deg, var(--color-bg), var(--color-bg) 10px, var(--color-surface) 10px, var(--color-surface) 20px);
+  color: var(--color-muted);
+  font-size: 1.6rem;
+}
+.event-photo-pending { font-size: .9rem; width: 28px; height: 28px; border-radius: 6px; }
 
 .photo-grid-overlay {
   position: absolute; bottom: 0; left: 0; right: 0;
@@ -1603,6 +1642,19 @@ textarea.input { min-height: 90px; resize: vertical }
   flex-direction: column;
   gap: 1px;
   background: var(--color-border);
+}
+.farm-section-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.farm-section-toggle {
+  align-self: center;
+  margin: 8px auto;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  min-height: 36px;
+  padding: 6px 14px;
 }
 
 /* Individual action card */
@@ -2550,11 +2602,16 @@ textarea.input { min-height: 90px; resize: vertical }
   .panel-title { font-size: 14px; }
 
   /* Bottom nav : items plus compacts pour faire tenir 9 panneaux */
-  .sidebar { height: 56px; }
+  .sidebar { height: 58px; }
   .nav-item { min-width: 0; padding: 6px 2px; }
-  .nav-icon { font-size: 17px; }
-  .nav-label { font-size: 9px; }
+  .nav-icon { font-size: 18px; }
+  .nav-label { font-size: 11px; }
   .nav-badge { right: calc(50% - 14px); }
+
+  /* Topbar ≤ 480 px : libérer de l'espace, garder l'essentiel */
+  .farm-chip { display: none; }              /* changement de ferme reste accessible via avatar → dropdown */
+  .topbar-right { gap: 6px; }
+  .user-info { gap: 4px; }
 
   /* Modal : occupe presque toute la largeur */
   .modal { padding: var(--space-2); }
@@ -2584,8 +2641,8 @@ textarea.input { min-height: 90px; resize: vertical }
 
 @media (max-width: 360px) {
   /* Ajustements ultra-narrow (iPhone SE 1ʳᵉ gén, 320-360px) */
-  .nav-label { font-size: 8px; }
-  .nav-icon  { font-size: 15px; }
+  .nav-label { font-size: 10px; }
+  .nav-icon  { font-size: 16px; }
   .nav-item  { padding: 6px 1px; }
   .brand .title { display: none; }
   .panel-title { font-size: 13px; }

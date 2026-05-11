@@ -304,6 +304,24 @@ function wireFarmActions(ctx) {
       }
     });
   });
+
+  // "Voir les N autre(s) ▾" / "Réduire ▴" — pagination locale par section.
+  document.querySelectorAll("[data-farm-section-toggle]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const list = btn.parentElement;
+      const extra = list?.querySelector(".farm-section-extra");
+      if (!extra) return;
+      const expanded = !extra.hasAttribute("hidden");
+      if (expanded) {
+        extra.setAttribute("hidden", "");
+        btn.textContent = btn.textContent.replace("Réduire ▴", `Voir les ${extra.children.length} autre(s) ▾`);
+      } else {
+        extra.removeAttribute("hidden");
+        btn.textContent = "Réduire ▴";
+      }
+    });
+  });
 }
 
 /* -------- Cage select helper -------- */
