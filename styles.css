@@ -4,7 +4,7 @@
    BASE
    ================================================================ */
 *, *::before, *::after { box-sizing: border-box }
-html, body { height: 100% }
+html, body { height: 100%; max-width: 100%; overflow-x: hidden; }
 body {
   margin: 0;
   background: var(--color-bg);
@@ -18,6 +18,7 @@ body {
   height: 100dvh;
   overflow: hidden;
 }
+img, svg, video, canvas { max-width: 100%; height: auto; }
 
 /* ================================================================
    BETA BANNER
@@ -109,8 +110,8 @@ body {
 .sync-badge.synced { color: #166534; background: #dcfce7; border-color: #86efac; }
 .sync-badge.error { color: #991b1b; background: #fee2e2; border-color: #fca5a5; }
 
-.toast-root { position: fixed; right: 14px; bottom: 14px; z-index: 2000; display: grid; gap: 8px; }
-.toast { background: #111827; color: #fff; padding: 10px 12px; border-radius: 10px; max-width: 320px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+.toast-root { position: fixed; right: 14px; bottom: 14px; left: 14px; z-index: 2000; display: grid; gap: 8px; justify-items: end; pointer-events: none; }
+.toast { background: #111827; color: #fff; padding: 10px 12px; border-radius: 10px; max-width: min(320px, calc(100vw - 28px)); font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.25); pointer-events: auto; word-wrap: break-word; }
 .toast.success { background: #166534; }
 .toast.error { background: #991b1b; }
 .toast.warn { background: #92400e; }
@@ -485,6 +486,7 @@ body {
   font-size: var(--font-size-base);
   font-family: inherit;
   min-width: 180px; min-height: 44px;
+  max-width: 100%;
   transition: border-color 150ms, box-shadow 150ms;
 }
 .input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-light) }
@@ -2485,4 +2487,76 @@ textarea.input { min-height: 90px; resize: vertical }
 @media (max-width: 640px) {
   .doc-toc { display: none }
   .doc-content { padding: 16px }
+}
+
+/* ================================================================
+   MOBILE RESPONSIVE — 480px et moins (smartphones 320/360/390/430)
+   ================================================================ */
+@media (max-width: 480px) {
+  /* Garde-fous globaux : aucun élément ne doit dépasser la fenêtre */
+  .topbar, .content-area, .panel-body, .modal, .modal-card,
+  .section-panel, .app-layout { max-width: 100vw; }
+
+  /* Topbar : compact, badge sync raccourci */
+  .topbar { padding: 0 var(--space-2); gap: var(--space-2); }
+  .brand .title { font-size: 14px; }
+  .sync-badge { font-size: 10px; padding: 2px 6px; }
+
+  /* Inputs : on autorise la compression complète */
+  .input { min-width: 0; width: 100%; padding: 10px 12px; }
+  .row { gap: var(--space-2); }
+  .row > .input, .row > .field { min-width: 0; flex: 1 1 100%; }
+  .form .row2 { grid-template-columns: 1fr; }
+
+  /* Boutons longs : pas de débordement */
+  .btn { padding: 10px 12px; max-width: 100%; }
+
+  /* Panel header : actions sur une 2ᵉ ligne si trop large */
+  .panel-header { flex-wrap: wrap; padding: var(--space-2) var(--space-3); gap: var(--space-2); }
+  .panel-header > * { min-width: 0; }
+  .panel-title { font-size: 14px; }
+
+  /* Bottom nav : items plus compacts pour faire tenir 9 panneaux */
+  .sidebar { height: 56px; }
+  .nav-item { min-width: 0; padding: 6px 2px; }
+  .nav-icon { font-size: 17px; }
+  .nav-label { font-size: 9px; }
+  .nav-badge { right: calc(50% - 14px); }
+
+  /* Modal : occupe presque toute la largeur */
+  .modal { padding: var(--space-2); }
+  .modal-card { width: 100%; max-height: calc(100dvh - 16px); }
+  .modal-head { padding: var(--space-2) var(--space-3); }
+  .modal-body { padding: var(--space-3); }
+
+  /* Liste lapins : déjà colonne à 900px, ici on raccourcit les paddings */
+  .rl-left, .rl-right { padding: var(--space-3); }
+
+  /* Cards & tiles plus serrés */
+  .card  { padding: var(--space-3); }
+  .tile  { padding: var(--space-3); }
+  .tile .n { font-size: 22px; }
+
+  /* Dashboard : passe à 1 colonne sur smartphone */
+  .dash { grid-template-columns: 1fr 1fr; }
+
+  /* Stock & batiments : éviter débordements horizontaux */
+  .bld-lodge { width: calc((100% - 18px) / 4); min-width: 56px; }
+  .bld-grid { padding: 8px 10px; }
+
+  /* Two-column générique (déjà 1fr à 900px) → ré-affirme */
+  .two-col { grid-template-columns: 1fr; }
+  .grid    { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 360px) {
+  /* Ajustements ultra-narrow (iPhone SE 1ʳᵉ gén, 320-360px) */
+  .nav-label { font-size: 8px; }
+  .nav-icon  { font-size: 15px; }
+  .nav-item  { padding: 6px 1px; }
+  .brand .title { display: none; }
+  .panel-title { font-size: 13px; }
+  .modal { padding: 6px; }
+  .modal-card { max-height: calc(100dvh - 12px); }
+  .dash { grid-template-columns: 1fr; }
 }
