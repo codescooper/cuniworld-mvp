@@ -82,6 +82,70 @@ function migrate(state) {
   return state;
 }
 
+// Throws an Error with a user-facing message if `parsed` does not look like a
+// valid CuniWorld export. Returns `parsed` unchanged on success.
+//
+// Strategy: required fields must be present with correct types. Optional fields
+// may be missing (back-compat) but must have the correct type when present.
+// Each entity must be an object with a non-empty id.
+function _validateImport(parsed) {
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Fichier invalide : un objet JSON est attendu.");
+  }
+
+  if (parsed.version !== undefined) {
+    const v = parsed.version;
+    if (!Number.isInteger(v) || v < 1) {
+      throw new Error(`Fichier invalide : version "${v}" non reconnue.`);
+    }
+    if (v > SCHEMA_VERSION) {
+      throw new Error(`Fichier issu d'une version plus récente (v${v}) que cette application (v${SCHEMA_VERSION}). Mettez l'application à jour avant d'importer.`);
+    }
+  }
+
+  const requiredArrays = ["rabbits", "events"];
+  for (const key of requiredArrays) {
+    if (!Array.isArray(parsed[key])) {
+      throw new Error(`Fichier invalide : champ "${key}" manquant ou non-tableau.`);
+    }
+  }
+
+  const optionalArrays = [
+    "photos", "stock", "stockMovements", "rounds",
+    "buildings", "lodges", "lodgeDefects", "lodgeEvents",
+  ];
+  for (const key of optionalArrays) {
+    if (parsed[key] !== undefined && !Array.isArray(parsed[key])) {
+      throw new Error(`Fichier invalide : champ "${key}" doit être un tableau.`);
+    }
+  }
+
+  const optionalObjects = ["usedNames", "lotStatuses", "meta"];
+  for (const key of optionalObjects) {
+    const val = parsed[key];
+    if (val !== undefined && (val === null || typeof val !== "object" || Array.isArray(val))) {
+      throw new Error(`Fichier invalide : champ "${key}" doit être un objet.`);
+    }
+  }
+
+  const allArrays = [...requiredArrays, ...optionalArrays];
+  for (const key of allArrays) {
+    const arr = parsed[key];
+    if (!Array.isArray(arr)) continue;
+    for (let i = 0; i < arr.length; i += 1) {
+      const item = arr[i];
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        throw new Error(`Fichier invalide : entrée ${key}[${i}] n'est pas un objet.`);
+      }
+      if (typeof item.id !== "string" || item.id.length === 0) {
+        throw new Error(`Fichier invalide : entrée ${key}[${i}] sans identifiant.`);
+      }
+    }
+  }
+
+  return parsed;
+}
+
 function stripPhotoPayloads(state) {
   if (!state || !Array.isArray(state.photos)) return state;
   const photos = state.photos.map((p) => {
@@ -129,12 +193,20 @@ export const Store = {
   },
 
   importJSON(text) {
-    backupCurrentState("import");
-    const parsed = JSON.parse(text);
-    const migrated = migrate(parsed);
-    if (!Array.isArray(migrated.rabbits) || !Array.isArray(migrated.events)) {
-      throw new Error("Fichier invalide (rabbits/events manquants).");
+    // Validate fully before touching current state or backups. A corrupt file
+    // must never overwrite live data or burn a slot of MAX_BACKUPS.
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (err) {
+      throw new Error(`Fichier JSON illisible : ${err?.message || err}`, { cause: err });
     }
+    _validateImport(parsed);
+    const migrated = migrate(parsed);
+    // Defensive recheck after migration in case a migration step yielded an
+    // unexpected shape — protects against future migration regressions.
+    _validateImport(migrated);
+    backupCurrentState("import");
     return this.save(migrated);
   },
 
