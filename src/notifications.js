@@ -9,14 +9,75 @@ function ensureToastRoot() {
   return root;
 }
 
+const MAX_TOASTS = 5;
+const DURATIONS = { error: 6000, warn: 5000, success: 3200, info: 3200 };
+const FADE_MS = 200;
+
+function dismissToast(item) {
+  if (item.dataset.leaving === '1') return;
+  item.dataset.leaving = '1';
+  item.classList.add('toast-leave');
+  setTimeout(() => item.remove(), FADE_MS);
+}
+
 export function showToast(message, type = 'info') {
   const root = ensureToastRoot();
+
+  // Cap stack size — oldest goes first so screen never fills up.
+  const existing = root.querySelectorAll('.toast:not([data-leaving="1"])');
+  if (existing.length >= MAX_TOASTS) dismissToast(existing[0]);
+
   const item = document.createElement('div');
-  item.className = `toast ${type}`;
-  item.textContent = String(message || '');
+  item.className = `toast toast-enter ${type}`;
+  item.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  item.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+
+  const text = document.createElement('span');
+  text.className = 'toast-text';
+  text.textContent = String(message || '');
+
+  const close = document.createElement('button');
+  close.className = 'toast-close';
+  close.setAttribute('aria-label', 'Fermer');
+  close.type = 'button';
+  close.textContent = '✕';
+
+  item.appendChild(text);
+  item.appendChild(close);
   root.appendChild(item);
-  // Each toast manages its own timer — no shared timer that earlier toasts lose.
-  setTimeout(() => item.remove(), 3200);
+
+  // Lift the enter class on next frame so the transition plays.
+  requestAnimationFrame(() => item.classList.remove('toast-enter'));
+
+  const duration = DURATIONS[type] || DURATIONS.info;
+  let remaining = duration;
+  let startedAt = Date.now();
+  let timer = null;
+
+  const schedule = (ms) => {
+    if (timer) clearTimeout(timer);
+    startedAt = Date.now();
+    timer = setTimeout(() => dismissToast(item), ms);
+  };
+  const pause = () => {
+    if (!timer) return;
+    clearTimeout(timer); timer = null;
+    remaining -= Date.now() - startedAt;
+  };
+  const resume = () => schedule(Math.max(800, remaining));
+
+  schedule(duration);
+
+  // Hover / focus pauses the auto-dismiss timer.
+  item.addEventListener('mouseenter', pause);
+  item.addEventListener('mouseleave', resume);
+  item.addEventListener('focusin', pause);
+  item.addEventListener('focusout', resume);
+
+  // Click anywhere on the toast (except the × specifically) is fine too —
+  // explicit × wins and stops propagation so the click handler doesn't double.
+  close.addEventListener('click', (e) => { e.stopPropagation(); dismissToast(item); });
+  item.addEventListener('click', () => dismissToast(item));
 }
 
 export function showConfirm({ title = 'Confirmation', message = '', confirmLabel = 'Confirmer', cancelLabel = 'Annuler', danger = false }) {

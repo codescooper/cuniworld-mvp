@@ -67,6 +67,12 @@ const ctx = {
 };
 ctx.syncManager = createSyncManager((status) => ctx.setSyncStatus(status));
 
+// Indicateur partagé entre le bandeau de simulation (croix de fermeture) et
+// updateSimulationUI : permet de masquer le bandeau pour la session sans
+// arrêter la simulation elle-même.
+let _simBannerDismissed = false;
+ctx.resetSimulationBannerDismissal = () => { _simBannerDismissed = false; };
+
 // ================================================================
 // NAVIGATION — panneau unique actif
 // ================================================================
@@ -118,11 +124,12 @@ function updateSimulationUI(ctx) {
   const exitTile = document.getElementById("moreExitSimulation");
   const startTile = document.getElementById("moreSimulation");
   const inSim = isSimulationState(ctx.state);
-  if (banner) banner.style.display = inSim ? "" : "none";
+  if (banner) banner.style.display = inSim && !_simBannerDismissed ? "" : "none";
   if (exitTile) exitTile.style.display = inSim ? "" : "none";
   if (startTile) startTile.style.display = ctx.farmId ? "none" : "";
 }
 
+let _syncFadeTimer = null;
 function updateSyncBadge(ctx) {
   const badge = ctx.el.syncBadge;
   if (!badge) return;
@@ -132,11 +139,52 @@ function updateSyncBadge(ctx) {
     synced: "Synchronisé",
     error: "Erreur sync",
   };
+  const tooltips = {
+    local:   "Mode local — pas de ferme connectée",
+    syncing: "Synchronisation en cours…",
+    synced:  "Données synchronisées avec le cloud",
+    error:   "Erreur de synchronisation — cliquez pour réessayer",
+  };
   const status = ctx.syncStatus || "local";
   const pending = getPendingMutationCount() + getPendingPhotoUploadCount();
   badge.className = `sync-badge ${status}`;
   const base = labels[status] || labels.local;
   badge.textContent = pending > 0 ? `${base} · ${pending} en attente` : base;
+  badge.title = pending > 0
+    ? `${tooltips[status] || ''} · ${pending} écriture(s) en attente`
+    : (tooltips[status] || '');
+
+  // Atténue le badge "synced" après 4 s pour ne pas attirer l'attention en
+  // permanence quand tout va bien. Re-déclenche dès qu'un autre statut survient.
+  if (_syncFadeTimer) { clearTimeout(_syncFadeTimer); _syncFadeTimer = null; }
+  badge.classList.remove("sync-faded");
+  if (status === "synced" && pending === 0) {
+    _syncFadeTimer = setTimeout(() => badge.classList.add("sync-faded"), 4000);
+  }
+}
+
+function wireSyncBadge(ctx) {
+  const badge = ctx.el.syncBadge;
+  if (!badge) return;
+  badge.setAttribute("role", "button");
+  badge.setAttribute("tabindex", "0");
+  const retry = async () => {
+    if (!ctx.farmId) {
+      showToast("Mode local — aucune ferme cloud connectée.", "info");
+      return;
+    }
+    const mut = await replayMutationQueue().catch(() => ({ remaining: 0, replayed: 0 }));
+    const pho = await replayPhotoUploadQueue(ctx).catch(() => ({ remaining: 0, replayed: 0 }));
+    ctx.updatePendingMutations();
+    const remaining = mut.remaining + pho.remaining;
+    if (remaining === 0) ctx.setSyncStatus("synced");
+    showToast(`Sync : ${mut.replayed + pho.replayed} rejouée(s), ${remaining} en attente.`, "success");
+    if (pho.replayed > 0) ctx.render();
+  };
+  badge.addEventListener("click", retry);
+  badge.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); retry(); }
+  });
 }
 
 function wireNav() {
@@ -435,20 +483,49 @@ function wireBetaBanner() {
   const banner = document.getElementById('betaBanner');
   const close  = document.getElementById('betaBannerClose');
   if (!banner || !close) return;
-  // Persist dismissal across sessions
+  // Croix → fermeture persistante (toutes sessions futures).
   if (localStorage.getItem('betaBannerDismissed') === '1') {
     banner.classList.add('hidden');
     return;
   }
+  let autoTimer = null;
+  const collapse = () => banner.classList.add('hidden');
   close.addEventListener('click', () => {
-    banner.classList.add('hidden');
+    if (autoTimer) clearTimeout(autoTimer);
+    collapse();
     try { localStorage.setItem('betaBannerDismissed', '1'); } catch (_) {}
   });
+  // Disparition automatique au bout de 12 s (session uniquement — réapparaît
+  // au prochain chargement tant que l'utilisateur n'a pas cliqué sur la croix).
+  autoTimer = setTimeout(collapse, 12000);
+  // Toute interaction (survol prolongé) suspend le timer pour ne pas masquer
+  // un bandeau que l'utilisateur est en train de lire.
+  banner.addEventListener('mouseenter', () => { if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; } });
+  banner.addEventListener('mouseleave', () => { if (!autoTimer) autoTimer = setTimeout(collapse, 5000); });
+}
+
+function wireSimulationBanner() {
+  const banner = document.getElementById('simulationBanner');
+  if (!banner) return;
+  if (banner.dataset.wired === '1') return;
+  banner.dataset.wired = '1';
+  const close = document.createElement('button');
+  close.className = 'beta-banner-close';
+  close.setAttribute('aria-label', 'Masquer');
+  close.type = 'button';
+  close.textContent = '✕';
+  close.addEventListener('click', () => {
+    _simBannerDismissed = true;
+    banner.style.display = 'none';
+  });
+  banner.appendChild(close);
 }
 
 async function initApp() {
   registerServiceWorker().catch(() => {});
   wireBetaBanner();
+  wireSimulationBanner();
+  wireSyncBadge(ctx);
   wireNav();
   wireExtra();
   wireStatic(ctx);

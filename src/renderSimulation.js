@@ -109,6 +109,8 @@ export async function exitSimulation(ctx) {
   ctx.selectedRabbitId = null;
   ctx.selectedLotId = null;
   ctx.selectedGeneRabbitId = null;
+  // Le bandeau pourra réapparaître la prochaine fois qu'une simulation démarre.
+  ctx.resetSimulationBannerDismissal?.();
   ctx.render();
   showToast("Simulation supprimée.", "success");
 }
