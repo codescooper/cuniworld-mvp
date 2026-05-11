@@ -7,6 +7,8 @@ export function createSyncManager(onStatusChange = () => {}) {
     onStatusChange(status, { pendingWrites, error: stickyError });
   }
 
+  function getError() { return stickyError; }
+
   function beginSync() {
     pendingWrites += 1;
     status = "syncing";
@@ -44,5 +46,5 @@ export function createSyncManager(onStatusChange = () => {}) {
     return status;
   }
 
-  return { beginSync, completeSync, failSync, track, getStatus };
+  return { beginSync, completeSync, failSync, track, getStatus, getError };
 }

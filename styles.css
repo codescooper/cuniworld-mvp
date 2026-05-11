@@ -2650,3 +2650,23 @@ textarea.input { min-height: 90px; resize: vertical }
   .modal-card { max-height: calc(100dvh - 12px); }
   .dash { grid-template-columns: 1fr; }
 }
+
+/* ── Pied de page : indicateur de version (utile pour distinguer un */
+/*    déploiement récent d'un cache obsolète sur mobile) ──────────── */
+.app-version-footer {
+  padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
+  text-align: center;
+  font-size: 11px;
+  color: #9ca3af;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: copy;
+  background: transparent;
+}
+.app-version-footer:empty { display: none; }
+.app-version-footer .v-sep { margin: 0 6px; opacity: 0.5; }
+.app-version-footer .v-stale { color: #b45309; }
+@media (max-width: 480px) {
+  .app-version-footer { font-size: 10px; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+}

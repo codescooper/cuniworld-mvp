@@ -58,14 +58,26 @@ const ctx = {
     updateBuildingsBadge(ctx);
     updateSimulationUI(ctx);
   },
-  setSyncStatus: (status) => {
+  setSyncStatus: (status, meta = {}) => {
     const allowed = new Set(["local", "syncing", "synced", "error"]);
     ctx.syncStatus = allowed.has(status) ? status : "local";
+    if (status === "error" && meta.error) {
+      const e = meta.error;
+      ctx.lastSyncError = {
+        message: e?.message || String(e),
+        code:    e?.code || e?.status || null,
+        details: e?.details || e?.hint || null,
+        at:      new Date().toISOString(),
+      };
+    } else if (status === "synced") {
+      ctx.lastSyncError = null;
+    }
     updateSyncBadge(ctx);
   },
+  lastSyncError: null,
   updatePendingMutations: () => updateSyncBadge(ctx),
 };
-ctx.syncManager = createSyncManager((status) => ctx.setSyncStatus(status));
+ctx.syncManager = createSyncManager((status, meta) => ctx.setSyncStatus(status, meta));
 
 // Indicateur partagé entre le bandeau de simulation (croix de fermeture) et
 // updateSimulationUI : permet de masquer le bandeau pour la session sans
@@ -160,9 +172,12 @@ function updateSyncBadge(ctx) {
   badge.className = `sync-badge ${status}`;
   const base = labels[status] || labels.local;
   badge.textContent = pending > 0 ? `${base} · ${pending} en attente` : base;
-  badge.title = pending > 0
+  const errTip = (status === "error" && ctx.lastSyncError?.message)
+    ? ` — ${ctx.lastSyncError.message}`
+    : "";
+  badge.title = (pending > 0
     ? `${tooltips[status] || ''} · ${pending} écriture(s) en attente`
-    : (tooltips[status] || '');
+    : (tooltips[status] || '')) + errTip;
 
   // Atténue le badge "synced" après 4 s pour ne pas attirer l'attention en
   // permanence quand tout va bien. Re-déclenche dès qu'un autre statut survient.
@@ -183,6 +198,15 @@ function wireSyncBadge(ctx) {
       showToast("Mode local — aucune ferme cloud connectée.", "info");
       return;
     }
+    // En statut "error", on affiche d'abord le détail pour que l'utilisateur
+    // sache POURQUOI ça a échoué (ex : RLS, network, quota, etc.) avant de
+    // relancer la file. Le message reste copiable depuis le toast.
+    if (ctx.syncStatus === "error" && ctx.lastSyncError) {
+      const e = ctx.lastSyncError;
+      const codeStr = e.code ? ` [${e.code}]` : "";
+      const detailStr = e.details ? ` — ${e.details}` : "";
+      showToast(`Erreur sync${codeStr} : ${e.message}${detailStr}`, "error");
+    }
     const mut = await replayMutationQueue().catch(() => ({ remaining: 0, replayed: 0 }));
     const pho = await replayPhotoUploadQueue(ctx).catch(() => ({ remaining: 0, replayed: 0 }));
     ctx.updatePendingMutations();
@@ -195,6 +219,54 @@ function wireSyncBadge(ctx) {
   badge.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); retry(); }
   });
+}
+
+// ── Footer version ────────────────────────────────────────────────
+// Permet à l'utilisateur de savoir si la page qu'il regarde correspond
+// au dernier déploiement (utile sur mobile où le cache du SW peut servir
+// une version obsolète). Cliquer copie la chaîne dans le presse-papier.
+function renderVersionFooter() {
+  const el = document.getElementById("appVersionFooter");
+  if (!el) return;
+  // Globaux injectés par Vite `define` — fallback "dev" pour le mode dev où
+  // les remplacements peuvent ne pas être appliqués selon le bundler.
+  const version  = (typeof __APP_VERSION__    !== "undefined") ? __APP_VERSION__    : "dev";
+  const commit   = (typeof __APP_COMMIT__     !== "undefined") ? __APP_COMMIT__     : "local";
+  const buildIso = (typeof __APP_BUILD_TIME__ !== "undefined") ? __APP_BUILD_TIME__ : null;
+
+  let buildLabel = "build inconnue";
+  let staleClass = "";
+  if (buildIso) {
+    const d = new Date(buildIso);
+    if (!isNaN(d)) {
+      const ageDays = (Date.now() - d.getTime()) / 86400000;
+      // > 30 j sans rebuild : on souligne pour aider à diagnostiquer un cache.
+      if (ageDays > 30) staleClass = " v-stale";
+      buildLabel = d.toLocaleString("fr-FR", {
+        year:   "numeric", month: "2-digit", day: "2-digit",
+        hour:   "2-digit", minute: "2-digit",
+      });
+    }
+  }
+
+  const fullText = `CuniWorld v${version} · ${commit} · ${buildLabel}`;
+  el.innerHTML =
+    `<span>v${version}</span>` +
+    `<span class="v-sep">·</span>` +
+    `<span>${commit}</span>` +
+    `<span class="v-sep">·</span>` +
+    `<span class="${staleClass.trim()}">${buildLabel}</span>`;
+  el.title = `Cliquer pour copier : ${fullText}`;
+  el.addEventListener("click", () => {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(fullText).then(
+        () => showToast("Version copiée.", "success"),
+        () => showToast(fullText, "info"),
+      );
+    } else {
+      showToast(fullText, "info");
+    }
+  }, { once: false });
 }
 
 function wireNav() {
@@ -536,6 +608,7 @@ async function initApp() {
   wireBetaBanner();
   wireSimulationBanner();
   wireSyncBadge(ctx);
+  renderVersionFooter();
   wireNav();
   wireExtra();
   wireStatic(ctx);

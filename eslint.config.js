@@ -73,6 +73,10 @@ export default [
         ReadableStream: 'readonly',
         WritableStream: 'readonly',
         TransformStream: 'readonly',
+        // Globaux injectés par Vite `define` (voir vite.config.js).
+        __APP_VERSION__: 'readonly',
+        __APP_COMMIT__: 'readonly',
+        __APP_BUILD_TIME__: 'readonly',
       },
     },
     rules: {
