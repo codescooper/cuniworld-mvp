@@ -1,4 +1,5 @@
 import { Store } from "./src/store.js";
+import { escapeHTML, escapeAttr } from "./src/utils.js";
 import { getEls } from "./src/dom.js";
 import { renderAll } from "./src/render.js";
 import { wireStatic, wireDynamic } from "./src/wire.js";
@@ -18,7 +19,6 @@ import {
   checkAndFireNotifications,
   notificationsGranted,
   notificationsSupported,
-  permissionAlreadyAsked,
 } from "./src/pushNotifications.js";
 import { openAddStockModal } from "./src/renderStock.js";
 import { openTourneeModal, _updateTourneeLabel } from "./src/renderTournee.js";
@@ -72,13 +72,13 @@ function seedIfEmpty() {
 
   const a = {
     id: uid("rb"), code: "CW-F001", name: "Naya", sex: "F",
-    breed: "Néo-zélandais", birthDate: "2025-11-20", cage: "A-01",
+    breed: "Néo-zélandais", birthDate: "2025-11-20", cage: "A1",
     status: "actif", notes: "Bonne mère, calme.",
     createdAt: nowISO(), updatedAt: nowISO(),
   };
   const b = {
     id: uid("rb"), code: "CW-M002", name: "Koda", sex: "M",
-    breed: "Californien", birthDate: "2025-10-12", cage: "B-02",
+    breed: "Californien", birthDate: "2025-10-12", cage: "B2",
     status: "actif", notes: "Reproducteur.",
     createdAt: nowISO(), updatedAt: nowISO(),
   };
@@ -130,8 +130,6 @@ function updateBuildingsBadge(ctx) {
 
 function updateStockBadge(ctx) {
   try {
-    const { getLowStockItems } = ctx._stockService || {};
-    // Dynamic import-free check via the already-loaded state
     const lowCount = (ctx.state.stock || []).filter(
       item => item.minQuantity > 0 && item.quantity <= item.minQuantity
     ).length;
@@ -400,7 +398,7 @@ function wireExtra() {
   });
 }
 
-function renderBackupList(ctx) {
+function renderBackupList(_ctx) {
   const host = document.getElementById("backupList");
   if (!host) return;
   const backups = Store.listBackups().slice().reverse();
@@ -411,8 +409,9 @@ function renderBackupList(ctx) {
   host.innerHTML = backups.map((b) => {
     const rabbits = Array.isArray(b?.state?.rabbits) ? b.state.rabbits.length : 0;
     const events = Array.isArray(b?.state?.events) ? b.state.events.length : 0;
-    const reason = b?.reason || "—";
-    const date = b?.createdAt || "—";
+    const reason = escapeHTML(b?.reason || "—");
+    const date   = escapeHTML(b?.createdAt || "—");
+    const id     = escapeAttr(b?.id || "");
     return `
       <div class="item" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
         <div class="small">
@@ -420,8 +419,8 @@ function renderBackupList(ctx) {
           <div>${rabbits} lapin(s) · ${events} événement(s)</div>
         </div>
         <div style="display:flex;gap:6px">
-          <button class="btn secondary" data-export-backup="${b.id}">Exporter ce backup</button>
-          <button class="btn" data-restore-backup="${b.id}">Restaurer</button>
+          <button class="btn secondary" data-export-backup="${id}">Exporter ce backup</button>
+          <button class="btn" data-restore-backup="${id}">Restaurer</button>
         </div>
       </div>
     `;

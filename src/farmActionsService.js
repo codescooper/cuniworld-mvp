@@ -27,8 +27,16 @@ function _getDismissed() {
 
 // ── Main entry point ──────────────────────────────────────────────────────────
 
+// One-entry cache: keyed on (state reference, date). Store.save() always returns
+// a new object via spreading, so any mutation automatically invalidates this.
+let _cache = { stateRef: null, date: null, result: null };
+
 export function getTodayFarmActions(state, currentDate) {
   const today = currentDate || new Date().toISOString().slice(0, 10);
+
+  if (_cache.stateRef === state && _cache.date === today) {
+    return _cache.result;
+  }
 
   const all = [
     ...getHealthActions(state, today),
@@ -47,13 +55,15 @@ export function getTodayFarmActions(state, currentDate) {
   const t = todayActions.length;
   const o = opportunities.length;
 
-  return {
+  const result = {
     urgent,
     today: todayActions,
     opportunities,
     total: all.length,
     summary: `${u} urgence${u !== 1 ? 's' : ''} · ${t} action${t !== 1 ? 's' : ''} · ${o} opportunité${o !== 1 ? 's' : ''}`,
   };
+  _cache = { stateRef: state, date: today, result };
+  return result;
 }
 
 // ── Weight ────────────────────────────────────────────────────────────────────
@@ -269,8 +279,7 @@ export function getWeaningActions(state, currentDate) {
 
 // ── Buildings ─────────────────────────────────────────────────────────────────
 
-export function getBuildingActions(state, currentDate) {
-  const today   = currentDate || new Date().toISOString().slice(0, 10);
+export function getBuildingActions(state, _currentDate) {
   const actions = [];
 
   for (const { lodge, building, daysSince } of getOverdueInspections(state)) {

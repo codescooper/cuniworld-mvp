@@ -2,8 +2,6 @@ import { getTodayFarmActions } from './farmActionsService.js';
 
 const NOTIF_KEY   = 'cuniworld_notif_fired';
 const PERM_KEY    = 'cuniworld_notif_perm_asked';
-const CHANNEL     = 'CuniWorld';
-
 // ── Permission ────────────────────────────────────────────────────────────────
 
 export function notificationsSupported() {

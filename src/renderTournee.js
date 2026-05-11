@@ -17,10 +17,7 @@ export function openTourneeModal(ctx) {
   _wireForm(ctx, existing, actifs, today);
 }
 
-function _buildHTML(existing, actifs, today) {
-  const portionOptions = Object.entries(PORTIONS)
-    .map(([k, v]) => `<option value="${k}">${v.icon} ${v.label}</option>`)
-    .join('');
+function _buildHTML(existing, actifs, _today) {
 
   const feedingMap = new Map((existing?.feedings || []).map(f => [f.rabbitId, f.portion]));
 

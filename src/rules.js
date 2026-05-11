@@ -183,7 +183,7 @@ export function applyEventSideEffects(ctx, event) {
 
   // Mise-bas -> création des petits
   if (event.type === "mise_bas") {
-    const dateStamp = (event.date || nowISO().slice(0, 10)).replaceAll("-", "");
+    const _dateStamp = (event.date || nowISO().slice(0, 10)).replaceAll("-", "");
     const alive = Number(event?.data?.alive ?? 0);
     if (alive > 0 && !event.data.kitsCreated) {
       const { uid } = ctx.Store.helpers;
@@ -233,7 +233,7 @@ export function applyEventSideEffects(ctx, event) {
       // Créer ou mettre à jour le lot
       const { uid } = ctx.Store.helpers;
       const lotId = uid("lot");
-      const lot = {
+      const _lot = {
         id: lotId,
         eventId: event.id,
         doeId: r.id,

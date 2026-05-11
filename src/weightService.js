@@ -14,7 +14,6 @@
  *   renderWeightSVG(points, opts?)              → string SVG
  */
 
-import { daysBetween } from "./utils.js";
 
 // ─── Historique individuel ────────────────────────────────────────────────────
 

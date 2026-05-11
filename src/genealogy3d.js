@@ -675,7 +675,7 @@ export function focusGeneRabbit(ctx, rabbitId) {
   }
 }
 
-export function resetGenealogyFocus(ctx) {
+export function resetGenealogyFocus(_ctx) {
   if (!G) return;
   G.focusId = null;
   hideSideCard();

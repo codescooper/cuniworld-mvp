@@ -1,4 +1,4 @@
-import { daysBetween } from "./utils.js";
+import { daysBetween, escapeHTML } from "./utils.js";
 
 export function getReminders(state, { todayISO, windowDays = 7 } = {}) {
   const today = todayISO || new Date().toISOString().slice(0, 10);
@@ -42,8 +42,8 @@ export function getReminders(state, { todayISO, windowDays = 7 } = {}) {
 
 export function reminderLabel(r) {
   const t = r.type === "vaccin" ? "Vaccin" : "Traitement";
-  const who = `${r.rabbitName} (${r.rabbitCode})`;
+  const who = `${escapeHTML(r.rabbitName)} (${escapeHTML(r.rabbitCode)})`;
   const when = r.daysLeft < 0 ? `en retard (J${r.daysLeft})` : `J-${r.daysLeft}`;
-  const extra = [r.product, r.dose].filter(Boolean).join(" · ");
-  return `${t} — ${who} — ${r.nextDate} — ${when}${extra ? " — " + extra : ""}`;
+  const extra = [r.product, r.dose].filter(Boolean).map(escapeHTML).join(" · ");
+  return `${t} — ${who} — ${escapeHTML(r.nextDate)} — ${when}${extra ? " — " + extra : ""}`;
 }

@@ -13,7 +13,7 @@ export function renderStats(ctx) {
     return;
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const _today = new Date().toISOString().slice(0, 10);
 
   // ── Cheptel ──────────────────────────────────────────────────────────────────
   const total   = rabbits.length;

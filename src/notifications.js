@@ -45,12 +45,21 @@ export function showConfirm({ title = 'Confirmation', message = '', confirmLabel
     overlay.querySelector('[data-testid="confirm-cancel"]').addEventListener('click', () => close(false));
     overlay.querySelector('[data-testid="confirm-ok"]').addEventListener('click', () => close(true));
 
-    // Keyboard: Escape cancels, Enter confirms
+    // Keyboard: Escape cancels, Enter confirms.
+    // preventDefault + stopPropagation empêchent de soumettre un formulaire parent.
     const onKey = (e) => {
-      if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); close(false); }
-      if (e.key === 'Enter')  { document.removeEventListener('keydown', onKey); close(true); }
+      if (e.key === 'Escape') {
+        e.preventDefault(); e.stopPropagation();
+        document.removeEventListener('keydown', onKey);
+        close(false);
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault(); e.stopPropagation();
+        document.removeEventListener('keydown', onKey);
+        close(true);
+      }
     };
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, { capture: true });
 
     document.body.appendChild(overlay);
     // Focus the confirm button for keyboard accessibility

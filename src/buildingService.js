@@ -158,6 +158,27 @@ export function getOverdueInspections(state) {
   return result;
 }
 
+// ── Normalise legacy cage codes (A-01 → A1) ───────────────────────────────────
+// Anciens formats avec tiret (ex: "A-01") ne matchent pas le format attendu.
+// Cette migration one-shot renomme les cages sur rabbits ET sur les loges existantes.
+export function normalizeLegacyCageCodes(state) {
+  const legacyRx = /^([A-Za-z]+)-(\d+)$/;
+  let changed = false;
+  const rabbits = (state.rabbits || []).map(r => {
+    const m = String(r.cage || '').match(legacyRx);
+    if (!m) return r;
+    changed = true;
+    return { ...r, cage: `${m[1].toUpperCase()}${parseInt(m[2], 10)}` };
+  });
+  const lodges = (state.lodges || []).map(l => {
+    const m = String(l.code || '').match(legacyRx);
+    if (!m) return l;
+    changed = true;
+    return { ...l, code: `${m[1].toUpperCase()}${parseInt(m[2], 10)}` };
+  });
+  return changed ? { ...state, rabbits, lodges } : state;
+}
+
 // ── Auto-migration from rabbit cage codes ─────────────────────────────────────
 
 export function autoMigrateFromCages(state) {

@@ -1,6 +1,6 @@
 import { saveData, loadData } from "./storage.js";
 import { migrateRabbitWeightData } from "./weightService.js";
-import { autoMigrateFromCages } from "./buildingService.js";
+import { autoMigrateFromCages, normalizeLegacyCageCodes } from "./buildingService.js";
 
 const KEY = "cuniworld_mvp_state";
 const BACKUPS_KEY = "cuniworld_mvp_backups";
@@ -86,7 +86,7 @@ function stripPhotoPayloads(state) {
   if (!state || !Array.isArray(state.photos)) return state;
   const photos = state.photos.map((p) => {
     if (!p || typeof p !== "object") return p;
-    const { dataUrl, ...meta } = p;
+    const { dataUrl: _dataUrl, ...meta } = p;
     return meta;
   });
   return { ...state, photos };
@@ -98,6 +98,9 @@ export const Store = {
     let state = migrate(raw ?? defaultState());
     // Migration one-shot : champs weight/currentWeight → événements pesée
     if (migrateRabbitWeightData(state)) saveData(KEY, state);
+    // Normalise les anciens codes cage "A-01" → "A1" avant la migration bâtiments
+    const normalized = normalizeLegacyCageCodes(state);
+    if (normalized !== state) { state = normalized; saveData(KEY, state); }
     // Auto-create buildings from existing rabbit cage codes (one-shot)
     const migrated = autoMigrateFromCages(state);
     if (migrated !== state) { state = migrated; saveData(KEY, state); }

@@ -409,6 +409,10 @@ body {
 .section-panel[data-panel="magasin"]   .panel-header { border-left: 4px solid #059669 }
 .section-panel[data-panel="stats"]     .panel-header { border-left: 4px solid #7c3aed }
 .section-panel[data-panel="actions"]   .panel-header { border-left: 4px solid #607d8b }
+.section-panel[data-panel="aide"]      .panel-header { border-left: 4px solid #7c3aed }
+
+/* Panel aide : les deux colonnes (TOC + contenu) gèrent leur propre scroll */
+#panel-aide .panel-body { overflow: hidden; padding: 0; }
 
 .panel-title-group {
   display: flex; align-items: center; gap: var(--space-2);

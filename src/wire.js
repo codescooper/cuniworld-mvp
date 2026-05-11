@@ -9,6 +9,8 @@ import { dismissActionForToday } from "./farmActionsService.js";
 import { showToast, showConfirm } from "./notifications.js";
 
 
+// wireStatic — called ONCE at startup on elements that exist in the static HTML.
+// Never attach listeners here to elements rendered by render() — they won't exist yet.
 export function wireStatic(ctx) {
   const { el, Store } = ctx;
 
@@ -68,40 +70,13 @@ export function wireStatic(ctx) {
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !el.modal.classList.contains("hidden")) closeModal(el);
   });
-
-    // clic lot
-  ctx.el.lotList?.querySelectorAll("[data-lot]").forEach(node => {
-    node.addEventListener("click", () => {
-      ctx.selectedLotId = node.dataset.lot;
-      ctx.render();
-    });
-  });
-
-  // bouton "voir la mère" depuis détails lot
-  const btnOpenDoe = document.getElementById("btnOpenDoe");
-  if (btnOpenDoe) {
-    btnOpenDoe.addEventListener("click", () => {
-      if (!ctx.selectedLotId) return;
-      const eventId = ctx.selectedLotId.replace("lot_", "");
-      const ev = ctx.state.events.find(e => e.id === eventId);
-      if (!ev) return;
-      ctx.selectedRabbitId = ev.rabbitId;
-      if (ctx.navigate) ctx.navigate("rabbits");
-      else ctx.render();
-    });
-  }
-
-  // changement de statut d'un lot
-  const lotStatusSelect = document.getElementById("lotStatusSelect");
-  if (lotStatusSelect && ctx.selectedLotId) {
-    lotStatusSelect.addEventListener("change", () => {
-      ctx.state.lotStatuses = { ...(ctx.state.lotStatuses || {}), [ctx.selectedLotId]: lotStatusSelect.value };
-      ctx.state = ctx.Store.save(ctx.state);
-      ctx.render();
-    });
-  }
+  // NOTE: lot click, btnOpenDoe, lotStatusSelect sont des éléments rendus dynamiquement
+  // → câblés dans wireDynamic(), pas ici.
 }
 
+// wireDynamic — called after every render() to re-attach listeners to freshly
+// injected DOM. Must be idempotent: the previous DOM is replaced so old listeners
+// are already garbage-collected; no need to explicitly remove them.
 export function wireDynamic(ctx) {
   const { el } = ctx;
 
@@ -223,7 +198,7 @@ export function wireDynamic(ctx) {
     });
   });
 
-    // clic lot
+  // clic lot
   ctx.el.lotList?.querySelectorAll("[data-lot]").forEach(node => {
     node.addEventListener("click", () => {
       ctx.selectedLotId = node.dataset.lot;
@@ -231,21 +206,28 @@ export function wireDynamic(ctx) {
     });
   });
 
-  // bouton "voir la mère" depuis détails lot (sans import dynamique)
-    const btnOpenDoe = document.getElementById("btnOpenDoe");
-    if (btnOpenDoe) {
+  // bouton "voir la mère" depuis détails lot
+  const btnOpenDoe = document.getElementById("btnOpenDoe");
+  if (btnOpenDoe) {
     btnOpenDoe.addEventListener("click", () => {
-        if (!ctx.selectedLotId) return;
-
-        // selectedLotId = "lot_<eventId>"
-        const eventId = ctx.selectedLotId.replace("lot_", "");
-        const ev = ctx.state.events.find(e => e.id === eventId);
-        if (!ev) return;
-
-        ctx.selectedRabbitId = ev.rabbitId; // la mère
-        ctx.render();
+      if (!ctx.selectedLotId) return;
+      const eventId = ctx.selectedLotId.replace("lot_", "");
+      const ev = ctx.state.events.find(e => e.id === eventId);
+      if (!ev) return;
+      ctx.selectedRabbitId = ev.rabbitId;
+      ctx.render();
     });
-    }
+  }
+
+  // changement de statut d'un lot — câblé ici car #lotStatusSelect est rendu dynamiquement
+  const lotStatusSelect = document.getElementById("lotStatusSelect");
+  if (lotStatusSelect && ctx.selectedLotId) {
+    lotStatusSelect.addEventListener("change", () => {
+      ctx.state.lotStatuses = { ...(ctx.state.lotStatuses || {}), [ctx.selectedLotId]: lotStatusSelect.value };
+      ctx.state = ctx.Store.save(ctx.state);
+      ctx.render();
+    });
+  }
 
   // Photo de profil depuis la fiche lapin
   const inputProfilePhoto = document.getElementById("inputProfilePhoto");
@@ -330,13 +312,21 @@ function cageSelectHTML(state, currentValue = '', fieldName = 'cage', { optional
     return `<input class="input" name="${escapeAttr(fieldName)}" placeholder="ex: A1" value="${escapeAttr(currentValue)}">`;
   }
 
+  const byCode = new Map();
+  for (const r of rabbits) {
+    if (r.status !== 'actif') continue;
+    const list = byCode.get(r.cage) || [];
+    list.push(r);
+    byCode.set(r.cage, list);
+  }
+
   const groups = buildings.map(b => {
     const bLodges = lodges
       .filter(l => l.buildingId === b.id)
       .sort((x, y) => x.number - y.number);
 
     const options = bLodges.map(l => {
-      const occupants = rabbits.filter(r => r.cage === l.code && r.status === 'actif');
+      const occupants = byCode.get(l.code) || [];
       const suffix    = occupants.length
         ? occupants.map(r => escapeHTML(r.name || r.code)).join(', ')
         : 'vide';

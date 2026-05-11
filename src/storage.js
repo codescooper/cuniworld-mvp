@@ -38,7 +38,8 @@ export function saveData(key, data) {
   } catch (err) {
     if (isQuotaError(err)) {
       throw new Error(
-        `localStorage plein – libérez de l'espace avant de sauvegarder (clé : "${key}").`
+        `localStorage plein – libérez de l'espace avant de sauvegarder (clé : "${key}").`,
+        { cause: err }
       );
     }
     throw err;

@@ -30,7 +30,9 @@
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\USER\\\\cuniworld-mvp\\\\dist\" -Recurse | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\Users\\\\USER\\\\cuniworld-mvp\\\\dist\\\\\", \"\"\\) })",
       "Bash(npx plugins *)",
       "Bash(grep -rn \"innerHTML.*\\\\${\" C:/Users/USER/cuniworld-mvp/src/ --include=\"*.js\")",
-      "Bash(grep -v \"^.*//.*innerHTML\")"
+      "Bash(grep -v \"^.*//.*innerHTML\")",
+      "Bash(npm list *)",
+      "Bash(npx eslint *)"
     ]
   }
 }

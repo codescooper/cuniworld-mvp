@@ -1,6 +1,7 @@
 import { Auth } from './auth.js';
 import { FarmService } from './farmService.js';
 import { DB } from './db.js';
+import { Store } from './store.js';
 import { escapeHTML } from './utils.js';
 import { hydrateAndMigratePhotos } from './photoStorage.js';
 import { showToast, showConfirm } from './notifications.js';
@@ -22,7 +23,7 @@ function _withTimeout(promise, ms, label) {
 const LOCAL_ONLY_FIELDS = ['buildings', 'lodges', 'lodgeDefects', 'lodgeEvents', 'stock', 'stockMovements', 'rounds', 'lotStatuses'];
 
 function _mergeLocalFields(farmState, localState) {
-  const merged = { ...farmState, version: 6 };
+  const merged = { ...farmState, version: Store.helpers.SCHEMA_VERSION };
   for (const key of LOCAL_ONLY_FIELDS) {
     merged[key] = localState?.[key] ?? (key === 'lotStatuses' ? {} : []);
   }

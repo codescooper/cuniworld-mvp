@@ -3,7 +3,7 @@ import {
   LODGE_EVENT_TYPES,
   createBuilding, updateBuilding, deleteBuilding,
   getRabbitsInLodge, getLodgeHistory,
-  reportDefect, resolveDefect, deleteDefect,
+  reportDefect, resolveDefect,
   getDefectsForTarget, getOpenDefects,
   addLodgeEvent, getLodgeEvents, getLastInspectionDate, getOverdueInspections,
 } from './buildingService.js';

@@ -1,7 +1,7 @@
 import { escapeHTML, escapeAttr, formatDate, rabbitStatusBadge, sexLabel, daysBetween, getRabbitStage, stageBadge } from "./utils.js";
 import { getReproInfo } from "./repro.js";
 import { getBreedingStatus, breedingStatusBadge } from "./breeding.js";
-import { getRabbitWeightHistory, getCurrentWeight, getTotalHerdWeightEvolution, renderWeightSVG } from "./weightService.js";
+import { getRabbitWeightHistory, getTotalHerdWeightEvolution, renderWeightSVG } from "./weightService.js";
 import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
 import { buildLots, lotBadge, LOT_STATUSES } from "./lots.js";
 import { renderGenealogy3D } from "./genealogy3d.js";
@@ -419,18 +419,39 @@ export function renderEventsPanel(ctx) {
 }
 
 export function renderAll(ctx) {
+  const active = ctx.activePanel || 'dashboard';
+
+  // Dashboard : toujours rendu (tuiles, actions, courbe poids)
   try { renderDashboard(ctx); } catch(e) { console.error("[renderDashboard]", e); }
-  try { renderRabbitList(ctx); } catch(e) { console.error("[renderRabbitList]", e); }
-  try { renderRabbitDetails(ctx); } catch(e) { console.error("[renderRabbitDetails]", e); }
-  try { renderEventsPanel(ctx); } catch(e) { console.error("[renderEventsPanel]", e); }
-  try { renderLots(ctx); } catch(e) { console.error("[renderLots]", e); }
-  try { renderGenealogy3D(ctx); } catch(e) { console.error("[renderGenealogy3D]", e); }
-  try { renderStats(ctx); } catch(e) { console.error("[renderStats]", e); }
-  try { renderStock(ctx); } catch(e) { console.error("[renderStock]", e); }
-  try { renderBuildings(ctx); } catch(e) { console.error("[renderBuildings]", e); }
+
+  // Lapins : uniquement si le panneau est actif
+  if (active === 'rabbits') {
+    try { renderRabbitList(ctx); } catch(e) { console.error("[renderRabbitList]", e); }
+    try { renderRabbitDetails(ctx); } catch(e) { console.error("[renderRabbitDetails]", e); }
+    try { renderEventsPanel(ctx); } catch(e) { console.error("[renderEventsPanel]", e); }
+  }
+
+  // Lots : uniquement si le panneau est actif
+  if (active === 'lots') {
+    try { renderLots(ctx); } catch(e) { console.error("[renderLots]", e); }
+  }
+
+  // Panneaux lourds : rendus uniquement quand actifs
+  if (active === 'genealogy') {
+    try { renderGenealogy3D(ctx); } catch(e) { console.error("[renderGenealogy3D]", e); }
+  }
+  if (active === 'stats') {
+    try { renderStats(ctx); } catch(e) { console.error("[renderStats]", e); }
+  }
+  if (active === 'magasin') {
+    try { renderStock(ctx); } catch(e) { console.error("[renderStock]", e); }
+  }
+  if (active === 'batiments') {
+    try { renderBuildings(ctx); } catch(e) { console.error("[renderBuildings]", e); }
+  }
 }
 
-function _buildWeightSection(r, history, todayISO) {
+function _buildWeightSection(r, history, _todayISO) {
   const isActive = r.status === "actif";
   const points = history.map(w => ({ label: w.date, value: w.weightKg }));
   const current = history.length > 0 ? history[history.length - 1] : null;

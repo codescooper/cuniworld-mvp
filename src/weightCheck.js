@@ -7,7 +7,7 @@
  */
 
 import { getRabbitWeightHistory } from './weightService.js';
-import { daysBetween, formatDate, escapeHTML, escapeAttr } from './utils.js';
+import { daysBetween, formatDate, escapeHTML } from './utils.js';
 import { addEvent } from './actions.js';
 import { openModal } from './modal.js';
 import { sortByCage } from './cageSort.js';

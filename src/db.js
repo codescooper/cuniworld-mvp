@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js';
 import { getPhotoData } from './photoStorage.js';
+import { Store } from './store.js';
 
 function _throwIfError(tag, error) {
   if (!error) return;
@@ -40,7 +41,7 @@ export const DB = {
     const usedNames = Object.fromEntries((nRes.data || []).map(n => [n.name, n.rabbit_id]));
 
     return {
-      version: 3,
+      version: Store.helpers.SCHEMA_VERSION,
       meta: { createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
       rabbits, events, photos, usedNames,
     };
@@ -76,7 +77,7 @@ export const DB = {
 
   // ── Photos ───────────────────────────────────────────────────────
   async upsertPhoto(farmId, photo) {
-    const { id, rabbitId, dataUrl, ...data } = photo;
+    const { id, rabbitId, dataUrl: _dataUrl, ...data } = photo;
     const { error } = await supabase.from('photos')
       .upsert({ id, farm_id: farmId, rabbit_id: rabbitId, data }, { onConflict: 'id' });
     _throwIfError('upsertPhoto', error);
