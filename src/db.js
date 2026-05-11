@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js';
 import { hydrateCloudPhoto } from './photoStorage.js';
+import { photoLog } from './photoDebug.js';
 import { Store } from './store.js';
 
 function _throwIfError(tag, error) {
@@ -64,6 +65,7 @@ export const DB = {
     const leData       = _safeData(leRes, 'lodge_events');
     const lsData       = _safeData(lsRes, 'lot_statuses');
 
+    photoLog('loadFarmState.photos', { count: (pRes.data || []).length, sample: (pRes.data || []).slice(0, 1).map(p => ({ id: p.id, storagePath: p.data?.storagePath })) });
     return {
       version:        Store.helpers.SCHEMA_VERSION,
       meta:           { createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
@@ -280,6 +282,11 @@ export const DB = {
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'photos', filter: `farm_id=eq.${farmId}`,
       }, async payload => {
+        photoLog('realtime.received', {
+          event: payload.eventType,
+          photoId: payload.new?.id || payload.old?.id,
+          storagePath: payload.new?.data?.storagePath,
+        });
         if (!ctx.state.photos) ctx.state.photos = [];
         _applyChange(ctx.state.photos, payload, row => ({ id: row.id, rabbitId: row.rabbit_id, ...row.data }));
         // Premier rendu immédiat avec l'état brut (l'utilisateur voit qu'une
@@ -360,7 +367,9 @@ export const DB = {
         _applyLotStatusChange(ctx.state.lotStatuses, payload);
         _scheduleRender(ctx);
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        photoLog('realtime.subscribe.status', { status, error: err ? String(err?.message || err) : null });
+      });
     return _channel;
   },
 

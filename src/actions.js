@@ -6,6 +6,7 @@ import { putPhotoData, deletePhotoData } from "./photoStorage.js";
 import { uploadPhotoToCloud, deletePhotoFromCloud } from "./photoCloudStorage.js";
 import { enqueueMutation } from "./mutationQueue.js";
 import { enqueuePhotoUpload } from "./photoUploadQueue.js";
+import { photoLog } from "./photoDebug.js";
 
 export function persist(ctx) {
   ctx.state = ctx.Store.save(ctx.state);
@@ -192,6 +193,7 @@ export async function addPhoto(ctx, rabbitId, { dataUrl, date, source = "profile
   await putPhotoData(localPhotoKey, dataUrl).catch((err) => {
     throw new Error(`Erreur stockage photo local (IndexedDB) : ${err?.message || err}`);
   });
+  photoLog("local.saved", { photoId, rabbitId, localPhotoKey, bytes: dataUrl.length });
 
   const photo = {
     id:       photoId,
@@ -230,9 +232,15 @@ async function _uploadAndSyncPhoto(ctx, photo) {
   try {
     const storagePath = await tracked;
     photo.storagePath = storagePath;
+    photoLog("upload.success", { photoId: photo.id, storagePath });
     persist(ctx);
-    trackCloudWrite(ctx, DB.upsertPhoto(farmId, photo), { type: "upsertPhoto", payload: { farmId, photo } });
+    trackCloudWrite(
+      ctx,
+      DB.upsertPhoto(farmId, photo).then((r) => { photoLog("db.upsert.success", { photoId: photo.id }); return r; }),
+      { type: "upsertPhoto", payload: { farmId, photo } },
+    );
   } catch (err) {
+    photoLog("upload.failed", { photoId: photo.id, error: String(err?.message || err) });
     console.warn("[photoUploadQueue] Upload différé:", err?.message || err);
     // Pas d'upsert SQL ici : pousser une ligne `photos` sans `storagePath` la
     // rendrait inaccessible aux autres appareils. Le photoUploadQueue effectue

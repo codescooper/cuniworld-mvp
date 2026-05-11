@@ -1,4 +1,5 @@
 import { getPhotoSignedUrl, downloadPhotoAsDataUrl } from "./photoCloudStorage.js";
+import { photoLog } from "./photoDebug.js";
 const DB_NAME = "cuniworld_mvp_photos";
 const STORE_NAME = "photos";
 const DB_VERSION = 1;
@@ -75,21 +76,26 @@ export async function hydrateCloudPhoto(photo) {
   if (local) {
     photo.dataUrl = local;
     photo.syncWarning = null;
+    photoLog("hydrate.local.hit", { photoId: photo.id, localKey });
     return photo;
   }
 
   if (photo.storagePath) {
-    const bytes = await downloadPhotoAsDataUrl(photo.storagePath).catch(() => null);
+    const bytes = await downloadPhotoAsDataUrl(photo.storagePath)
+      .catch((err) => { photoLog("hydrate.storage.error", { photoId: photo.id, storagePath: photo.storagePath, error: String(err?.message || err) }); return null; });
     if (bytes) {
       photo.dataUrl = bytes;
       photo.syncWarning = null;
       putPhotoData(localKey, bytes).catch(() => {});
+      photoLog("hydrate.storage.success", { photoId: photo.id, storagePath: photo.storagePath, bytes: bytes.length });
       return photo;
     }
-    const signed = await getPhotoSignedUrl(photo.storagePath).catch(() => null);
+    const signed = await getPhotoSignedUrl(photo.storagePath)
+      .catch((err) => { photoLog("hydrate.signed.error", { photoId: photo.id, error: String(err?.message || err) }); return null; });
     if (signed) {
       photo.dataUrl = signed;
       photo.syncWarning = null;
+      photoLog("hydrate.signed.success", { photoId: photo.id });
       return photo;
     }
   }
@@ -97,6 +103,7 @@ export async function hydrateCloudPhoto(photo) {
   // Aucun moyen d'afficher la photo pour l'instant — marquage explicite.
   photo.dataUrl = null;
   photo.syncWarning = "photo_unavailable";
+  photoLog("hydrate.failed", { photoId: photo.id, storagePath: photo.storagePath, localKey });
   return photo;
 }
 

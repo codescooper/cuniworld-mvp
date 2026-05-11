@@ -126,7 +126,17 @@ function updateSimulationUI(ctx) {
   const inSim = isSimulationState(ctx.state);
   if (banner) banner.style.display = inSim && !_simBannerDismissed ? "" : "none";
   if (exitTile) exitTile.style.display = inSim ? "" : "none";
-  if (startTile) startTile.style.display = ctx.farmId ? "none" : "";
+  if (startTile) {
+    // Toujours visible : le clic est déjà bloqué proprement par
+    // openSimulationModal quand `farmId` est défini (toast explicite).
+    startTile.style.display = "";
+    const blocked = !!ctx.farmId;
+    startTile.style.opacity = blocked ? "0.5" : "";
+    startTile.style.cursor = blocked ? "not-allowed" : "";
+    startTile.title = blocked
+      ? "Déconnectez-vous de la ferme cloud pour démarrer une simulation."
+      : "";
+  }
 }
 
 let _syncFadeTimer = null;
