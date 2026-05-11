@@ -70,6 +70,55 @@ async function uploadOne(entry, ctx) {
   return storagePath;
 }
 
+// Répare les photos déjà présentes côté SQL (donc partagées entre appareils)
+// mais dont l'upload Storage n'a jamais abouti — détectées par `storagePath`
+// null/absent dans la ligne cloud. Cas typique : photos créées avant le fix
+// qui interdit d'upsert SQL sans `storagePath` (Phase 2 historique). Ces lignes
+// sont invisibles sur les autres appareils car `hydrateCloudPhoto` n'a aucun
+// chemin Storage où aller chercher les bytes.
+//
+// La réparation n'est possible QUE depuis l'appareil qui possède encore les
+// bytes en IndexedDB (typiquement celui qui a pris la photo). Sur les autres
+// appareils, on signale au caller que la photo doit être réparée ailleurs.
+//
+// Retour : { repaired, missingBytes, failed, errors: [{photoId, reason}] }.
+export async function repairPhotosWithoutStoragePath(ctx) {
+  const farmId = ctx?.farmId;
+  if (!farmId) throw new Error("Mode local — aucune ferme cloud connectée.");
+
+  const photos = ctx.state?.photos || [];
+  const broken = photos.filter(p => !p.storagePath);
+
+  const out = { repaired: 0, missingBytes: 0, failed: 0, errors: [], total: broken.length };
+  if (broken.length === 0) return out;
+
+  for (const photo of broken) {
+    const localKey = photo.localPhotoKey || photo.id;
+    try {
+      const dataUrl = await getPhotoData(localKey).catch(() => null);
+      if (!dataUrl) {
+        out.missingBytes += 1;
+        out.errors.push({ photoId: photo.id, reason: "bytes absents de l'IndexedDB local" });
+        continue;
+      }
+      const storagePath = await uploadPhotoToCloud({
+        farmId, rabbitId: photo.rabbitId, photoId: photo.id, dataUrl,
+      });
+      photo.storagePath = storagePath;
+      photo.dataUrl = dataUrl;
+      photo.syncWarning = null;
+      ctx.state = ctx.Store.save(ctx.state);
+      await DB.upsertPhoto(farmId, photo);
+      await hydrateCloudPhoto(photo);
+      out.repaired += 1;
+    } catch (err) {
+      out.failed += 1;
+      out.errors.push({ photoId: photo.id, reason: String(err?.message || err) });
+    }
+  }
+  return out;
+}
+
 export async function replayPhotoUploadQueue(ctx = null) {
   const queue = loadQueue();
   if (!queue.length) return { remaining: 0, replayed: 0 };

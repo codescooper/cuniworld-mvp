@@ -1,7 +1,8 @@
 import { openModal, closeModal } from "./modal.js";
-import { showToast } from "./notifications.js";
+import { showToast, showConfirm } from "./notifications.js";
 import { getPhotoLogBuffer, clearPhotoLogBuffer } from "./photoDebug.js";
-import { getPendingPhotoUploadCount } from "./photoUploadQueue.js";
+import { getPendingPhotoUploadCount, repairPhotosWithoutStoragePath } from "./photoUploadQueue.js";
+import { getPhotoData } from "./photoStorage.js";
 
 // Couleurs par type d'événement, pour repérer les anomalies au scroll.
 function _color(ev) {
@@ -19,7 +20,17 @@ function _formatLine({ at, event, details }) {
   return { time, event, detailsStr, color: _color(event) };
 }
 
-function _summary(buffer, ctx) {
+async function _scanBrokenPhotos(ctx) {
+  const broken = (ctx.state.photos || []).filter(p => !p.storagePath);
+  let withBytesHere = 0;
+  for (const p of broken) {
+    const bytes = await getPhotoData(p.localPhotoKey || p.id).catch(() => null);
+    if (bytes) withBytesHere += 1;
+  }
+  return { total: broken.length, withBytesHere };
+}
+
+function _summary(buffer, ctx, scan) {
   const counts = {};
   for (const { event } of buffer) counts[event] = (counts[event] || 0) + 1;
   const hasError = buffer.some(b => b.event.includes("error") || b.event.includes("failed"));
@@ -27,12 +38,16 @@ function _summary(buffer, ctx) {
     ? `Ferme: <code>${ctx.farmId}</code>`
     : `<span style="color:#b45309">Mode local — pas de ferme cloud</span>`;
   const pending = getPendingPhotoUploadCount();
+  const brokenLine = scan.total > 0
+    ? `<div style="color:#dc2626;margin-top:4px"><strong>${scan.total}</strong> photo(s) sans <code>storagePath</code> (invisibles sur les autres appareils). <strong>${scan.withBytesHere}</strong> ont leurs bytes localement → réparables d'ici.</div>`
+    : '';
   return `
     <div style="margin-bottom:8px;font-size:13px">
       <div>${farmInfo}</div>
       <div>Utilisateur: <code>${ctx.currentUser?.email || ctx.currentUser?.id || "anonyme"}</code></div>
       <div>Photos en attente d'upload: <strong>${pending}</strong></div>
       <div>Photos dans l'état: <strong>${(ctx.state.photos || []).length}</strong></div>
+      ${brokenLine}
       ${hasError ? '<div style="color:#dc2626;font-weight:700;margin-top:4px">⚠️ Au moins une erreur détectée dans le buffer</div>' : ''}
     </div>
     <details style="margin-bottom:8px;font-size:12px">
@@ -79,16 +94,23 @@ function _serializeBuffer(buffer, ctx) {
   return header + "\n" + body + "\n";
 }
 
-export function openPhotoDiagnosticModal(ctx) {
+export async function openPhotoDiagnosticModal(ctx) {
   const buffer = getPhotoLogBuffer();
+  const scan = await _scanBrokenPhotos(ctx);
+  const repairBtn = scan.withBytesHere > 0
+    ? `<button class="btn" id="diagRepair" style="flex:2 1 100%;background:#dc2626">🛠 Réparer ${scan.withBytesHere} photo(s) (upload bytes locaux)</button>`
+    : (scan.total > 0
+        ? `<div style="flex:2 1 100%;padding:8px;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#92400e">⚠️ ${scan.total} photo(s) à réparer mais leurs bytes sont absents d'ici — ouvre ce panneau sur l'appareil qui a pris les photos.</div>`
+        : '');
   openModal(ctx.el, "🔍 Diagnostic photos", `
-    ${_summary(buffer, ctx)}
+    ${_summary(buffer, ctx, scan)}
     ${_logsHTML(buffer)}
     <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
       <button class="btn secondary" id="diagClose" style="flex:1 1 auto">Fermer</button>
       <button class="btn secondary" id="diagClear" style="flex:1 1 auto">Vider</button>
       <button class="btn secondary" id="diagRefresh" style="flex:1 1 auto">Rafraîchir</button>
       <button class="btn" id="diagCopy" style="flex:2 1 100%">📋 Copier tout</button>
+      ${repairBtn}
     </div>
   `);
 
@@ -97,6 +119,33 @@ export function openPhotoDiagnosticModal(ctx) {
   document.getElementById("diagClear")?.addEventListener("click", () => {
     clearPhotoLogBuffer();
     openPhotoDiagnosticModal(ctx);
+  });
+  document.getElementById("diagRepair")?.addEventListener("click", async () => {
+    const ok = await showConfirm({
+      title: "Réparer les photos sans storagePath",
+      message: `Les bytes locaux de ${scan.withBytesHere} photo(s) vont être uploadés vers le bucket Storage, puis la ligne SQL sera mise à jour. Continuer ?`,
+      confirmLabel: "Réparer", cancelLabel: "Annuler",
+    });
+    if (!ok) return;
+    const btn = document.getElementById("diagRepair");
+    if (btn) { btn.disabled = true; btn.textContent = "Réparation en cours…"; }
+    try {
+      const result = await repairPhotosWithoutStoragePath(ctx);
+      ctx.render();
+      const lines = [
+        `✅ Réparées : ${result.repaired}`,
+        `↪ Bytes absents ici : ${result.missingBytes}`,
+        `❌ Échouées : ${result.failed}`,
+      ];
+      showToast(lines.join(" · "), result.failed > 0 ? "error" : "success");
+      if (result.errors.length > 0) {
+        console.error("[photoRepair] détails erreurs :", result.errors);
+      }
+      openPhotoDiagnosticModal(ctx);
+    } catch (err) {
+      showToast(`Réparation impossible : ${err?.message || err}`, "error");
+      if (btn) { btn.disabled = false; }
+    }
   });
   document.getElementById("diagCopy")?.addEventListener("click", async () => {
     const text = _serializeBuffer(getPhotoLogBuffer(), ctx);
