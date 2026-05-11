@@ -1,4 +1,4 @@
-import { getPhotoSignedUrl } from "./photoCloudStorage.js";
+import { getPhotoSignedUrl, downloadPhotoAsDataUrl } from "./photoCloudStorage.js";
 const DB_NAME = "cuniworld_mvp_photos";
 const STORE_NAME = "photos";
 const DB_VERSION = 1;
@@ -59,16 +59,27 @@ export async function hydrateAndMigratePhotos(state, farmId = null) {
   const photos = state?.photos || [];
   for (const p of photos) {
     if (!p.localPhotoKey) p.localPhotoKey = p.id;
-    if (p.dataUrl) {
+    if (p.dataUrl && !/^https?:/i.test(p.dataUrl)) {
+      // Legacy state may carry a real data:URL embedded inline — persist it to IDB.
       await putPhotoData(p.localPhotoKey, p.dataUrl);
+      delete p.dataUrl;
+    } else if (p.dataUrl) {
+      // An expired signed URL leaked into state — drop it; reload below.
       delete p.dataUrl;
     }
     if (!p.dataUrl) {
       p.dataUrl = await getPhotoData(p.localPhotoKey);
     }
     if (!p.dataUrl && farmId && p.storagePath) {
-      p.dataUrl = await getPhotoSignedUrl(p.storagePath);
-      if (p.dataUrl) await putPhotoData(p.localPhotoKey, p.dataUrl);
+      // Prefer downloading the actual bytes so the cached value is durable.
+      const downloaded = await downloadPhotoAsDataUrl(p.storagePath).catch(() => null);
+      if (downloaded) {
+        p.dataUrl = downloaded;
+        await putPhotoData(p.localPhotoKey, downloaded).catch(() => {});
+      } else {
+        // Transient fallback for display only; not cached.
+        p.dataUrl = await getPhotoSignedUrl(p.storagePath).catch(() => null);
+      }
     }
   }
   return photos;

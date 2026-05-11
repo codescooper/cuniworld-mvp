@@ -5,6 +5,7 @@ import { DB } from "./db.js";
 import { putPhotoData, deletePhotoData } from "./photoStorage.js";
 import { uploadPhotoToCloud, deletePhotoFromCloud } from "./photoCloudStorage.js";
 import { enqueueMutation } from "./mutationQueue.js";
+import { enqueuePhotoUpload } from "./photoUploadQueue.js";
 
 export function persist(ctx) {
   ctx.state = ctx.Store.save(ctx.state);
@@ -186,17 +187,12 @@ export async function addPhoto(ctx, rabbitId, { dataUrl, date, source = "profile
   const photoId = uid("ph");
   const localPhotoKey = uid("phdat");
   if (!dataUrl) throw new Error("Image manquante.");
+
+  // Offline-first: local IndexedDB save is the only blocking step.
   await putPhotoData(localPhotoKey, dataUrl).catch((err) => {
     throw new Error(`Erreur stockage photo local (IndexedDB) : ${err?.message || err}`);
   });
-  let storagePath = null;
-  if (fid(ctx)) {
-    storagePath = await uploadPhotoToCloud({
-      farmId: fid(ctx), rabbitId, photoId, dataUrl,
-    }).catch((err) => {
-      throw new Error(`Erreur sync photo cloud : ${err?.message || err}`);
-    });
-  }
+
   const photo = {
     id:       photoId,
     rabbitId,
@@ -206,14 +202,44 @@ export async function addPhoto(ctx, rabbitId, { dataUrl, date, source = "profile
     note:     (note || "").trim(),
     createdAt: nowISO(),
     localPhotoKey,
-    storagePath,
+    storagePath: null,
     dataUrl,
   };
   ctx.state.photos.unshift(photo);
   persist(ctx);
-  if (fid(ctx)) trackCloudWrite(ctx, DB.upsertPhoto(fid(ctx), photo), { type: "upsertPhoto", payload: { farmId: fid(ctx), photo } });
   ctx.render();
+
+  // Cloud upload + DB write in background (non-blocking).
+  const farmId = fid(ctx);
+  if (farmId) {
+    _uploadAndSyncPhoto(ctx, photo).catch(() => {});
+  }
   return photo;
+}
+
+async function _uploadAndSyncPhoto(ctx, photo) {
+  const farmId = fid(ctx);
+  if (!farmId) return;
+  const tracked = ctx.syncManager?.track ? ctx.syncManager.track(
+    uploadPhotoToCloud({
+      farmId, rabbitId: photo.rabbitId, photoId: photo.id, dataUrl: photo.dataUrl,
+    })
+  ) : uploadPhotoToCloud({
+      farmId, rabbitId: photo.rabbitId, photoId: photo.id, dataUrl: photo.dataUrl,
+  });
+  try {
+    const storagePath = await tracked;
+    photo.storagePath = storagePath;
+    persist(ctx);
+    trackCloudWrite(ctx, DB.upsertPhoto(farmId, photo), { type: "upsertPhoto", payload: { farmId, photo } });
+  } catch (err) {
+    console.warn("[photoUploadQueue] Upload différé:", err?.message || err);
+    enqueuePhotoUpload({ farmId, rabbitId: photo.rabbitId, photoId: photo.id, localPhotoKey: photo.localPhotoKey }, err);
+    // Record exists locally; still register the DB mutation so metadata syncs
+    // even before storage upload succeeds (storagePath will be filled by replay).
+    enqueueMutation("upsertPhoto", { farmId, photo }, err);
+    ctx.updatePendingMutations?.();
+  }
 }
 
 export function deletePhoto(ctx, photoId) {

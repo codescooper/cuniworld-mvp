@@ -37,3 +37,22 @@ export async function getPhotoSignedUrl(storagePath, expiresIn = 3600) {
   if (error) throw new Error(`URL signée photo indisponible: ${error.message || error}`);
   return data?.signedUrl || null;
 }
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error('FileReader failed'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Downloads the actual bytes (not a transient signed URL) so the result can be
+// cached in IndexedDB without worrying about expiry.
+export async function downloadPhotoAsDataUrl(storagePath) {
+  if (!storagePath) return null;
+  const { data, error } = await supabase.storage.from('photos').download(storagePath);
+  if (error) throw new Error(`Téléchargement photo échoué: ${error.message || error}`);
+  if (!data) return null;
+  return blobToDataUrl(data);
+}

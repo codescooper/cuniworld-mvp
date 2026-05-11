@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js';
-import { getPhotoData } from './photoStorage.js';
+import { getPhotoData, putPhotoData } from './photoStorage.js';
+import { getPhotoSignedUrl, downloadPhotoAsDataUrl } from './photoCloudStorage.js';
 import { Store } from './store.js';
 
 function _throwIfError(tag, error) {
@@ -285,7 +286,20 @@ export const DB = {
         if (payload.eventType !== 'DELETE' && payload.new?.id) {
           const photo = ctx.state.photos.find(p => p.id === payload.new.id);
           if (photo && !photo.dataUrl) {
-            photo.dataUrl = await getPhotoData(photo.localPhotoKey || photo.id).catch(() => null);
+            // Device B may not have the bytes locally — try IndexedDB first,
+            // then download the actual bytes from Supabase Storage (cache-safe,
+            // no expiry), with a signed URL as a last-resort transient fallback.
+            const localKey = photo.localPhotoKey || photo.id;
+            photo.dataUrl = await getPhotoData(localKey).catch(() => null);
+            if (!photo.dataUrl && photo.storagePath) {
+              const downloaded = await downloadPhotoAsDataUrl(photo.storagePath).catch(() => null);
+              if (downloaded) {
+                photo.dataUrl = downloaded;
+                putPhotoData(localKey, downloaded).catch(() => {});
+              } else {
+                photo.dataUrl = await getPhotoSignedUrl(photo.storagePath).catch(() => null);
+              }
+            }
           }
         }
         _scheduleRender(ctx);

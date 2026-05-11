@@ -11,6 +11,7 @@ import { hydrateAndMigratePhotos } from "./src/photoStorage.js";
 import { exportRabbitsCSV, exportEventsCSV } from "./src/csvExport.js";
 import { createSyncManager } from "./src/syncManager.js";
 import { getPendingMutationCount, replayMutationQueue } from "./src/mutationQueue.js";
+import { getPendingPhotoUploadCount, replayPhotoUploadQueue } from "./src/photoUploadQueue.js";
 import { showToast, showConfirm } from "./src/notifications.js";
 import { supabaseConfigured } from "./src/supabase.js";
 import {
@@ -148,7 +149,7 @@ function updateSyncBadge(ctx) {
     error: "Erreur sync",
   };
   const status = ctx.syncStatus || "local";
-  const pending = getPendingMutationCount();
+  const pending = getPendingMutationCount() + getPendingPhotoUploadCount();
   badge.className = `sync-badge ${status}`;
   const base = labels[status] || labels.local;
   badge.textContent = pending > 0 ? `${base} · ${pending} en attente` : base;
@@ -318,10 +319,13 @@ function wireExtra() {
   document.getElementById("moreReset")?.addEventListener("click", () => ctx.el.btnReset?.click());
   document.getElementById("moreRetrySync")?.addEventListener("click", async () => {
     if (!ctx.farmId) return;
-    const { remaining, replayed } = await replayMutationQueue();
+    const mut = await replayMutationQueue();
+    const pho = await replayPhotoUploadQueue(ctx);
     ctx.updatePendingMutations();
+    const remaining = mut.remaining + pho.remaining;
     if (remaining === 0) ctx.setSyncStatus("synced");
-    showToast(`Synchronisation relancée : ${replayed} rejouée(s), ${remaining} en attente.`, "success");
+    showToast(`Sync relancée : ${mut.replayed} mutation(s) + ${pho.replayed} photo(s) rejouée(s), ${remaining} en attente.`, "success");
+    if (pho.replayed > 0) ctx.render();
   });
 
   // ── Notifications ────────────────────────────────────────────────────────────
@@ -488,7 +492,21 @@ async function initApp() {
     }
   } else {
     ctx.setSyncStatus("synced");
-    replayMutationQueue().then(() => ctx.updatePendingMutations()).catch(() => {});
+    Promise.all([
+      replayMutationQueue().catch(() => ({ remaining: 0, replayed: 0 })),
+      replayPhotoUploadQueue(ctx).catch(() => ({ remaining: 0, replayed: 0 })),
+    ]).then(([, pho]) => {
+      ctx.updatePendingMutations();
+      if (pho.replayed > 0) ctx.render();
+    });
+    window.addEventListener("online", async () => {
+      if (!ctx.farmId) return;
+      const mut = await replayMutationQueue().catch(() => ({ remaining: 0, replayed: 0 }));
+      const pho = await replayPhotoUploadQueue(ctx).catch(() => ({ remaining: 0, replayed: 0 }));
+      ctx.updatePendingMutations();
+      if (mut.remaining + pho.remaining === 0) ctx.setSyncStatus("synced");
+      if (pho.replayed > 0) ctx.render();
+    });
     import("./src/wireAuth.js").then(({ bootWithAuth }) => {
       bootWithAuth(ctx, () => {
         setActivePanel(savedPanel);
