@@ -38,14 +38,34 @@ export function getPendingMutationCount() {
 async function runMutation(m) {
   const p = m.payload || {};
   switch (m.type) {
-    case 'upsertRabbit': return DB.upsertRabbit(p.farmId, p.rabbit);
-    case 'deleteRabbit': return DB.deleteRabbit(p.farmId, p.rabbitId);
-    case 'upsertEvent': return DB.upsertEvent(p.farmId, p.event);
-    case 'deleteEvent': return DB.deleteEvent(p.farmId, p.eventId);
-    case 'upsertPhoto': return DB.upsertPhoto(p.farmId, p.photo);
-    case 'deletePhoto': return DB.deletePhoto(p.farmId, p.photoId);
-    case 'setUsedName': return DB.setUsedName(p.farmId, p.name, p.rabbitId);
-    case 'deleteUsedName': return DB.deleteUsedName(p.farmId, p.name);
+    // ── Core ──
+    case 'upsertRabbit':       return DB.upsertRabbit(p.farmId, p.rabbit);
+    case 'deleteRabbit':       return DB.deleteRabbit(p.farmId, p.rabbitId);
+    case 'upsertEvent':        return DB.upsertEvent(p.farmId, p.event);
+    case 'deleteEvent':        return DB.deleteEvent(p.farmId, p.eventId);
+    case 'upsertPhoto':        return DB.upsertPhoto(p.farmId, p.photo);
+    case 'deletePhoto':        return DB.deletePhoto(p.farmId, p.photoId);
+    case 'setUsedName':        return DB.setUsedName(p.farmId, p.name, p.rabbitId);
+    case 'deleteUsedName':     return DB.deleteUsedName(p.farmId, p.name);
+    // ── Bâtiments ──
+    case 'upsertBuilding':     return DB.upsertBuilding(p.farmId, p.building);
+    case 'deleteBuilding':     return DB.deleteBuilding(p.farmId, p.buildingId);
+    case 'upsertLodge':        return DB.upsertLodge(p.farmId, p.lodge);
+    case 'deleteLodge':        return DB.deleteLodge(p.farmId, p.lodgeId);
+    case 'upsertLodgeDefect':  return DB.upsertLodgeDefect(p.farmId, p.defect);
+    case 'deleteLodgeDefect':  return DB.deleteLodgeDefect(p.farmId, p.defectId);
+    case 'upsertLodgeEvent':   return DB.upsertLodgeEvent(p.farmId, p.event);
+    case 'deleteLodgeEvent':   return DB.deleteLodgeEvent(p.farmId, p.eventId);
+    // ── Stock ──
+    case 'upsertStockItem':    return DB.upsertStockItem(p.farmId, p.item);
+    case 'deleteStockItem':    return DB.deleteStockItem(p.farmId, p.itemId);
+    case 'upsertStockMovement':return DB.upsertStockMovement(p.farmId, p.movement);
+    case 'deleteStockMovement':return DB.deleteStockMovement(p.farmId, p.movementId);
+    // ── Tournées ──
+    case 'upsertRound':        return DB.upsertRound(p.farmId, p.round);
+    // ── Statuts lots ──
+    case 'setLotStatus':       return DB.setLotStatus(p.farmId, p.lotId, p.status);
+    case 'deleteLotStatus':    return DB.deleteLotStatus(p.farmId, p.lotId);
     default: throw new Error(`Type de mutation inconnu: ${m.type}`);
   }
 }

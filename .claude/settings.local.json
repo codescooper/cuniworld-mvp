@@ -32,7 +32,8 @@
       "Bash(grep -rn \"innerHTML.*\\\\${\" C:/Users/USER/cuniworld-mvp/src/ --include=\"*.js\")",
       "Bash(grep -v \"^.*//.*innerHTML\")",
       "Bash(npm list *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(echo \"EXIT_CODE:$?\")"
     ]
   }
 }

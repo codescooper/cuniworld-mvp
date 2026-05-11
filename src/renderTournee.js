@@ -4,6 +4,8 @@ import { Store } from './store.js';
 import { openModal, closeModal } from './modal.js';
 import { showToast } from './notifications.js';
 import { sortByCage } from './cageSort.js';
+import { DB } from './db.js';
+import { trackCloudWrite } from './actions.js';
 
 export function openTourneeModal(ctx) {
   const today    = new Date().toISOString().slice(0, 10);
@@ -95,7 +97,16 @@ function _wireForm(ctx, existing, actifs, today) {
       portion:  document.querySelector(`.tournee-portion-sel[data-rabbit-id="${r.id}"]`)?.value || 'aucun',
     }));
 
+    const fid = ctx.farmId || null;
+    const prevRoundIds = new Set((ctx.state.rounds || []).map(r => r.id));
     ctx.state = Store.save(saveRound(ctx.state, { date: today, water, cleaning, feedings, notes }));
+    if (fid) {
+      for (const round of (ctx.state.rounds || []).filter(r => !prevRoundIds.has(r.id)))
+        trackCloudWrite(ctx, DB.upsertRound(fid, round), { type: 'upsertRound', payload: { farmId: fid, round } });
+      const updated = (ctx.state.rounds || []).find(r => r.date === today);
+      if (updated && prevRoundIds.has(updated.id))
+        trackCloudWrite(ctx, DB.upsertRound(fid, updated), { type: 'upsertRound', payload: { farmId: fid, round: updated } });
+    }
     closeModal(ctx.el);
     ctx.render();
     _updateTourneeLabel(ctx.state);

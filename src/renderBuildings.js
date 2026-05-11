@@ -10,6 +10,20 @@ import {
 import { Store } from './store.js';
 import { openModal, closeModal } from './modal.js';
 import { showToast, showConfirm } from './notifications.js';
+import { DB } from './db.js';
+import { trackCloudWrite } from './actions.js';
+
+// Calcule les IDs ajoutés entre deux snapshots d'un tableau d'entités.
+function _newIds(prevArr, nextArr) {
+  const prev = new Set((prevArr || []).map(x => x.id));
+  return (nextArr || []).filter(x => !prev.has(x.id));
+}
+
+// Calcule les IDs supprimés entre deux snapshots.
+function _removedIds(prevArr, nextArr) {
+  const next = new Set((nextArr || []).map(x => x.id));
+  return (prevArr || []).filter(x => !next.has(x.id));
+}
 
 // ── Main panel render ─────────────────────────────────────────────────────────
 
@@ -238,7 +252,10 @@ export function openLodgeDetail(ctx, lodgeCode) {
 
   document.getElementById('ldSaveNotes')?.addEventListener('click', () => {
     const notes = document.getElementById('ldNotes')?.value?.trim() || '';
+    const fid   = ctx.farmId || null;
     ctx.state = Store.save({ ...ctx.state, lodges: (ctx.state.lodges || []).map(l => l.id === lodge.id ? { ...l, notes } : l) });
+    const updated = (ctx.state.lodges || []).find(l => l.id === lodge.id);
+    if (fid && updated) trackCloudWrite(ctx, DB.upsertLodge(fid, updated), { type: 'upsertLodge', payload: { farmId: fid, lodge: updated } });
     showToast('Notes sauvegardées.', 'success');
   });
 
@@ -254,7 +271,11 @@ export function openLodgeDetail(ctx, lodgeCode) {
 
   document.querySelectorAll('[data-resolve-defect]').forEach(btn =>
     btn.addEventListener('click', () => {
-      ctx.state = Store.save(resolveDefect(ctx.state, btn.dataset.resolveDefect));
+      const defectId = btn.dataset.resolveDefect;
+      const fid = ctx.farmId || null;
+      ctx.state = Store.save(resolveDefect(ctx.state, defectId));
+      const updated = (ctx.state.lodgeDefects || []).find(d => d.id === defectId);
+      if (fid && updated) trackCloudWrite(ctx, DB.upsertLodgeDefect(fid, updated), { type: 'upsertLodgeDefect', payload: { farmId: fid, defect: updated } });
       ctx.render();
       openLodgeDetail(ctx, lodgeCode);
     })
@@ -332,11 +353,24 @@ function _wireBuildingForm(ctx, existing) {
     const errEl   = document.getElementById('bfError');
 
     try {
+      const fid = ctx.farmId || null;
       if (existing) {
+        const prevBuildings = ctx.state.buildings;
         ctx.state = Store.save(updateBuilding(ctx.state, existing.id, { lodgeCount: count, lodgesPerRow: perRow, inspectionDays: inspect, notes }));
+        const updated = (ctx.state.buildings || []).find(b => b.id === existing.id);
+        if (fid && updated) trackCloudWrite(ctx, DB.upsertBuilding(fid, updated), { type: 'upsertBuilding', payload: { farmId: fid, building: updated } });
         showToast(`Bâtiment ${existing.letter} mis à jour.`, 'success');
+        void prevBuildings; // ref kept to avoid lint warning
       } else {
+        const prevBldIds = new Set((ctx.state.buildings || []).map(b => b.id));
+        const prevLgIds  = new Set((ctx.state.lodges    || []).map(l => l.id));
         ctx.state = Store.save(createBuilding(ctx.state, { letter, lodgeCount: count, lodgesPerRow: perRow, inspectionDays: inspect, notes }));
+        if (fid) {
+          for (const b of (ctx.state.buildings || []).filter(b => !prevBldIds.has(b.id)))
+            trackCloudWrite(ctx, DB.upsertBuilding(fid, b), { type: 'upsertBuilding', payload: { farmId: fid, building: b } });
+          for (const l of (ctx.state.lodges || []).filter(l => !prevLgIds.has(l.id)))
+            trackCloudWrite(ctx, DB.upsertLodge(fid, l), { type: 'upsertLodge', payload: { farmId: fid, lodge: l } });
+        }
         showToast(`Bâtiment ${letter} créé avec ${count} loges.`, 'success');
       }
       closeModal(ctx.el);
@@ -374,7 +408,10 @@ export function openQuickSetupModal(ctx) {
 
     let s = ctx.state;
     const created = [];
+    const fid = ctx.farmId || null;
     try {
+      const prevBldIds = new Set((ctx.state.buildings || []).map(b => b.id));
+      const prevLgIds  = new Set((ctx.state.lodges    || []).map(l => l.id));
       for (const line of lines) {
         const parts  = line.split(':');
         const letter = parts[0]?.trim().toUpperCase();
@@ -384,6 +421,12 @@ export function openQuickSetupModal(ctx) {
         created.push(`${letter}(${count})`);
       }
       ctx.state = Store.save(s);
+      if (fid) {
+        for (const b of (ctx.state.buildings || []).filter(b => !prevBldIds.has(b.id)))
+          trackCloudWrite(ctx, DB.upsertBuilding(fid, b), { type: 'upsertBuilding', payload: { farmId: fid, building: b } });
+        for (const l of (ctx.state.lodges || []).filter(l => !prevLgIds.has(l.id)))
+          trackCloudWrite(ctx, DB.upsertLodge(fid, l), { type: 'upsertLodge', payload: { farmId: fid, lodge: l } });
+      }
       closeModal(ctx.el);
       ctx.render();
       showToast(`${created.length} bâtiment(s) créé(s) : ${created.join(', ')}`, 'success');
@@ -425,7 +468,13 @@ function openDefectModal(ctx, targetType, targetId) {
     const severity    = document.querySelector('input[name="dfSev"]:checked')?.value || 'mineur';
     const errEl       = document.getElementById('dfError');
     try {
+      const fid = ctx.farmId || null;
+      const prevDefIds = new Set((ctx.state.lodgeDefects || []).map(d => d.id));
       ctx.state = Store.save(reportDefect(ctx.state, { targetType, targetId, description, severity }));
+      if (fid) {
+        for (const d of (ctx.state.lodgeDefects || []).filter(d => !prevDefIds.has(d.id)))
+          trackCloudWrite(ctx, DB.upsertLodgeDefect(fid, d), { type: 'upsertLodgeDefect', payload: { farmId: fid, defect: d } });
+      }
       closeModal(ctx.el);
       ctx.render();
       showToast('Défaut signalé.', 'success');
@@ -466,7 +515,13 @@ function openLodgeEventModal(ctx, lodgeId, lodgeCode) {
     const type  = document.getElementById('leType')?.value;
     const date  = document.getElementById('leDate')?.value || today;
     const notes = document.getElementById('leNotes')?.value?.trim() || '';
+    const fid   = ctx.farmId || null;
+    const prevEvIds = new Set((ctx.state.lodgeEvents || []).map(e => e.id));
     ctx.state = Store.save(addLodgeEvent(ctx.state, { lodgeId, type, date, notes }));
+    if (fid) {
+      for (const e of (ctx.state.lodgeEvents || []).filter(e => !prevEvIds.has(e.id)))
+        trackCloudWrite(ctx, DB.upsertLodgeEvent(fid, e), { type: 'upsertLodgeEvent', payload: { farmId: fid, event: e } });
+    }
     closeModal(ctx.el);
     ctx.render();
     showToast(`${LODGE_EVENT_TYPES[type]?.label || type} enregistrée pour loge ${lodgeCode}.`, 'success');
@@ -515,6 +570,8 @@ function openBuildingEventModal(ctx, buildingId) {
     const notes  = document.getElementById('beNotes')?.value?.trim() || '';
 
     let s = ctx.state;
+    const fid = ctx.farmId || null;
+    const prevEvIds = new Set((s.lodgeEvents || []).map(e => e.id));
     if (target === 'all_lodges') {
       const lodges = (s.lodges || []).filter(l => l.buildingId === buildingId);
       for (const l of lodges) s = addLodgeEvent(s, { lodgeId: l.id, type, date, notes });
@@ -522,6 +579,10 @@ function openBuildingEventModal(ctx, buildingId) {
       s = addLodgeEvent(s, { buildingId, type, date, notes });
     }
     ctx.state = Store.save(s);
+    if (fid) {
+      for (const e of (ctx.state.lodgeEvents || []).filter(e => !prevEvIds.has(e.id)))
+        trackCloudWrite(ctx, DB.upsertLodgeEvent(fid, e), { type: 'upsertLodgeEvent', payload: { farmId: fid, event: e } });
+    }
     closeModal(ctx.el);
     ctx.render();
     showToast(`${LODGE_EVENT_TYPES[type]?.label} enregistré${target === 'all_lodges' ? ' pour toutes les loges' : ''}.`, 'success');
@@ -560,7 +621,11 @@ function openAllDefectsModal(ctx) {
   document.getElementById('allDefClose')?.addEventListener('click', () => closeModal(ctx.el));
   document.querySelectorAll('[data-resolve-defect]').forEach(btn =>
     btn.addEventListener('click', () => {
-      ctx.state = Store.save(resolveDefect(ctx.state, btn.dataset.resolveDefect));
+      const defectId = btn.dataset.resolveDefect;
+      const fid = ctx.farmId || null;
+      ctx.state = Store.save(resolveDefect(ctx.state, defectId));
+      const updated = (ctx.state.lodgeDefects || []).find(d => d.id === defectId);
+      if (fid && updated) trackCloudWrite(ctx, DB.upsertLodgeDefect(fid, updated), { type: 'upsertLodgeDefect', payload: { farmId: fid, defect: updated } });
       ctx.render();
       openAllDefectsModal(ctx);
     })
@@ -572,14 +637,35 @@ function openAllDefectsModal(ctx) {
 async function _deleteBuilding(ctx, buildingId) {
   const b = (ctx.state.buildings || []).find(x => x.id === buildingId);
   if (!b) return;
-  const lodgeCount = (ctx.state.lodges || []).filter(l => l.buildingId === buildingId).length;
+  const lodges = (ctx.state.lodges || []).filter(l => l.buildingId === buildingId);
+  const lodgeIds = new Set(lodges.map(l => l.id));
   const ok = await showConfirm({
     title: `Supprimer bâtiment ${b.letter}`,
-    message: `Supprimer le bâtiment ${b.letter} et ses ${lodgeCount} loges ? Les lapins ne seront pas supprimés mais perdront leur loge.`,
+    message: `Supprimer le bâtiment ${b.letter} et ses ${lodges.length} loges ? Les lapins ne seront pas supprimés mais perdront leur loge.`,
     confirmLabel: 'Supprimer', danger: true,
   });
   if (!ok) return;
+
+  const fid = ctx.farmId || null;
+  const defectIds = (ctx.state.lodgeDefects || [])
+    .filter(d => d.targetId === buildingId || lodgeIds.has(d.targetId))
+    .map(d => d.id);
+  const eventIds = (ctx.state.lodgeEvents || [])
+    .filter(e => e.buildingId === buildingId || lodgeIds.has(e.lodgeId))
+    .map(e => e.id);
+
   ctx.state = Store.save(deleteBuilding(ctx.state, buildingId));
+
+  if (fid) {
+    trackCloudWrite(ctx, DB.deleteBuilding(fid, buildingId), { type: 'deleteBuilding', payload: { farmId: fid, buildingId } });
+    for (const lodgeId of lodgeIds)
+      trackCloudWrite(ctx, DB.deleteLodge(fid, lodgeId), { type: 'deleteLodge', payload: { farmId: fid, lodgeId } });
+    for (const defectId of defectIds)
+      trackCloudWrite(ctx, DB.deleteLodgeDefect(fid, defectId), { type: 'deleteLodgeDefect', payload: { farmId: fid, defectId } });
+    for (const eventId of eventIds)
+      trackCloudWrite(ctx, DB.deleteLodgeEvent(fid, eventId), { type: 'deleteLodgeEvent', payload: { farmId: fid, eventId } });
+  }
+
   ctx.render();
   showToast(`Bâtiment ${b.letter} supprimé.`, 'success');
 }

@@ -1,6 +1,7 @@
 import { openModal, closeModal } from "./modal.js";
 import { escapeHTML, escapeAttr, generateRabbitCode, num, numOrNull } from "./utils.js";
-import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent, addPhoto, deletePhoto } from "./actions.js";
+import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent, addPhoto, deletePhoto, trackCloudWrite } from "./actions.js";
+import { DB } from "./db.js";
 import { compressImage } from "./photos.js";
 import { isNameFromPool, isNameAvailable, isNameUsedByLivingRabbit, suggestAvailableRabbitName } from "./rabbitNameService.js";
 import { openWeightCheckModal } from "./weightCheck.js";
@@ -223,8 +224,12 @@ export function wireDynamic(ctx) {
   const lotStatusSelect = document.getElementById("lotStatusSelect");
   if (lotStatusSelect && ctx.selectedLotId) {
     lotStatusSelect.addEventListener("change", () => {
-      ctx.state.lotStatuses = { ...(ctx.state.lotStatuses || {}), [ctx.selectedLotId]: lotStatusSelect.value };
+      const lotId = ctx.selectedLotId;
+      const status = lotStatusSelect.value;
+      const fid = ctx.farmId || null;
+      ctx.state.lotStatuses = { ...(ctx.state.lotStatuses || {}), [lotId]: status };
       ctx.state = ctx.Store.save(ctx.state);
+      if (fid) trackCloudWrite(ctx, DB.setLotStatus(fid, lotId, status), { type: 'setLotStatus', payload: { farmId: fid, lotId, status } });
       ctx.render();
     });
   }

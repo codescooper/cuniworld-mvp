@@ -11,7 +11,7 @@ export function persist(ctx) {
 }
 
 function fid(ctx) { return ctx.farmId || null; }
-function trackCloudWrite(ctx, promise, meta = null) {
+export function trackCloudWrite(ctx, promise, meta = null) {
   if (!promise || typeof promise.then !== "function") return promise;
   if (!ctx.syncManager) return promise;
   return ctx.syncManager.track(promise).catch((err) => {

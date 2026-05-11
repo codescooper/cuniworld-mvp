@@ -3,6 +3,8 @@ import { STOCK_CATEGORIES, getStockByCategory, getLowStockItems, addStockMovemen
 import { Store } from './store.js';
 import { openModal, closeModal } from './modal.js';
 import { showToast, showConfirm } from './notifications.js';
+import { DB } from './db.js';
+import { trackCloudWrite } from './actions.js';
 
 function _close(ctx) { closeModal(ctx.el); }
 
@@ -91,7 +93,14 @@ function _wireStockButtons(ctx, host) {
       if (!item) return;
       const ok = await showConfirm({ title: 'Supprimer l\'article', message: `Supprimer "${item.name}" et tout son historique ?`, confirmLabel: 'Supprimer', danger: true });
       if (!ok) return;
+      const fid = ctx.farmId || null;
+      const mvIds = (ctx.state.stockMovements || []).filter(m => m.stockItemId === delId).map(m => m.id);
       ctx.state = Store.save(deleteStockItem(ctx.state, delId));
+      if (fid) {
+        trackCloudWrite(ctx, DB.deleteStockItem(fid, delId), { type: 'deleteStockItem', payload: { farmId: fid, itemId: delId } });
+        for (const mvId of mvIds)
+          trackCloudWrite(ctx, DB.deleteStockMovement(fid, mvId), { type: 'deleteStockMovement', payload: { farmId: fid, movementId: mvId } });
+      }
       ctx.render();
     }
   }, { once: true });
@@ -164,14 +173,22 @@ function _wireStockForm(ctx, existingItem) {
     if (!name) { if (errEl) errEl.textContent = 'Le nom est requis.'; return; }
 
     try {
+      const fid = ctx.farmId || null;
       if (existingItem) {
         ctx.state = Store.save(updateStockItem(ctx.state, existingItem.id, {
           name, category, quantity: isNaN(qty) ? existingItem.quantity : qty, unit, minQuantity: min, notes,
         }));
+        const updated = (ctx.state.stock || []).find(x => x.id === existingItem.id);
+        if (fid && updated) trackCloudWrite(ctx, DB.upsertStockItem(fid, updated), { type: 'upsertStockItem', payload: { farmId: fid, item: updated } });
       } else {
+        const prevIds = new Set((ctx.state.stock || []).map(x => x.id));
         ctx.state = Store.save(createStockItem(ctx.state, {
           name, category, quantity: isNaN(qty) ? 0 : qty, unit, minQuantity: min, notes,
         }));
+        if (fid) {
+          for (const item of (ctx.state.stock || []).filter(x => !prevIds.has(x.id)))
+            trackCloudWrite(ctx, DB.upsertStockItem(fid, item), { type: 'upsertStockItem', payload: { farmId: fid, item } });
+        }
       }
       _close(ctx);
       ctx.render();
@@ -223,7 +240,15 @@ function _openMovementModal(ctx, itemId, type) {
       return;
     }
     try {
+      const fid = ctx.farmId || null;
+      const prevMvIds = new Set((ctx.state.stockMovements || []).map(m => m.id));
       ctx.state = Store.save(addStockMovement(ctx.state, { stockItemId: itemId, type, quantity: qty, date, notes }));
+      if (fid) {
+        for (const mv of (ctx.state.stockMovements || []).filter(m => !prevMvIds.has(m.id)))
+          trackCloudWrite(ctx, DB.upsertStockMovement(fid, mv), { type: 'upsertStockMovement', payload: { farmId: fid, movement: mv } });
+        const updatedItem = (ctx.state.stock || []).find(x => x.id === itemId);
+        if (updatedItem) trackCloudWrite(ctx, DB.upsertStockItem(fid, updatedItem), { type: 'upsertStockItem', payload: { farmId: fid, item: updatedItem } });
+      }
       _close(ctx);
       ctx.render();
       const updated = (ctx.state.stock || []).find(x => x.id === itemId);

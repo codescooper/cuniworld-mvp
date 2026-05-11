@@ -19,13 +19,19 @@ function _withTimeout(promise, ms, label) {
   ]);
 }
 
-// Fields stored only in localStorage (no Supabase tables); must survive a farm reload.
-const LOCAL_ONLY_FIELDS = ['buildings', 'lodges', 'lodgeDefects', 'lodgeEvents', 'stock', 'stockMovements', 'rounds', 'lotStatuses'];
+// Fields now synced to Supabase. _mergeLocalFields uses local data only as a
+// fallback when the Supabase table returns null (SQL migration not run yet).
+const SYNCED_FIELDS = ['buildings', 'lodges', 'lodgeDefects', 'lodgeEvents', 'stock', 'stockMovements', 'rounds', 'lotStatuses'];
 
 function _mergeLocalFields(farmState, localState) {
   const merged = { ...farmState, version: Store.helpers.SCHEMA_VERSION };
-  for (const key of LOCAL_ONLY_FIELDS) {
-    merged[key] = localState?.[key] ?? (key === 'lotStatuses' ? {} : []);
+  for (const key of SYNCED_FIELDS) {
+    const cloudVal = farmState[key];
+    // null = table unavailable (SQL migration not run yet) → use local as fallback
+    if (cloudVal === null) {
+      merged[key] = localState?.[key] ?? (key === 'lotStatuses' ? {} : []);
+    }
+    // non-null (even []) = Supabase has the table → trust cloud data
   }
   return merged;
 }
@@ -281,6 +287,10 @@ async function _loadFarm(farmId, farmName, ctx, onReady, isNew = false) {
 
     if (isNew) await _offerMigration(ctx);
 
+    // Auto-migrate local-only data to the new Supabase tables (one-shot per farm).
+    // Runs silently in background — does not block the UI.
+    _autoMigrateLocalModules(ctx, farmState, preLoadLocal).catch(() => {});
+
     overlay.style.display = 'none';
     overlay.classList.add('hidden');
     _updateTopbar(ctx, onReady);
@@ -298,6 +308,43 @@ async function _loadFarm(farmId, farmName, ctx, onReady, isNew = false) {
     overlay.querySelector('#btnRetryLoad')?.addEventListener('click', () => _loadFarm(farmId, farmName, ctx, onReady, false));
     overlay.querySelector('#btnOfflineFallback2')?.addEventListener('click', () => _goOffline(ctx, onReady));
   }
+}
+
+// ── Migration automatique des modules locaux vers Supabase (one-shot) ────────
+// Déclenché la première fois que la ferme est chargée après le déploiement de
+// la migration SQL 002. Idempotent grâce aux upserts.
+async function _autoMigrateLocalModules(ctx, freshCloud, localState) {
+  const key = `cuniworld_sync2_${ctx.farmId}`;
+  if (localStorage.getItem(key)) return; // déjà fait
+
+  const fid = ctx.farmId;
+  const ops = [];
+
+  // Pour chaque module : migrer seulement si Supabase est vide ET local a des données.
+  // (freshCloud[key] === null signifie que la table SQL n'existe pas encore.)
+  const needsArr = (cloudArr, localArr, fn) => {
+    if (cloudArr === null) return; // table absente, pas de migration possible
+    if (cloudArr.length > 0) return; // déjà des données cloud
+    for (const item of (localArr || [])) ops.push(fn(item).catch(() => {}));
+  };
+
+  needsArr(freshCloud.buildings,      localState?.buildings,      b => DB.upsertBuilding(fid, b));
+  needsArr(freshCloud.lodges,         localState?.lodges,         l => DB.upsertLodge(fid, l));
+  needsArr(freshCloud.lodgeDefects,   localState?.lodgeDefects,   d => DB.upsertLodgeDefect(fid, d));
+  needsArr(freshCloud.lodgeEvents,    localState?.lodgeEvents,    e => DB.upsertLodgeEvent(fid, e));
+  needsArr(freshCloud.stock,          localState?.stock,          s => DB.upsertStockItem(fid, s));
+  needsArr(freshCloud.stockMovements, localState?.stockMovements, m => DB.upsertStockMovement(fid, m));
+  needsArr(freshCloud.rounds,         localState?.rounds,         r => DB.upsertRound(fid, r));
+
+  const cloudStatuses = freshCloud.lotStatuses;
+  if (cloudStatuses !== null && Object.keys(cloudStatuses).length === 0) {
+    for (const [lotId, status] of Object.entries(localState?.lotStatuses || {})) {
+      ops.push(DB.setLotStatus(fid, lotId, status).catch(() => {}));
+    }
+  }
+
+  if (ops.length > 0) await Promise.all(ops);
+  localStorage.setItem(key, '1');
 }
 
 // ── Migration localStorage → Supabase ────────────────────────────
@@ -318,10 +365,18 @@ async function _offerMigration(ctx) {
     });
     if (!ok) return;
 
-    for (const r of (local.rabbits   || [])) await DB.upsertRabbit(ctx.farmId, r).catch(() => {});
-    for (const e of (local.events    || [])) await DB.upsertEvent(ctx.farmId, e).catch(() => {});
-    for (const p of (local.photos    || [])) await DB.upsertPhoto(ctx.farmId, p).catch(() => {});
+    for (const r of (local.rabbits         || [])) await DB.upsertRabbit(ctx.farmId, r).catch(() => {});
+    for (const e of (local.events          || [])) await DB.upsertEvent(ctx.farmId, e).catch(() => {});
+    for (const p of (local.photos          || [])) await DB.upsertPhoto(ctx.farmId, p).catch(() => {});
     for (const [n, rid] of Object.entries(local.usedNames || {})) await DB.setUsedName(ctx.farmId, n, rid).catch(() => {});
+    for (const b of (local.buildings       || [])) await DB.upsertBuilding(ctx.farmId, b).catch(() => {});
+    for (const l of (local.lodges          || [])) await DB.upsertLodge(ctx.farmId, l).catch(() => {});
+    for (const d of (local.lodgeDefects    || [])) await DB.upsertLodgeDefect(ctx.farmId, d).catch(() => {});
+    for (const e of (local.lodgeEvents     || [])) await DB.upsertLodgeEvent(ctx.farmId, e).catch(() => {});
+    for (const s of (local.stock           || [])) await DB.upsertStockItem(ctx.farmId, s).catch(() => {});
+    for (const m of (local.stockMovements  || [])) await DB.upsertStockMovement(ctx.farmId, m).catch(() => {});
+    for (const r of (local.rounds          || [])) await DB.upsertRound(ctx.farmId, r).catch(() => {});
+    for (const [lid, st] of Object.entries(local.lotStatuses || {})) await DB.setLotStatus(ctx.farmId, lid, st).catch(() => {});
 
     await new Promise(r => setTimeout(r, 800));
     const afterImport = await DB.loadFarmState(ctx.farmId);
