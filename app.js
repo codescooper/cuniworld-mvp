@@ -25,6 +25,7 @@ import { openAddStockModal } from "./src/renderStock.js";
 import { openTourneeModal, _updateTourneeLabel } from "./src/renderTournee.js";
 import { openAddBuildingModal, openQuickSetupModal } from "./src/renderBuildings.js";
 import { openSimulationModal, exitSimulation } from "./src/renderSimulation.js";
+import { openPhotoDiagnosticModal } from "./src/renderPhotoDiagnostic.js";
 import { isSimulationState } from "./src/simulation.js";
 
 const el = getEls();
@@ -433,6 +434,7 @@ function wireExtra() {
   document.getElementById("moreReset")?.addEventListener("click", () => ctx.el.btnReset?.click());
   document.getElementById("moreSimulation")?.addEventListener("click", () => openSimulationModal(ctx));
   document.getElementById("moreExitSimulation")?.addEventListener("click", () => exitSimulation(ctx));
+  document.getElementById("morePhotoDiagnostic")?.addEventListener("click", () => openPhotoDiagnosticModal(ctx));
   document.getElementById("moreRetrySync")?.addEventListener("click", async () => {
     if (!ctx.farmId) return;
     const mut = await replayMutationQueue();
