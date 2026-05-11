@@ -24,6 +24,8 @@ import {
 import { openAddStockModal } from "./src/renderStock.js";
 import { openTourneeModal, _updateTourneeLabel } from "./src/renderTournee.js";
 import { openAddBuildingModal, openQuickSetupModal } from "./src/renderBuildings.js";
+import { openSimulationModal, exitSimulation } from "./src/renderSimulation.js";
+import { isSimulationState } from "./src/simulation.js";
 
 const el = getEls();
 
@@ -54,6 +56,7 @@ const ctx = {
     try { _updateTourneeLabel(ctx.state); } catch(_) {}
     updateStockBadge(ctx);
     updateBuildingsBadge(ctx);
+    updateSimulationUI(ctx);
   },
   setSyncStatus: (status) => {
     const allowed = new Set(["local", "syncing", "synced", "error"]);
@@ -63,35 +66,6 @@ const ctx = {
   updatePendingMutations: () => updateSyncBadge(ctx),
 };
 ctx.syncManager = createSyncManager((status) => ctx.setSyncStatus(status));
-
-// ================================================================
-// SEED INITIAL (mode hors-ligne uniquement)
-// ================================================================
-function seedIfEmpty() {
-  if (ctx.state.rabbits.length > 0 || ctx.farmId) return;
-  const { uid, nowISO } = Store.helpers;
-
-  const a = {
-    id: uid("rb"), code: "CW-F001", name: "Naya", sex: "F",
-    breed: "Néo-zélandais", birthDate: "2025-11-20", cage: "A1",
-    status: "actif", notes: "Bonne mère, calme.",
-    createdAt: nowISO(), updatedAt: nowISO(),
-  };
-  const b = {
-    id: uid("rb"), code: "CW-M002", name: "Koda", sex: "M",
-    breed: "Californien", birthDate: "2025-10-12", cage: "B2",
-    status: "actif", notes: "Reproducteur.",
-    createdAt: nowISO(), updatedAt: nowISO(),
-  };
-
-  ctx.state.rabbits = [a, b];
-  ctx.state.events  = [
-    { id: uid("ev"), rabbitId: a.id, type: "vaccin",    date: "2026-01-10", notes: "Rappel",          data: {},                           createdAt: nowISO() },
-    { id: uid("ev"), rabbitId: a.id, type: "mise_bas",  date: "2026-01-12", notes: "Première portée", data: { born: 8, alive: 7, dead: 1 }, createdAt: nowISO() },
-    { id: uid("ev"), rabbitId: b.id, type: "traitement",date: "2026-01-08", notes: "Vermifuge",        data: {},                           createdAt: nowISO() },
-  ];
-  ctx.state = Store.save(ctx.state);
-}
 
 // ================================================================
 // NAVIGATION — panneau unique actif
@@ -137,6 +111,16 @@ function updateStockBadge(ctx) {
     const badge = document.getElementById("badge-magasin");
     if (badge) badge.textContent = lowCount > 0 ? String(lowCount) : "";
   } catch (_) {}
+}
+
+function updateSimulationUI(ctx) {
+  const banner = document.getElementById("simulationBanner");
+  const exitTile = document.getElementById("moreExitSimulation");
+  const startTile = document.getElementById("moreSimulation");
+  const inSim = isSimulationState(ctx.state);
+  if (banner) banner.style.display = inSim ? "" : "none";
+  if (exitTile) exitTile.style.display = inSim ? "" : "none";
+  if (startTile) startTile.style.display = ctx.farmId ? "none" : "";
 }
 
 function updateSyncBadge(ctx) {
@@ -317,6 +301,8 @@ function wireExtra() {
   document.getElementById("morePhotoCheck")?.addEventListener("click", () => openPhotoCheckModal(ctx));
   document.getElementById("moreWeightCheck")?.addEventListener("click", () => openWeightCheckModal(ctx));
   document.getElementById("moreReset")?.addEventListener("click", () => ctx.el.btnReset?.click());
+  document.getElementById("moreSimulation")?.addEventListener("click", () => openSimulationModal(ctx));
+  document.getElementById("moreExitSimulation")?.addEventListener("click", () => exitSimulation(ctx));
   document.getElementById("moreRetrySync")?.addEventListener("click", async () => {
     if (!ctx.farmId) return;
     const mut = await replayMutationQueue();
@@ -484,7 +470,6 @@ async function initApp() {
       authOverlay.innerHTML = "";
     }
     if (!isE2E) {
-      seedIfEmpty();
       setActivePanel(savedPanel);
       if (notificationsGranted()) checkAndFireNotifications(ctx.state);
     } else {
@@ -516,7 +501,6 @@ async function initApp() {
       console.error("[CuniWorld] Impossible de charger l'auth Supabase:", err);
       const authOverlay = document.getElementById("authOverlay");
       if (authOverlay) { authOverlay.style.display = "none"; authOverlay.innerHTML = ""; }
-      seedIfEmpty();
       setActivePanel(savedPanel);
     });
   }

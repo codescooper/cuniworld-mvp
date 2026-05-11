@@ -19,6 +19,11 @@
     <button class="beta-banner-close" id="betaBannerClose" aria-label="Fermer">✕</button>
   </div>
 
+  <!-- ===== SIMULATION BANNER (visible uniquement en mode Simulation) ===== -->
+  <div class="beta-banner" id="simulationBanner" style="display:none;background:#7c3aed">
+    <span>🧪 Mode Simulation actif — données fictives, non synchronisées au cloud.</span>
+  </div>
+
   <!-- ===== TOPBAR ===== -->
   <header class="topbar">
     <div class="brand">
@@ -327,6 +332,22 @@
               <span class="tile-body">
                 <span class="tile-title">Prise de poids assistée</span>
                 <span class="tile-sub">Peser les lapins en attente de pesée</span>
+              </span>
+            </button>
+
+            <button id="moreSimulation" class="more-action-tile" type="button">
+              <span class="tile-icon">🧪</span>
+              <span class="tile-body">
+                <span class="tile-title">Démarrer une simulation</span>
+                <span class="tile-sub">Générer un élevage fictif réaliste (hors-ligne)</span>
+              </span>
+            </button>
+
+            <button id="moreExitSimulation" class="more-action-tile danger-tile" type="button" style="display:none">
+              <span class="tile-icon">🚪</span>
+              <span class="tile-body">
+                <span class="tile-title">Quitter la simulation</span>
+                <span class="tile-sub">Supprime les données de simulation</span>
               </span>
             </button>
 

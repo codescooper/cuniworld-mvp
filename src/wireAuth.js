@@ -314,6 +314,9 @@ async function _loadFarm(farmId, farmName, ctx, onReady, isNew = false) {
 // Déclenché la première fois que la ferme est chargée après le déploiement de
 // la migration SQL 002. Idempotent grâce aux upserts.
 async function _autoMigrateLocalModules(ctx, freshCloud, localState) {
+  // Les données de simulation ne doivent JAMAIS être poussées vers une vraie
+  // ferme cloud. Elles sont fictives et marquées explicitement.
+  if (localState?.meta?.simulation) return;
   const key = `cuniworld_sync2_${ctx.farmId}`;
   if (localStorage.getItem(key)) return; // déjà fait
 
@@ -353,6 +356,8 @@ async function _offerMigration(ctx) {
     const raw = localStorage.getItem('cuniworld_mvp_state');
     if (!raw) return;
     const local = JSON.parse(raw);
+    // Refus catégorique de proposer la migration d'une simulation.
+    if (local?.meta?.simulation) return;
     const rCount = local?.rabbits?.length || 0;
     const eCount = local?.events?.length  || 0;
     if (rCount === 0 && eCount === 0) return;
