@@ -5,6 +5,7 @@ import { Store } from './store.js';
 import { escapeHTML } from './utils.js';
 import { hydrateAndMigratePhotos } from './photoStorage.js';
 import { showToast, showConfirm } from './notifications.js';
+import { fetchFarmMembers } from './membersService.js';
 
 function escAttr(s) { return String(s).replace(/"/g, '&quot;'); }
 
@@ -284,6 +285,12 @@ async function _loadFarm(farmId, farmName, ctx, onReady, isNew = false) {
     const farmState = await _withTimeout(DB.loadFarmState(farmId), 12000, 'loadFarmState');
     ctx.state = _mergeLocalFields(farmState, preLoadLocal);
     await hydrateAndMigratePhotos(ctx.state, farmId);
+
+    // Charge la liste des membres pour les sélecteurs "Effectué par".
+    // Échec silencieux : on garde l'utilisateur courant comme seul membre.
+    fetchFarmMembers(farmId, ctx.currentUser?.id)
+      .then(members => { ctx.farmMembers = members; ctx.render?.(); })
+      .catch(() => { ctx.farmMembers = null; });
 
     if (isNew) await _offerMigration(ctx);
 

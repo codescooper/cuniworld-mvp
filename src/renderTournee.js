@@ -6,6 +6,7 @@ import { showToast } from './notifications.js';
 import { sortByCage } from './cageSort.js';
 import { DB } from './db.js';
 import { trackCloudWrite } from './actions.js';
+import { actorSelectHTML, resolvePerformedBy } from './membersService.js';
 
 export function openTourneeModal(ctx) {
   const today    = new Date().toISOString().slice(0, 10);
@@ -15,13 +16,16 @@ export function openTourneeModal(ctx) {
     r => r.cage
   );
 
-  openModal(ctx.el, `Tournée du ${_formatDate(today)}`, _buildHTML(existing, actifs, today));
+  openModal(ctx.el, `Tournée du ${_formatDate(today)}`, _buildHTML(ctx, existing, actifs, today));
   _wireForm(ctx, existing, actifs, today);
 }
 
-function _buildHTML(existing, actifs, _today) {
+function _buildHTML(ctx, existing, actifs, _today) {
 
   const feedingMap = new Map((existing?.feedings || []).map(f => [f.rabbitId, f.portion]));
+  const waterActor   = actorSelectHTML(ctx, existing?.waterBy?.userId,    'waterByUserId');
+  const cleanActor   = actorSelectHTML(ctx, existing?.cleaningBy?.userId, 'cleaningByUserId');
+  const feedingActor = actorSelectHTML(ctx, null,                          'feedingByUserId');
 
   const rabbitRows = actifs.map(r => {
     const portion = feedingMap.get(r.id) || 'aucun';
@@ -43,17 +47,33 @@ function _buildHTML(existing, actifs, _today) {
 
   return `
     <div class="tournee-checks">
-      <label class="tournee-check-item">
-        <input type="checkbox" id="trWater" ${existing?.water ? 'checked' : ''} />
-        <span class="tournee-check-label">💧 Eau distribuée</span>
-      </label>
-      <label class="tournee-check-item">
-        <input type="checkbox" id="trCleaning" ${existing?.cleaning ? 'checked' : ''} />
-        <span class="tournee-check-label">🧹 Nettoyage effectué</span>
-      </label>
+      <div class="tournee-check-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <label class="tournee-check-item" style="flex:1;min-width:180px">
+          <input type="checkbox" id="trWater" ${existing?.water ? 'checked' : ''} />
+          <span class="tournee-check-label">💧 Eau distribuée</span>
+        </label>
+        <div class="field" style="margin:0;min-width:180px">
+          <div class="label" style="font-size:.75rem">Effectué par</div>
+          ${waterActor}
+        </div>
+      </div>
+      <div class="tournee-check-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px">
+        <label class="tournee-check-item" style="flex:1;min-width:180px">
+          <input type="checkbox" id="trCleaning" ${existing?.cleaning ? 'checked' : ''} />
+          <span class="tournee-check-label">🧹 Nettoyage effectué</span>
+        </label>
+        <div class="field" style="margin:0;min-width:180px">
+          <div class="label" style="font-size:.75rem">Effectué par</div>
+          ${cleanActor}
+        </div>
+      </div>
     </div>
 
     <div class="tournee-section-title">🌾 Alimentation (ordre des cages)</div>
+    <div class="field" style="margin:6px 0">
+      <div class="label" style="font-size:.75rem">Nourrissage effectué par (s'applique aux portions servies)</div>
+      ${feedingActor}
+    </div>
     <div class="tournee-quick-btns">
       <span class="muted" style="font-size:.8rem">Appliquer à tous :</span>
       ${Object.entries(PORTIONS).map(([k, v]) =>
@@ -92,14 +112,28 @@ function _wireForm(ctx, existing, actifs, today) {
     const cleaning = document.getElementById('trCleaning')?.checked || false;
     const notes    = document.getElementById('trNotes')?.value?.trim() || '';
 
-    const feedings = actifs.map(r => ({
-      rabbitId: r.id,
-      portion:  document.querySelector(`.tournee-portion-sel[data-rabbit-id="${r.id}"]`)?.value || 'aucun',
-    }));
+    const waterByUserId    = document.querySelector('[name="waterByUserId"]')?.value || '';
+    const cleaningByUserId = document.querySelector('[name="cleaningByUserId"]')?.value || '';
+    const feedingByUserId  = document.querySelector('[name="feedingByUserId"]')?.value || '';
+
+    const waterBy    = water    ? resolvePerformedBy(ctx, waterByUserId)    : null;
+    const cleaningBy = cleaning ? resolvePerformedBy(ctx, cleaningByUserId) : null;
+    const feedingBy  = resolvePerformedBy(ctx, feedingByUserId);
+
+    const feedings = actifs.map(r => {
+      const portion = document.querySelector(`.tournee-portion-sel[data-rabbit-id="${r.id}"]`)?.value || 'aucun';
+      return {
+        rabbitId: r.id,
+        portion,
+        by: portion !== 'aucun' ? feedingBy : null,
+      };
+    });
 
     const fid = ctx.farmId || null;
     const prevRoundIds = new Set((ctx.state.rounds || []).map(r => r.id));
-    ctx.state = Store.save(saveRound(ctx.state, { date: today, water, cleaning, feedings, notes }));
+    ctx.state = Store.save(saveRound(ctx.state, {
+      date: today, water, cleaning, feedings, notes, waterBy, cleaningBy,
+    }));
     if (fid) {
       for (const round of (ctx.state.rounds || []).filter(r => !prevRoundIds.has(r.id)))
         trackCloudWrite(ctx, DB.upsertRound(fid, round), { type: 'upsertRound', payload: { farmId: fid, round } });

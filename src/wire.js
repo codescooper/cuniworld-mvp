@@ -8,6 +8,8 @@ import { openWeightCheckModal } from "./weightCheck.js";
 import { openPhotoCheckModal, openSinglePhotoModal } from "./photoCheck.js";
 import { dismissActionForToday } from "./farmActionsService.js";
 import { showToast, showConfirm } from "./notifications.js";
+import { actorSelectHTML } from "./membersService.js";
+import { openTourneeModal } from "./renderTournee.js";
 
 
 // wireStatic — called ONCE at startup on elements that exist in the static HTML.
@@ -108,7 +110,7 @@ export function wireDynamic(ctx) {
       ctx.selectedRabbitId = id;
       ctx.selectedGeneRabbitId = id;
       ctx.render();
-      openModal(el, "Ajouter un événement", eventFormHTML());
+      openModal(el, "Ajouter un événement", eventFormHTML("autre", ctx));
       wireEventForm(ctx);
     });
   });
@@ -117,6 +119,12 @@ export function wireDynamic(ctx) {
   const btnWeightCheck = document.getElementById("btnWeightCheck");
   if (btnWeightCheck) {
     btnWeightCheck.addEventListener("click", () => openWeightCheckModal(ctx));
+  }
+
+  // Bouton "Ouvrir la tournée" depuis la carte Tâches du jour
+  const btnOpenTournee = document.getElementById("btnOpenTournee");
+  if (btnOpenTournee) {
+    btnOpenTournee.addEventListener("click", () => openTourneeModal(ctx));
   }
 
   // Carte "Aujourd'hui dans la ferme" — Traiter / Ignorer
@@ -138,7 +146,7 @@ export function wireDynamic(ctx) {
       const id = node.dataset.quickWeight;
       if (!id) return;
       ctx.selectedRabbitId = id;
-      openModal(el, "Peser ce lapin", eventFormHTML("pesée"));
+      openModal(el, "Peser ce lapin", eventFormHTML("pesée", ctx));
       wireEventForm(ctx);
     });
   });
@@ -185,7 +193,7 @@ export function wireDynamic(ctx) {
   document.querySelectorAll("#btnAddEvent, #btnAddEvent2").forEach((btnAddEvent) => {
     btnAddEvent.addEventListener("click", () => {
       if (!ctx.selectedRabbitId) return;
-      openModal(el, "Ajouter un événement", eventFormHTML());
+      openModal(el, "Ajouter un événement", eventFormHTML("autre", ctx));
       wireEventForm(ctx);
     });
   });
@@ -374,6 +382,9 @@ function rabbitFormHTML(rabbit=null, state=null) {
   const bucks = allRabbits.filter(x => x.sex === "M" && x.status === "actif" && x.id !== r.id);
   const currentMotherId = r.motherId || r.doeId || "";
   const currentFatherId = r.fatherId || r.buckId || "";
+  const initialStage = (r.stage || "").trim();
+  const hasBirthDate = !!((r.birthDate || "").trim());
+  const stageFieldDisplay = hasBirthDate ? "none" : "";
   return `
     <form id="rabbitForm" class="form">
       <div class="row2">
@@ -409,12 +420,22 @@ function rabbitFormHTML(rabbit=null, state=null) {
       <div class="row2">
         <div class="field">
           <div class="label">Date de naissance</div>
-          <input class="input" name="birthDate" type="date" value="${escapeAttr((r.birthDate || "").slice(0,10))}">
+          <input class="input" name="birthDate" id="rabbitBirthDate" type="date" value="${escapeAttr((r.birthDate || "").slice(0,10))}">
         </div>
         <div class="field">
           <div class="label">Cage</div>
           ${cageSelectHTML(state, r.cage || '', 'cage')}
         </div>
+      </div>
+
+      <div class="field" id="stageField" style="display:${stageFieldDisplay}">
+        <div class="label">Stade <span style="color:var(--color-danger,#c0392b)">*</span></div>
+        <select class="input" name="stage" id="rabbitStageSelect">
+          <option value="kit"    ${initialStage === "kit"    ? "selected" : ""}>Nouveau-né (lapereau)</option>
+          <option value="jeune"  ${initialStage === "jeune"  ? "selected" : ""}>Jeune</option>
+          <option value="adulte" ${(!initialStage || initialStage === "adulte") ? "selected" : ""}>Adulte</option>
+        </select>
+        <div style="font-size:.8rem;color:#888;margin-top:3px">Requis lorsqu'aucune date de naissance n'est renseignée.</div>
       </div>
 
       ${!rabbit ? `
@@ -490,7 +511,21 @@ function wireRabbitForm(ctx, existingRabbit) {
   const cancel = document.getElementById("cancelRabbit");
   const codeInput = form?.querySelector('input[name="code"]');
   const sexSelect = form?.querySelector('select[name="sex"]');
+  const birthDateInput = document.getElementById("rabbitBirthDate");
+  const stageField = document.getElementById("stageField");
+  const stageSelect = document.getElementById("rabbitStageSelect");
   cancel?.addEventListener("click", () => closeModal(ctx.el));
+
+  // Affichage conditionnel du champ Stade : visible uniquement quand la date
+  // de naissance est vide. Si elle se vide pendant la saisie, on réaffiche.
+  const refreshStageVisibility = () => {
+    if (!stageField || !birthDateInput) return;
+    const hasDate = !!(birthDateInput.value || "").trim();
+    stageField.style.display = hasDate ? "none" : "";
+  };
+  birthDateInput?.addEventListener("input", refreshStageVisibility);
+  birthDateInput?.addEventListener("change", refreshStageVisibility);
+  refreshStageVisibility();
 
   // ── Suggestion de nom ───────────────────────────────────────────────────────
   const nameInput  = document.getElementById("rabbitNameInput");
@@ -598,6 +633,20 @@ function wireRabbitForm(ctx, existingRabbit) {
     data.fatherId = data.fatherId || null;
     data.breedingOverride = data.breedingOverride || "auto";
 
+    // Stade : requis quand pas de date de naissance. Quand une date est
+    // fournie, on ne stocke pas de stage (laissé au calcul auto par utils.js).
+    const stageRaw = (data.stage || "").toString().trim();
+    if (!data.birthDate) {
+      if (!stageRaw || !["kit", "jeune", "adulte"].includes(stageRaw)) {
+        showToast("Sélectionnez un stade (lapereau, jeune ou adulte) car la date de naissance est manquante.", "warn");
+        stageSelect?.focus();
+        return;
+      }
+      data.stage = stageRaw;
+    } else {
+      data.stage = "";
+    }
+
     // ── Validation du nom ─────────────────────────────────────────────────────
     const submittedName = (data.name || "").trim();
     const ownerId = existingRabbit?.id ?? null;
@@ -658,11 +707,12 @@ function wireRabbitForm(ctx, existingRabbit) {
   setupModalFormKeyboardUX(form, '[data-testid="rabbit-form-submit"]');
 }
 
-function eventFormHTML(preType = "autre") {
+function eventFormHTML(preType = "autre", ctx = null) {
   const today = new Date().toISOString().slice(0,10);
   const types = ["saillie","mise_bas","sevrage","vaccin","traitement","pesée","vente","décès","autre"];
   const labels = { saillie:"Saillie", mise_bas:"Mise-bas", sevrage:"Sevrage", vaccin:"Vaccin", traitement:"Traitement", "pesée":"Pesée", vente:"Vente", "décès":"Décès", autre:"Autre" };
   const options = types.map(t => `<option value="${t}" ${t === preType ? "selected" : ""}>${labels[t]}</option>`).join("");
+  const actorHTML = ctx ? actorSelectHTML(ctx, null, "performedByUserId") : "";
   return `
     <form id="eventForm" class="form">
       <div class="row2">
@@ -679,6 +729,12 @@ function eventFormHTML(preType = "autre") {
       </div>
 
       <div id="evExtra"></div>
+
+      ${actorHTML ? `
+      <div class="field">
+        <div class="label">Effectué par</div>
+        ${actorHTML}
+      </div>` : ""}
 
       <div class="field">
         <div class="label">Notes</div>
@@ -857,6 +913,7 @@ function wireEventForm(ctx) {
     const type = (data.type || "autre").toString();
     const date = (data.date || new Date().toISOString().slice(0,10)).toString();
     const notes = (data.notes || "").toString();
+    const performedByUserId = (data.performedByUserId || "").toString();
 
     const evData = {};
     if (type === "mise_bas") {
@@ -885,7 +942,7 @@ function wireEventForm(ctx) {
     }
 
 
-    const draft = { type, date, notes, data: evData };
+    const draft = { type, date, notes, data: evData, performedByUserId };
 
     try {
       const ev = addEvent(ctx, ctx.selectedRabbitId, draft);

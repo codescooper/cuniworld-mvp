@@ -11,6 +11,8 @@ import { getTodayFarmActions } from "./farmActionsService.js";
 import { renderStats } from "./stats.js";
 import { renderStock } from "./renderStock.js";
 import { renderBuildings } from "./renderBuildings.js";
+import { getTodayRoundSummary } from "./roundService.js";
+import { formatPerformedBy } from "./membersService.js";
 
 
 
@@ -42,6 +44,9 @@ export function renderDashboard(ctx) {
   let farmActionsHTML = '';
   try { farmActionsHTML = _renderFarmActionsCard(ctx); } catch (_) {}
 
+  let dailyTasksHTML = '';
+  try { dailyTasksHTML = _renderDailyTasksCard(ctx); } catch (_) {}
+
   // KPI tiles d'abord (vue d'ensemble immédiate), actions ferme ensuite (déroulables).
   el.dash.innerHTML = `
     <div class="tile"><div class="n">${total}</div><div class="t">Lapins (total)</div></div>
@@ -53,7 +58,7 @@ export function renderDashboard(ctx) {
     <div class="tile"><div class="n">${upcoming.length}</div><div class="t">Rappels (≤7j)</div></div>
     <div class="tile"><div class="n">${overdue.length}</div><div class="t">Rappels en retard</div></div>
     <div class="tile"><div class="n">${state.rabbits.filter(r=>r.status==="mort").length}</div><div class="t">Morts</div></div>
-  ` + farmActionsHTML;
+  ` + dailyTasksHTML + farmActionsHTML;
 
   // Liste mise-bas bientôt
   if (dueSoon.length > 0) {
@@ -420,10 +425,12 @@ export function renderEventsPanel(ctx) {
           : linkedPhoto
             ? `<span class="event-photo-thumb event-photo-pending" title="Photo en attente">⏳</span>`
             : "";
+        const byTxt = formatPerformedBy(e.performedBy);
+        const byBadge = byTxt ? `<span class="badge" title="Auteur de l'action">${escapeHTML(byTxt)}</span>` : "";
         return `
           <div class="item">
             <div style="flex:1">
-              <div><strong>${escapeHTML(types[e.type] || e.type)}</strong> <span class="badge">${escapeHTML(e.date)}</span></div>
+              <div><strong>${escapeHTML(types[e.type] || e.type)}</strong> <span class="badge">${escapeHTML(e.date)}</span> ${byBadge}</div>
               <div class="small">${escapeHTML(formatEventDetails(e))}</div>
               ${thumbHTML ? `<div style="margin-top:6px">${thumbHTML}</div>` : ""}
             </div>
@@ -596,6 +603,67 @@ function _farmActionCardHTML(a) {
         <button class="btn ghost farm-action-dismiss"
           data-farm-dismiss="${escapeAttr(a.id)}">Ignorer</button>
       </div>
+    </div>
+  `;
+}
+
+// ── Carte "Tâches du jour" : eau, nourriture, nettoyage ──────────────────────
+function _renderDailyTasksCard(ctx) {
+  const summary = getTodayRoundSummary(ctx.state);
+  const total = (ctx.state.rabbits || []).filter(r => r.status === 'actif').length;
+
+  const lineWater = _dailyTaskLine({
+    icon: '💧',
+    name: 'Eau',
+    done: !!summary?.water,
+    statusDone: '✓ distribuée',
+    statusTodo: '— non distribuée',
+    by: summary?.waterBy,
+  });
+  const lineFood = _dailyTaskLine({
+    icon: '🌾',
+    name: 'Nourriture',
+    done: !!summary && summary.fedCount > 0,
+    statusDone: summary ? `${summary.fedCount}/${summary.total || total} nourris` : '— aucun',
+    statusTodo: '— aucun lapin nourri',
+    by: summary?.feedBy,
+  });
+  const lineClean = _dailyTaskLine({
+    icon: '🧹',
+    name: 'Nettoyage',
+    done: !!summary?.cleaning,
+    statusDone: '✓ effectué',
+    statusTodo: '— non fait',
+    by: summary?.cleaningBy,
+  });
+
+  return `
+    <div class="farm-actions-card" id="dailyTasksCard" style="grid-column:1/-1">
+      <div class="farm-actions-header">
+        <span class="farm-actions-title">🗓 Tâches du jour</span>
+        <button class="btn secondary" id="btnOpenTournee" style="font-size:.8rem;padding:4px 12px">Ouvrir la tournée</button>
+      </div>
+      <div class="daily-tasks-list" style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+        ${lineWater}${lineFood}${lineClean}
+      </div>
+    </div>
+  `;
+}
+
+function _dailyTaskLine({ icon, name, done, statusDone, statusTodo, by }) {
+  const dot = done ? '✓' : '○';
+  const dotColor = done ? '#4f7942' : '#c0392b';
+  const status = done ? statusDone : statusTodo;
+  const byTxt = done ? formatPerformedBy(by) : '';
+  return `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#f9f9f7;border-radius:8px">
+      <span style="font-size:1.2rem">${icon}</span>
+      <span style="flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <strong>${escapeHTML(name)}</strong>
+        <span class="small" style="color:#555">${escapeHTML(status)}</span>
+        ${byTxt ? `<span class="badge" title="Auteur de l'action">${escapeHTML(byTxt)}</span>` : ''}
+      </span>
+      <span style="color:${dotColor};font-weight:700">${dot}</span>
     </div>
   `;
 }

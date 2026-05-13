@@ -1,5 +1,5 @@
 import { validateEvent, applyEventSideEffects } from "./rules.js";
-import { generateRabbitCode, getRabbitStage, num, numOrNull } from "./utils.js";
+import { generateRabbitCode, num, numOrNull } from "./utils.js";
 import { isNameFromPool, lockRabbitName, releaseRabbitName } from "./rabbitNameService.js";
 import { DB } from "./db.js";
 import { putPhotoData, deletePhotoData } from "./photoStorage.js";
@@ -7,6 +7,7 @@ import { uploadPhotoToCloud, deletePhotoFromCloud } from "./photoCloudStorage.js
 import { enqueueMutation } from "./mutationQueue.js";
 import { enqueuePhotoUpload } from "./photoUploadQueue.js";
 import { photoLog } from "./photoDebug.js";
+import { defaultActor, resolvePerformedBy } from "./membersService.js";
 
 export function persist(ctx) {
   ctx.state = ctx.Store.save(ctx.state);
@@ -29,6 +30,12 @@ export function trackCloudWrite(ctx, promise, meta = null) {
 export function addRabbit(ctx, data) {
   const { uid, nowISO } = ctx.Store.helpers;
   const nextCode = generateRabbitCode(ctx.state, data.sex || "U");
+  // Si pas de date de naissance, on conserve le stade saisi par l'utilisateur ;
+  // sinon on laisse getRabbitStage le calculer dynamiquement (champ stage vide).
+  const hasBirth = !!(data.birthDate || "").trim();
+  const storedStage = hasBirth
+    ? ""
+    : (["kit", "jeune", "adulte"].includes(data.stage) ? data.stage : "adulte");
   const rabbit = {
     id: uid("rb"),
     code:      (data.code  || "").trim() || nextCode,
@@ -38,7 +45,7 @@ export function addRabbit(ctx, data) {
     birthDate: data.birthDate || "",
     cage:      (data.cage  || "").trim(),
     status:    data.status || "actif",
-    stage:     data.stage  || getRabbitStage({ birthDate: data.birthDate, stage: data.stage }),
+    stage:     storedStage,
     notes:     (data.notes || "").trim(),
     motherId:  data.motherId  || null,
     fatherId:  data.fatherId  || null,
@@ -82,6 +89,18 @@ export function updateRabbit(ctx, id, patch) {
   const { nowISO } = ctx.Store.helpers;
   const i = ctx.state.rabbits.findIndex((r) => r.id === id);
   if (i === -1) return;
+
+  // Stade : on stocke le stade choisi seulement quand il n'y a pas de date.
+  // Si une date est saisie, on efface le stade pour laisser le calcul auto.
+  if (Object.prototype.hasOwnProperty.call(patch, "stage") ||
+      Object.prototype.hasOwnProperty.call(patch, "birthDate")) {
+    const nextBirth = (patch.birthDate ?? ctx.state.rabbits[i].birthDate ?? "").toString().trim();
+    if (nextBirth) {
+      patch.stage = "";
+    } else if (patch.stage !== undefined) {
+      patch.stage = ["kit", "jeune", "adulte"].includes(patch.stage) ? patch.stage : "adulte";
+    }
+  }
 
   const oldName = ctx.state.rabbits[i].name;
   const newName = patch.name;
@@ -138,6 +157,14 @@ export function addEvent(ctx, rabbitId, data) {
     if (born === null) evData.born = alive + dead;
     else evData.dead = Math.max(born - alive, 0);
   }
+  // performedBy : auteur de l'action (membre connecté par défaut, surchargeable
+  // via le sélecteur du formulaire). Stocké en plein texte pour rester lisible
+  // même si le membre quitte la ferme.
+  const performedBy = data.performedBy && typeof data.performedBy === "object"
+    ? data.performedBy
+    : (data.performedByUserId !== undefined
+      ? resolvePerformedBy(ctx, data.performedByUserId || null)
+      : defaultActor(ctx));
   const ev = {
     id:       uid("ev"),
     rabbitId,
@@ -145,6 +172,7 @@ export function addEvent(ctx, rabbitId, data) {
     date:     data.date || new Date().toISOString().slice(0, 10),
     notes:    (data.notes || "").trim(),
     data:     evData,
+    performedBy,
     createdAt: nowISO(),
   };
 
