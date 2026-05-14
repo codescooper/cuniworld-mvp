@@ -8,6 +8,7 @@ import {
   addMiseBas,
   addSevrage,
   navigateTo,
+  goBackToList,
 } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
@@ -34,7 +35,7 @@ test("flux complet de reproduction: femelle -> saillie -> mise-bas -> sevrage ->
   await expect(page.locator("#rabbitDetails")).toContainText("Terme prévu: 2026-01-29");
 
   // Vérifier que la femelle apparaît comme "enceinte" dans la liste
-  await page.locator("#btnBack").click(); // Retour à la liste
+  await goBackToList(page); // Retour à la liste (no-op sur desktop : liste déjà visible)
   await expect(page.locator("#rabbitList")).toContainText("🤰"); // Badge enceinte
 
   // Re-sélectionner la femelle
@@ -57,7 +58,7 @@ test("flux complet de reproduction: femelle -> saillie -> mise-bas -> sevrage ->
   await expect(page.locator("#rabbitDetails")).toContainText("Père: Orion (CW-M001)");
 
   // Retour à la femelle
-  await page.locator("#btnBack").click();
+  await goBackToList(page);
   await selectRabbitByCode(page, "CW-F001");
 
   // Ajouter sevrage - doit automatiquement sevrer tous les lapereaux actifs

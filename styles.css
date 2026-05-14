@@ -1009,6 +1009,9 @@ textarea.input { min-height: 90px; resize: vertical }
   display: flex; align-items: center; gap: 8px;
   transition: background 150ms;
 }
+/* `display:flex` ci-dessus écrase le défaut UA `[hidden]{display:none}` :
+   sans cette règle, le badge reste visible même quand le JS pose `hidden`. */
+.gene-focus-badge[hidden] { display: none; }
 .gene-focus-badge:hover { background: rgba(99,102,241,.24) }
 .gene-focus-badge kbd {
   display: inline-block;

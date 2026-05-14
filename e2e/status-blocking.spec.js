@@ -5,6 +5,7 @@ import {
   selectRabbitByCode,
   openAddEvent,
   submitEventForm,
+  goBackToList,
 } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
@@ -45,7 +46,7 @@ test("événements bloqués pour lapins morts ou vendus", async ({ page }) => {
   await page.locator("#modalClose").click();
 
   // Créer un autre lapin pour tester la vente
-  await page.locator("#btnBack").click();
+  await goBackToList(page);
   await createRabbit(page, { code: "CW-R002", name: "Sale Rabbit", sex: "M" });
   await selectRabbitByCode(page, "CW-R002");
 

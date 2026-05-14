@@ -180,6 +180,16 @@ export async function navigateTo(page, panel) {
   await page.waitForTimeout(120);
 }
 
+// Revient à la liste des lapins. Sur desktop (≥1101px) la liste et le détail
+// cohabitent et #btnBack est volontairement masqué par CSS — on ne clique
+// alors rien (la liste est déjà visible). Sur mobile, on clique le ← Retour.
+export async function goBackToList(page) {
+  const back = page.locator("#btnBack");
+  if (await back.isVisible().catch(() => false)) {
+    await back.click();
+  }
+}
+
 export async function confirmCustomDialog(page) {
   await page.locator('[data-testid="confirm-ok"]').waitFor({ state: "visible", timeout: 3000 });
   await page.locator('[data-testid="confirm-ok"]').click();

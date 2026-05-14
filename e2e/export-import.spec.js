@@ -28,8 +28,10 @@ test("export -> reset -> import restaure les données", async ({ page }, testInf
 
   // Vérifs pré-export (rabbits panel)
   await expect(page.locator("#rabbitDetails")).toContainText("CW-F001");
-  await expect(page.locator("#lotList")).toContainText("C-04");
   await expect(page.locator("#rabbitList")).toContainText("CW-F001-K01");
+  // #lotList n'est rendu que quand le panneau Lots est actif → on y navigue.
+  await navigateTo(page, "lots");
+  await expect(page.locator("#lotList")).toContainText("C-04");
 
   // Export depuis le panneau Actions
   await navigateTo(page, "actions");
@@ -54,8 +56,11 @@ test("export -> reset -> import restaure les données", async ({ page }, testInf
 
   await expect(page.locator("#rabbitDetails")).toContainText("CW-F001");
   await expect(page.locator("#rabbitDetails")).toContainText("Naya");
-  await expect(page.locator("#lotList")).toContainText("C-04");
-  await expect(page.locator("#lotList")).toContainText("6 sevrés");
   await expect(page.locator("#rabbitList")).toContainText("CW-F001-K01");
   await expect(page.locator("#eventsPanel")).toContainText("Vaccin");
+
+  // Le lot — vérifié sur le panneau Lots.
+  await navigateTo(page, "lots");
+  await expect(page.locator("#lotList")).toContainText("C-04");
+  await expect(page.locator("#lotList")).toContainText("6 sevrés");
 });
