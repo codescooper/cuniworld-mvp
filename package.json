@@ -21,6 +21,7 @@
     "@playwright/test": "^1.49.0",
     "eslint": "^10.3.0",
     "jsdom": "^25.0.1",
+    "supabase": "^2.98.2",
     "vite": "^6.0.0",
     "vitest": "^2.1.0"
   },
