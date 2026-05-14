@@ -7,6 +7,7 @@ import { sortByCage } from './cageSort.js';
 import { DB } from './db.js';
 import { trackCloudWrite } from './actions.js';
 import { actorSelectHTML, resolvePerformedBy } from './membersService.js';
+import { rabbitThumbHTML } from './photos.js';
 
 export function openTourneeModal(ctx) {
   const today    = new Date().toISOString().slice(0, 10);
@@ -29,9 +30,11 @@ function _buildHTML(ctx, existing, actifs, _today) {
 
   const rabbitRows = actifs.map(r => {
     const portion = feedingMap.get(r.id) || 'aucun';
+    const thumb = rabbitThumbHTML(ctx.state, r, { size: 28 });
     return `
-      <div class="tournee-rabbit-row">
-        <div class="tournee-rabbit-info">
+      <div class="tournee-rabbit-row" style="display:flex;align-items:center;gap:8px">
+        ${thumb}
+        <div class="tournee-rabbit-info" style="flex:1;min-width:0">
           <span class="tournee-cage"><strong>${escapeHTML(r.cage || '—')}</strong></span>
           <span class="tournee-name">${escapeHTML(r.name)}</span>
           <span class="muted tournee-code">${escapeHTML(r.code || '')}</span>

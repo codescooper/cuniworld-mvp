@@ -7,7 +7,7 @@
  *   openSinglePhotoModal(ctx, rabbitId)
  */
 
-import { getRabbitsDueForPhotoCheck as _getDue, getPhotoHistory, compressImage } from './photos.js';
+import { getRabbitsDueForPhotoCheck as _getDue, getPhotoHistory, compressImage, rabbitThumbHTML } from './photos.js';
 import { daysBetween, formatDate, escapeHTML, escapeAttr } from './utils.js';
 import { addPhoto } from './actions.js';
 import { openModal } from './modal.js';
@@ -133,7 +133,9 @@ function _renderStepContent(ctx, r, lastPhoto, { showProgress, current, total, o
     ${progressHTML}
 
     <div class="wc-rabbit-card">
-      <div class="wc-name">${escapeHTML(r.name)}
+      <div class="wc-name" style="display:flex;align-items:center;gap:8px">
+        ${rabbitThumbHTML(ctx.state, r, { size: 40 })}
+        <span>${escapeHTML(r.name)}</span>
         <span class="badge">${r.sex === 'F' ? 'Femelle' : r.sex === 'M' ? 'Mâle' : '?'}</span>
       </div>
       <div class="wc-id-row">

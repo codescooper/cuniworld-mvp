@@ -6,7 +6,7 @@ import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
 import { buildLots, lotBadge, LOT_STATUSES } from "./lots.js";
 import { renderGenealogy3D } from "./genealogy3d.js";
 import { getReminders, reminderLabel } from "./health.js";
-import { getPhotoHistory, getProfilePhoto } from "./photos.js";
+import { getPhotoHistory, getProfilePhoto, rabbitThumbHTML } from "./photos.js";
 import { getTodayFarmActions } from "./farmActionsService.js";
 import { renderStats } from "./stats.js";
 import { renderStock } from "./renderStock.js";
@@ -156,8 +156,10 @@ export function renderRabbitList(ctx) {
     const stage  = getRabbitStage(r);
     const repro  = getReproInfo(ctx.state, r);
     const pregnantBadge = repro?.isPregnant ? `<span class="badge accent">🤰</span>` : "";
+    const thumb = rabbitThumbHTML(ctx.state, r, { size: 40 });
     return `
-      <div class="item rl-item ${active}" data-testid="rabbit-item" data-rabbit="${r.id}" style="cursor:pointer">
+      <div class="item rl-item ${active}" data-testid="rabbit-item" data-rabbit="${r.id}" style="cursor:pointer;display:flex;align-items:center;gap:10px">
+        ${thumb}
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <strong>${escapeHTML(r.code)}</strong>

@@ -11,6 +11,7 @@ import { daysBetween, formatDate, escapeHTML } from './utils.js';
 import { addEvent } from './actions.js';
 import { openModal } from './modal.js';
 import { sortByCage } from './cageSort.js';
+import { rabbitThumbHTML } from './photos.js';
 
 // ── Calcul des lapins à peser ────────────────────────────────────
 
@@ -97,7 +98,9 @@ function _renderStep(ctx, queue, cursor, setCursor) {
     </div>
 
     <div class="wc-rabbit-card">
-      <div class="wc-name">${escapeHTML(r.name)}
+      <div class="wc-name" style="display:flex;align-items:center;gap:8px">
+        ${rabbitThumbHTML(ctx.state, r, { size: 40 })}
+        <span>${escapeHTML(r.name)}</span>
         <span class="badge">${r.sex === 'F' ? 'Femelle' : r.sex === 'M' ? 'Mâle' : '?'}</span>
       </div>
       <div class="wc-id-row">

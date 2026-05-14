@@ -141,3 +141,53 @@ export async function replayPhotoUploadQueue(ctx = null) {
   saveQueue(next);
   return { remaining: next.length, replayed };
 }
+
+// ── Retry périodique automatique ─────────────────────────────────────────────
+// Démarre un poller qui réessaie le queue toutes les `intervalMs` ms tant qu'il
+// reste des entrées non synchronisées. S'arrête de lui-même quand le queue est
+// vide. Re-démarre automatiquement à chaque appel si déjà arrêté.
+let _autoRetryTimer = null;
+let _autoRetryRunning = false;
+
+export function startPhotoUploadAutoRetry(ctx, intervalMs = 30000) {
+  if (_autoRetryTimer) return; // déjà programmé
+  if (typeof window === 'undefined') return;
+
+  const tick = async () => {
+    _autoRetryTimer = null;
+    if (_autoRetryRunning) return;
+    if (!navigator.onLine) {
+      _scheduleNext(intervalMs);
+      return;
+    }
+    const queue = loadQueue();
+    if (!queue.length) return; // s'arrête tout seul
+
+    _autoRetryRunning = true;
+    try {
+      const result = await replayPhotoUploadQueue(ctx);
+      ctx?.updatePendingMutations?.();
+      if (result.replayed > 0) ctx?.render?.();
+    } catch (_) { /* on retentera plus tard */ }
+    finally { _autoRetryRunning = false; }
+
+    if (loadQueue().length > 0) _scheduleNext(intervalMs);
+  };
+
+  const _scheduleNext = (ms) => {
+    if (_autoRetryTimer) return;
+    _autoRetryTimer = setTimeout(tick, ms);
+  };
+
+  // Déclencheurs supplémentaires : retour en ligne, retour de visibilité.
+  // Idempotents grâce à _autoRetryRunning + _autoRetryTimer.
+  if (!startPhotoUploadAutoRetry._wiredGlobals) {
+    startPhotoUploadAutoRetry._wiredGlobals = true;
+    window.addEventListener('online',           () => _scheduleNext(1000));
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) _scheduleNext(1000);
+    });
+  }
+
+  _scheduleNext(intervalMs);
+}

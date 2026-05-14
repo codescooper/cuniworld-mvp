@@ -1,4 +1,4 @@
-import { daysBetween } from './utils.js';
+import { daysBetween, escapeHTML, escapeAttr } from './utils.js';
 
 export function compressImage(file, maxDim = 600, quality = 0.72) {
   return new Promise((resolve, reject) => {
@@ -36,6 +36,39 @@ export function getPhotoHistory(state, rabbitId) {
 export function getProfilePhoto(state, rabbitId) {
   const history = getPhotoHistory(state, rabbitId);
   return history.find(p => p.source === "profile") || history[0] || null;
+}
+
+// HTML d'un thumbnail rond standard pour représenter un lapin dans une liste,
+// une tournée, un sélecteur, etc. Si la photo est en attente de sync (cloud
+// download en cours) on affiche un placeholder ⏳, sinon 🐇.
+//   size = pixels (carré). Optionnel `name` pour fallback initiales.
+export function rabbitThumbHTML(state, rabbit, { size = 32 } = {}) {
+  if (!rabbit) {
+    return `<span class="rabbit-thumb rabbit-thumb--ph" style="width:${size}px;height:${size}px">🐇</span>`;
+  }
+  const photo = getProfilePhoto(state, rabbit.id);
+  const alt   = escapeAttr(`Photo de ${rabbit.name || rabbit.code || ''}`);
+  if (photo?.dataUrl) {
+    return `<img class="rabbit-thumb" src="${escapeAttr(photo.dataUrl)}" alt="${alt}" loading="lazy" style="width:${size}px;height:${size}px">`;
+  }
+  if (photo) {
+    return `<span class="rabbit-thumb rabbit-thumb--pending" title="Photo en attente de synchronisation" style="width:${size}px;height:${size}px">⏳</span>`;
+  }
+  // Fallback : emoji avec couleur dépendante du sexe pour différenciation rapide
+  const tone = rabbit.sex === 'F' ? 'rabbit-thumb--f'
+             : rabbit.sex === 'M' ? 'rabbit-thumb--m'
+             : '';
+  return `<span class="rabbit-thumb rabbit-thumb--ph ${tone}" style="width:${size}px;height:${size}px" aria-hidden="true">🐇</span>`;
+}
+
+// Utilitaire combiné : thumbnail + nom + code, pour les cellules d'une liste.
+export function rabbitThumbWithName(state, rabbit, { size = 28 } = {}) {
+  if (!rabbit) return '';
+  return `
+    <span class="rabbit-thumb-name" style="display:inline-flex;align-items:center;gap:6px">
+      ${rabbitThumbHTML(state, rabbit, { size })}
+      <span><strong>${escapeHTML(rabbit.name || '—')}</strong>${rabbit.code ? ` <span class="small muted">${escapeHTML(rabbit.code)}</span>` : ''}</span>
+    </span>`;
 }
 
 /**

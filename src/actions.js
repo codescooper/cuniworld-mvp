@@ -5,7 +5,7 @@ import { DB } from "./db.js";
 import { putPhotoData, deletePhotoData } from "./photoStorage.js";
 import { uploadPhotoToCloud, deletePhotoFromCloud } from "./photoCloudStorage.js";
 import { enqueueMutation } from "./mutationQueue.js";
-import { enqueuePhotoUpload } from "./photoUploadQueue.js";
+import { enqueuePhotoUpload, startPhotoUploadAutoRetry } from "./photoUploadQueue.js";
 import { photoLog } from "./photoDebug.js";
 import { defaultActor, resolvePerformedBy } from "./membersService.js";
 
@@ -303,6 +303,8 @@ async function _uploadAndSyncPhoto(ctx, photo) {
     // garantit que la ligne cloud n'apparaît qu'avec un `storagePath` valide.
     enqueuePhotoUpload({ farmId, rabbitId: photo.rabbitId, photoId: photo.id, localPhotoKey: photo.localPhotoKey }, err);
     ctx.updatePendingMutations?.();
+    // Relance immédiate du poller pour ne pas attendre le tick suivant.
+    startPhotoUploadAutoRetry(ctx, 30000);
   }
 }
 

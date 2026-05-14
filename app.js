@@ -11,7 +11,7 @@ import { hydrateAndMigratePhotos } from "./src/photoStorage.js";
 import { exportRabbitsCSV, exportEventsCSV } from "./src/csvExport.js";
 import { createSyncManager } from "./src/syncManager.js";
 import { getPendingMutationCount, replayMutationQueue } from "./src/mutationQueue.js";
-import { getPendingPhotoUploadCount, replayPhotoUploadQueue } from "./src/photoUploadQueue.js";
+import { getPendingPhotoUploadCount, replayPhotoUploadQueue, startPhotoUploadAutoRetry } from "./src/photoUploadQueue.js";
 import { showToast, showConfirm } from "./src/notifications.js";
 import { supabaseConfigured } from "./src/supabase.js";
 import {
@@ -641,6 +641,8 @@ async function initApp() {
     }
   } else {
     ctx.setSyncStatus("synced");
+    // Replay au démarrage + poller périodique : une photo locale doit
+    // systématiquement finir dans le cloud sans action manuelle.
     Promise.all([
       replayMutationQueue().catch(() => ({ remaining: 0, replayed: 0 })),
       replayPhotoUploadQueue(ctx).catch(() => ({ remaining: 0, replayed: 0 })),
@@ -648,6 +650,7 @@ async function initApp() {
       ctx.updatePendingMutations();
       if (pho.replayed > 0) ctx.render();
     });
+    startPhotoUploadAutoRetry(ctx, 30000);
     window.addEventListener("online", async () => {
       if (!ctx.farmId) return;
       const mut = await replayMutationQueue().catch(() => ({ remaining: 0, replayed: 0 }));
