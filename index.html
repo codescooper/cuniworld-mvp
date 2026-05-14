@@ -93,6 +93,11 @@
         <span class="nav-label">Statistiques</span>
         <span class="nav-badge" id="badge-stats"></span>
       </button>
+      <button class="nav-item" data-panel="orders" data-testid="nav-orders">
+        <span class="nav-icon">🛒</span>
+        <span class="nav-label">Commandes</span>
+        <span class="nav-badge" id="badge-orders"></span>
+      </button>
       <button class="nav-item" data-panel="actions" data-testid="nav-actions">
         <span class="nav-icon">⚙️</span>
         <span class="nav-label">Actions</span>
@@ -401,6 +406,24 @@
           <div class="section-card" style="margin-top:14px">
             <div style="font-weight:700;margin-bottom:8px">Sauvegardes locales</div>
             <div id="backupList" class="list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panneau : Commandes -->
+      <div class="section-panel" id="panel-orders" data-panel="orders">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-icon">🛒</span>
+            <span class="panel-title">Commandes</span>
+          </div>
+          <div class="panel-header-actions">
+            <button class="btn secondary" data-refresh-orders type="button">🔄 Actualiser</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="ordersContent" data-testid="orders-content">
+            <div class="muted">Chargement…</div>
           </div>
         </div>
       </div>

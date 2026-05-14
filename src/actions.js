@@ -50,6 +50,9 @@ export function addRabbit(ctx, data) {
     motherId:  data.motherId  || null,
     fatherId:  data.fatherId  || null,
     breedingOverride: data.breedingOverride || "auto",
+    forSale:   !!data.forSale,
+    salePrice: Number.isFinite(parseFloat(data.salePrice)) ? parseFloat(data.salePrice) : null,
+    shopDescription: (data.shopDescription || "").trim(),
     createdAt: nowISO(),
     updatedAt: nowISO(),
   };

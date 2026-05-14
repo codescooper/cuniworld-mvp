@@ -385,6 +385,9 @@ function rabbitFormHTML(rabbit=null, state=null) {
   const initialStage = (r.stage || "").trim();
   const hasBirthDate = !!((r.birthDate || "").trim());
   const stageFieldDisplay = hasBirthDate ? "none" : "";
+  const forSale = !!r.forSale;
+  const salePrice = r.salePrice ? String(r.salePrice) : "";
+  const shopDescription = r.shopDescription || "";
   return `
     <form id="rabbitForm" class="form">
       <div class="row2">
@@ -480,6 +483,23 @@ function rabbitFormHTML(rabbit=null, state=null) {
         </select>
       </div>
 
+      <div class="field" style="background:#fff8e8;border:1px solid #f0d28a;border-radius:8px;padding:10px">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer">
+          <input type="checkbox" name="forSale" id="forSaleToggle" ${forSale ? "checked" : ""}>
+          🏪 Mettre ce lapin en vente sur la boutique publique
+        </label>
+        <div id="forSaleFields" style="margin-top:8px;display:${forSale ? "block" : "none"}">
+          <div class="field">
+            <div class="label">Prix demandé <span class="muted small">(laisser vide pour calcul auto : poids × prix vif)</span></div>
+            <input class="input" name="salePrice" type="number" min="0" step="any" placeholder="ex: 12500" value="${escapeAttr(salePrice)}">
+          </div>
+          <div class="field">
+            <div class="label">Description boutique (visible des clients)</div>
+            <textarea class="input" name="shopDescription" rows="2" placeholder="Reproducteur sélectionné, vacciné, etc.">${escapeHTML(shopDescription)}</textarea>
+          </div>
+        </div>
+      </div>
+
       <div class="field">
         <div class="label">Notes</div>
         <textarea class="input" name="notes" placeholder="Observations...">${escapeHTML(r.notes || "")}</textarea>
@@ -526,6 +546,13 @@ function wireRabbitForm(ctx, existingRabbit) {
   birthDateInput?.addEventListener("input", refreshStageVisibility);
   birthDateInput?.addEventListener("change", refreshStageVisibility);
   refreshStageVisibility();
+
+  // Toggle des champs "À vendre" (prix, description boutique)
+  const forSaleToggle = document.getElementById("forSaleToggle");
+  const forSaleFields = document.getElementById("forSaleFields");
+  forSaleToggle?.addEventListener("change", () => {
+    if (forSaleFields) forSaleFields.style.display = forSaleToggle.checked ? "block" : "none";
+  });
 
   // ── Suggestion de nom ───────────────────────────────────────────────────────
   const nameInput  = document.getElementById("rabbitNameInput");
@@ -632,6 +659,17 @@ function wireRabbitForm(ctx, existingRabbit) {
     data.motherId = data.motherId || null;
     data.fatherId = data.fatherId || null;
     data.breedingOverride = data.breedingOverride || "auto";
+
+    // Champs boutique
+    data.forSale = !!(form.querySelector('input[name="forSale"]')?.checked);
+    if (data.forSale) {
+      const priceRaw = parseFloat(data.salePrice);
+      data.salePrice = Number.isFinite(priceRaw) && priceRaw > 0 ? priceRaw : null;
+      data.shopDescription = (data.shopDescription || "").toString().trim();
+    } else {
+      data.salePrice = null;
+      data.shopDescription = "";
+    }
 
     // Stade : requis quand pas de date de naissance. Quand une date est
     // fournie, on ne stocke pas de stage (laissé au calcul auto par utils.js).

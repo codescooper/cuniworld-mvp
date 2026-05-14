@@ -15,6 +15,7 @@ import { renderBuildings } from "./renderBuildings.js";
 import { getTodayRoundSummary } from "./roundService.js";
 import { formatPerformedBy } from "./membersService.js";
 import { renderSettings } from "./renderSettings.js";
+import { renderOrders } from "./renderOrders.js";
 
 
 
@@ -508,6 +509,9 @@ export function renderAll(ctx) {
   }
   if (active === 'settings') {
     try { renderSettings(ctx); } catch(e) { console.error("[renderSettings]", e); }
+  }
+  if (active === 'orders') {
+    try { renderOrders(ctx); } catch(e) { console.error("[renderOrders]", e); }
   }
 }
 

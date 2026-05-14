@@ -2694,3 +2694,176 @@ img.rabbit-thumb { padding: 0 }
 @media (max-width: 480px) {
   .app-version-footer { font-size: 10px; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 }
+
+/* ===== Boutique publique (shop) ===================================== */
+.shop-overlay {
+  position: fixed; inset: 0;
+  z-index: 5000;
+  background: linear-gradient(180deg, #f8f6ef 0%, #fff 100%);
+  overflow-y: auto;
+  font-family: var(--font-family, system-ui, sans-serif);
+}
+.shop-header {
+  background: var(--color-primary, #1a7a47);
+  color: #fff;
+  padding: 14px 20px;
+  position: sticky; top: 0; z-index: 10;
+  box-shadow: 0 1px 6px rgba(0,0,0,.12);
+}
+.shop-header-inner {
+  max-width: 1100px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.shop-logo { color: #fff; font-weight: 700; font-size: 1.1rem; text-decoration: none }
+.shop-nav { display: flex; gap: 16px; flex-wrap: wrap }
+.shop-nav a { color: #fff; text-decoration: none; opacity: .9 }
+.shop-nav a:hover { opacity: 1; text-decoration: underline }
+.shop-nav-back { font-size: .9rem }
+
+.shop-main { max-width: 1100px; margin: 0 auto; padding: 20px }
+.shop-section { padding: 20px 0 }
+.shop-title { font-size: 1.6rem; margin: 0 0 6px }
+.shop-desc { color: #555; max-width: 600px }
+.shop-muted { color: #888; font-size: .9rem }
+.shop-contacts { display: flex; gap: 12px; margin: 8px 0 16px; flex-wrap: wrap }
+.shop-contacts a {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 6px; background: #fff;
+  border: 1px solid #e0dccf; color: #1a7a47; text-decoration: none;
+}
+.shop-loading { padding: 60px 0; text-align: center; color: #888 }
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.shop-card {
+  background: #fff;
+  border: 1px solid #e0dccf;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  display: flex; flex-direction: column;
+}
+.shop-card:hover, .shop-card:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.10);
+  outline: none;
+}
+.shop-card-img {
+  aspect-ratio: 1;
+  background: #f5f3eb;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 3rem; color: #c4baa3;
+}
+.shop-card-img img { width: 100%; height: 100%; object-fit: cover; display: block }
+.shop-card-body { padding: 10px 12px 14px; flex: 1; display: flex; flex-direction: column; gap: 4px }
+.shop-card-name { margin: 0; font-size: 1.05rem }
+.shop-card-meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: .8rem; color: #666 }
+.shop-card-meta span {
+  background: #f5f3eb; padding: 2px 6px; border-radius: 4px;
+}
+.shop-card-farm { font-size: .8rem; color: #888; margin-top: 2px }
+.shop-card-price { font-weight: 700; color: #1a7a47; margin-top: 6px }
+.shop-card-price-tba { color: #888; font-weight: 500; font-size: .9rem }
+
+.shop-footer {
+  text-align: center; padding: 24px 12px; color: #888; font-size: .85rem;
+}
+
+/* ── Modal commande ── */
+.shop-modal-bg {
+  position: fixed; inset: 0; z-index: 6000;
+  background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.shop-modal {
+  background: #fff; border-radius: 14px;
+  max-width: 680px; width: 100%;
+  max-height: 92vh; overflow-y: auto;
+  padding: 24px;
+  position: relative;
+}
+.shop-modal-close {
+  position: absolute; top: 12px; right: 12px;
+  background: none; border: 0; font-size: 1.4rem; cursor: pointer;
+  line-height: 1;
+}
+.shop-modal-grid {
+  display: grid; grid-template-columns: 200px 1fr;
+  gap: 18px; margin-bottom: 18px;
+}
+.shop-modal-img {
+  background: #f5f3eb; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 4rem; color: #c4baa3;
+  aspect-ratio: 1;
+}
+.shop-modal-img img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px }
+.shop-modal-info h2 { margin: 0 0 4px }
+.shop-code { font-size: .85rem; color: #888; font-weight: normal }
+.shop-modal-desc { color: #555; min-height: 20px; margin: 8px 0 }
+.shop-modal-price { font-size: 1.4rem; font-weight: 700; color: #1a7a47; margin-top: 6px }
+.shop-modal-farm { font-size: .9rem; color: #666 }
+.shop-order-form { border-top: 1px solid #eee; padding-top: 18px }
+.shop-order-form h3 { margin: 0 0 4px }
+.shop-form-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px 14px; margin: 12px 0;
+}
+.shop-form-grid label, .shop-form-full {
+  display: flex; flex-direction: column;
+  font-size: .85rem; color: #444; gap: 4px;
+}
+.shop-form-full { margin-bottom: 12px }
+.shop-form-grid input, .shop-form-full input, .shop-form-full textarea {
+  border: 1px solid #cfc8b3; border-radius: 6px;
+  padding: 8px 10px; font-size: .95rem;
+  font-family: inherit;
+}
+.shop-form-actions {
+  display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;
+}
+.shop-btn-primary, .shop-btn-secondary {
+  padding: 10px 16px; border-radius: 8px; cursor: pointer; border: 0;
+  font-size: .95rem; font-weight: 600;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+}
+.shop-btn-primary { background: #1a7a47; color: #fff }
+.shop-btn-primary:hover { background: #155f37 }
+.shop-btn-primary:disabled { background: #888; cursor: not-allowed }
+.shop-btn-secondary { background: #f0ece0; color: #444 }
+.shop-btn-secondary:hover { background: #e6e1d0 }
+.shop-error { background: #fde7e1; color: #b9352e; padding: 8px 10px; border-radius: 6px; margin: 6px 0; font-size: .9rem }
+
+/* ── Suivi commande ── */
+.shop-track-steps {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 16px 0 24px; padding: 16px;
+  background: #f8f6ef; border-radius: 12px;
+}
+.shop-track-step {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 6px 10px;
+  opacity: .35;
+  font-size: .85rem;
+}
+.shop-track-step.done { opacity: .7 }
+.shop-track-step.active { opacity: 1; color: #1a7a47; font-weight: 700 }
+.shop-track-icon { font-size: 1.6rem }
+.shop-track-sep { color: #c4baa3 }
+.shop-track-card {
+  background: #fff; border: 1px solid #e0dccf; border-radius: 10px;
+  padding: 14px 16px; margin: 10px 0;
+}
+.shop-track-card h3 { margin: 0 0 6px; font-size: 1rem }
+.shop-track-card ul { padding-left: 18px; margin: 6px 0 }
+
+@media (max-width: 600px) {
+  .shop-modal-grid { grid-template-columns: 1fr }
+  .shop-form-grid { grid-template-columns: 1fr }
+}

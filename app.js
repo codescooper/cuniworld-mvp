@@ -28,10 +28,11 @@ import { openAddBuildingModal, openQuickSetupModal } from "./src/renderBuildings
 import { openSimulationModal, exitSimulation } from "./src/renderSimulation.js";
 import { openPhotoDiagnosticModal } from "./src/renderPhotoDiagnostic.js";
 import { isSimulationState } from "./src/simulation.js";
+import { bootShopView } from "./src/renderShop.js";
 
 const el = getEls();
 
-const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "batiments", "magasin", "stats", "actions", "settings", "aide"];
+const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "batiments", "magasin", "stats", "orders", "actions", "settings", "aide"];
 
 const ctx = {
   Store,
@@ -611,6 +612,11 @@ function wireSimulationBanner() {
 }
 
 async function initApp() {
+  // Mode boutique publique : si l'URL contient ?shop=…, on monte une vue
+  // dédiée et on n'initialise pas le reste de l'app (pas d'auth, pas de
+  // hooks). Permet l'accès anon pour les clients de la boutique.
+  if (await bootShopView()) return;
+
   registerServiceWorker().catch(() => {});
   wireBetaBanner();
   wireSimulationBanner();
