@@ -98,6 +98,11 @@
         <span class="nav-label">Actions</span>
         <span class="nav-badge" id="badge-actions"></span>
       </button>
+      <button class="nav-item" data-panel="settings" data-testid="nav-settings">
+        <span class="nav-icon">📐</span>
+        <span class="nav-label">Paramètres ferme</span>
+        <span class="nav-badge" id="badge-settings"></span>
+      </button>
       <button class="nav-item" data-panel="aide" data-testid="nav-aide">
         <span class="nav-icon">📖</span>
         <span class="nav-label">Documentation</span>
@@ -396,6 +401,21 @@
           <div class="section-card" style="margin-top:14px">
             <div style="font-weight:700;margin-bottom:8px">Sauvegardes locales</div>
             <div id="backupList" class="list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panneau : Paramètres ferme -->
+      <div class="section-panel" id="panel-settings" data-panel="settings">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-icon">📐</span>
+            <span class="panel-title">Paramètres ferme</span>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="settingsContent" data-testid="settings-content">
+            <div class="muted">Connectez-vous pour personnaliser votre ferme.</div>
           </div>
         </div>
       </div>

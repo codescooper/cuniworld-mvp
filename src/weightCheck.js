@@ -12,6 +12,7 @@ import { addEvent } from './actions.js';
 import { openModal } from './modal.js';
 import { sortByCage } from './cageSort.js';
 import { rabbitThumbHTML } from './photos.js';
+import { getSettings } from './settingsService.js';
 
 // ── Calcul des lapins à peser ────────────────────────────────────
 
@@ -41,7 +42,9 @@ export function getRabbitsDueForWeightCheck(state, thresholdHours = 48) {
 // ── Modal assisté ────────────────────────────────────────────────
 
 export function openWeightCheckModal(ctx) {
-  const due = getRabbitsDueForWeightCheck(ctx.state);
+  // Seuil paramétrable par ferme : Paramètres → Soins → Pesée en retard après X jours
+  const thresholdHours = (getSettings(ctx).weightCheckOverdueDays || 7) * 24;
+  const due = getRabbitsDueForWeightCheck(ctx.state, thresholdHours);
 
   if (due.length === 0) {
     openModal(ctx.el, 'Prise de poids', `

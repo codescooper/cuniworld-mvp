@@ -1,4 +1,5 @@
-import { escapeHTML, escapeAttr, formatDate, rabbitStatusBadge, sexLabel, daysBetween, getRabbitStage, stageBadge, estimateRabbitValue, formatFCFA, PRICE_LIVE_FCFA_PER_KG, PRICE_CARCASS_FCFA_PER_KG, CARCASS_YIELD } from "./utils.js";
+import { escapeHTML, escapeAttr, formatDate, rabbitStatusBadge, sexLabel, daysBetween, getRabbitStage, stageBadge } from "./utils.js";
+import { estimateRabbitValue, formatCurrency, getSettings } from "./settingsService.js";
 import { getReproInfo } from "./repro.js";
 import { getBreedingStatus, breedingStatusBadge } from "./breeding.js";
 import { getRabbitWeightHistory, getTotalHerdWeightEvolution, renderWeightSVG } from "./weightService.js";
@@ -13,6 +14,7 @@ import { renderStock } from "./renderStock.js";
 import { renderBuildings } from "./renderBuildings.js";
 import { getTodayRoundSummary } from "./roundService.js";
 import { formatPerformedBy } from "./membersService.js";
+import { renderSettings } from "./renderSettings.js";
 
 
 
@@ -26,7 +28,7 @@ export function renderDashboard(ctx) {
 
   const todayISO = new Date().toISOString().slice(0,10);
 
-  const { overdue, upcoming } = getReminders(state, { windowDays: 7 });
+  const { overdue, upcoming } = getReminders(state, { windowDays: getSettings(ctx).healthReminderWindowDays });
 
   const recent7 = state.events.filter(e => {
     const diff = daysBetween(e.date, todayISO);
@@ -47,7 +49,9 @@ export function renderDashboard(ctx) {
   let dailyTasksHTML = '';
   try { dailyTasksHTML = _renderDailyTasksCard(ctx); } catch (_) {}
 
-  // ── Évaluation FCFA du cheptel actif (dernière pesée connue par lapin) ─────
+  // ── Évaluation du cheptel actif (dernière pesée connue par lapin) ──
+  // Utilise les paramètres de la ferme : devise, prix vif/carcasse, rendement.
+  const settings = getSettings(ctx);
   let herdValueLive = 0;
   let herdValueCarcass = 0;
   let herdEvaluatedCount = 0;
@@ -56,7 +60,7 @@ export function renderDashboard(ctx) {
     const wHist = getRabbitWeightHistory(state, r.id);
     if (wHist.length === 0) continue;
     const lastW = wHist[wHist.length - 1].weightKg;
-    const v = estimateRabbitValue(lastW);
+    const v = estimateRabbitValue(lastW, settings);
     herdValueLive += v.live;
     herdValueCarcass += v.carcass;
     herdEvaluatedCount += 1;
@@ -74,11 +78,11 @@ export function renderDashboard(ctx) {
     <div class="tile"><div class="n">${overdue.length}</div><div class="t">Rappels en retard</div></div>
     <div class="tile"><div class="n">${state.rabbits.filter(r=>r.status==="mort").length}</div><div class="t">Morts</div></div>
     <div class="tile" title="Estimation à partir des dernières pesées (${herdEvaluatedCount}/${actifs} actifs)">
-      <div class="n" style="font-size:1.1rem">${formatFCFA(herdValueLive)}</div>
+      <div class="n" style="font-size:1.1rem">${formatCurrency(herdValueLive, settings)}</div>
       <div class="t">Valeur vif (cheptel)</div>
     </div>
-    <div class="tile" title="Estimation carcasse (${Math.round(CARCASS_YIELD * 100)}% × ${PRICE_CARCASS_FCFA_PER_KG.toLocaleString('fr-FR')}/kg)">
-      <div class="n" style="font-size:1.1rem">${formatFCFA(herdValueCarcass)}</div>
+    <div class="tile" title="Estimation carcasse (${Math.round(settings.carcassYield * 100)}% × ${settings.priceCarcassPerKg.toLocaleString('fr-FR')} ${settings.currencySymbol}/kg)">
+      <div class="n" style="font-size:1.1rem">${formatCurrency(herdValueCarcass, settings)}</div>
       <div class="t">Valeur carcasse</div>
     </div>
   ` + dailyTasksHTML + farmActionsHTML;
@@ -296,7 +300,7 @@ export function renderRabbitDetails(ctx) {
 
   // ── Poids individuel ────────────────────────────────────────────────────────
   const weightHistory = getRabbitWeightHistory(state, r.id);
-  const weightHTML    = _buildWeightSection(r, weightHistory, todayISO);
+  const weightHTML    = _buildWeightSection(r, weightHistory, todayISO, getSettings(ctx));
 
   const profilePhoto = getProfilePhoto(state, r.id);
   const allPhotos = getPhotoHistory(state, r.id);
@@ -502,9 +506,12 @@ export function renderAll(ctx) {
   if (active === 'batiments') {
     try { renderBuildings(ctx); } catch(e) { console.error("[renderBuildings]", e); }
   }
+  if (active === 'settings') {
+    try { renderSettings(ctx); } catch(e) { console.error("[renderSettings]", e); }
+  }
 }
 
-function _buildWeightSection(r, history, _todayISO) {
+function _buildWeightSection(r, history, _todayISO, _rabbitSettings) {
   const isActive = r.status === "actif";
   const points = history.map(w => ({ label: w.date, value: w.weightKg }));
   const current = history.length > 0 ? history[history.length - 1] : null;
@@ -523,13 +530,13 @@ function _buildWeightSection(r, history, _todayISO) {
       ? `${avgPerDay >= 0 ? "+" : ""}${(avgPerDay * 1000).toFixed(1)} g/j`
       : null;
 
-    const value = estimateRabbitValue(current.weightKg);
+    const value = estimateRabbitValue(current.weightKg, _rabbitSettings);
     const valueHTML = `
       <div class="sep"></div>
       <div style="font-weight:700;margin:8px 0 4px">💰 Évaluation</div>
       <div class="kv">
-        <div>Vif (${PRICE_LIVE_FCFA_PER_KG.toLocaleString('fr-FR')}/kg):</div><div><strong>${formatFCFA(value.live)}</strong></div>
-        <div>Carcasse estimée (${Math.round(CARCASS_YIELD * 100)}% × ${PRICE_CARCASS_FCFA_PER_KG.toLocaleString('fr-FR')}/kg):</div><div><strong>${formatFCFA(value.carcass)}</strong> <span class="small muted">(${value.carcassWeightKg.toFixed(2)} kg)</span></div>
+        <div>Vif (${_rabbitSettings.priceLivePerKg.toLocaleString('fr-FR')} ${_rabbitSettings.currencySymbol}/kg):</div><div><strong>${formatCurrency(value.live, _rabbitSettings)}</strong></div>
+        <div>Carcasse estimée (${Math.round(_rabbitSettings.carcassYield * 100)}% × ${_rabbitSettings.priceCarcassPerKg.toLocaleString('fr-FR')} ${_rabbitSettings.currencySymbol}/kg):</div><div><strong>${formatCurrency(value.carcass, _rabbitSettings)}</strong> <span class="small muted">(${value.carcassWeightKg.toFixed(2)} kg)</span></div>
       </div>`;
 
     statsHTML = `

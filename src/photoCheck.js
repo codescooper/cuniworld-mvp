@@ -8,6 +8,7 @@
  */
 
 import { getRabbitsDueForPhotoCheck as _getDue, getPhotoHistory, compressImage, rabbitThumbHTML } from './photos.js';
+import { getSettings } from './settingsService.js';
 import { daysBetween, formatDate, escapeHTML, escapeAttr } from './utils.js';
 import { addPhoto } from './actions.js';
 import { openModal } from './modal.js';
@@ -23,7 +24,8 @@ export { getRabbitsDueForPhotoCheck };
 // ── Modal parcours complet ────────────────────────────────────────
 
 export function openPhotoCheckModal(ctx) {
-  const due = getRabbitsDueForPhotoCheck(ctx.state);
+  const thresholdDays = getSettings(ctx).photoCheckOverdueDays || 7;
+  const due = getRabbitsDueForPhotoCheck(ctx.state, thresholdDays);
 
   if (due.length === 0) {
     openModal(ctx.el, 'Prise de photo', `

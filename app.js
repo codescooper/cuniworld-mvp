@@ -7,6 +7,7 @@ import { GUIDE_STEPS, getGuideStep, getNextStep, getPrevStep } from "./src/guide
 import { openWeightCheckModal } from "./src/weightCheck.js";
 import { openPhotoCheckModal } from "./src/photoCheck.js";
 import { getReminders } from "./src/health.js";
+import { getSettings } from "./src/settingsService.js";
 import { hydrateAndMigratePhotos } from "./src/photoStorage.js";
 import { exportRabbitsCSV, exportEventsCSV } from "./src/csvExport.js";
 import { createSyncManager } from "./src/syncManager.js";
@@ -30,7 +31,7 @@ import { isSimulationState } from "./src/simulation.js";
 
 const el = getEls();
 
-const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "batiments", "magasin", "stats", "actions", "aide"];
+const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "batiments", "magasin", "stats", "actions", "settings", "aide"];
 
 const ctx = {
   Store,
@@ -41,6 +42,8 @@ const ctx = {
   currentUser: null,
   farmMembers: null,   // liste des membres pour les sélecteurs "Effectué par"
   myProfile:   null,   // { firstName, lastName } de l'utilisateur connecté
+  myRole:      null,   // rôle du user dans la ferme courante (owner/admin/member/viewer)
+  farmSettings: null,  // paramètres personnalisés de la ferme (DEFAULT_SETTINGS si absent)
   syncStatus: "local",
   selectedRabbitId:     null,
   selectedLotId:        null,
@@ -110,7 +113,7 @@ ctx.navigate = (panel) => setActivePanel(panel);
 
 function updateNavBadges(ctx) {
   try {
-    const { overdue } = getReminders(ctx.state, { windowDays: 7 });
+    const { overdue } = getReminders(ctx.state, { windowDays: getSettings(ctx).healthReminderWindowDays });
     const badge = document.getElementById("badge-dashboard");
     if (badge) badge.textContent = overdue.length > 0 ? String(overdue.length) : "";
   } catch (_) {}

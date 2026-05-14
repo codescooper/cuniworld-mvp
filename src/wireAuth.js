@@ -8,6 +8,7 @@ import { showToast, showConfirm } from './notifications.js';
 import { fetchFarmMembers } from './membersService.js';
 import { getMyProfile, saveMyProfile } from './profileService.js';
 import { openModal, closeModal } from './modal.js';
+import { loadFarmSettings, DEFAULT_SETTINGS } from './settingsService.js';
 
 function escAttr(s) { return String(s).replace(/"/g, '&quot;'); }
 
@@ -288,13 +289,22 @@ async function _loadFarm(farmId, farmName, ctx, onReady, isNew = false) {
     ctx.state = _mergeLocalFields(farmState, preLoadLocal);
     await hydrateAndMigratePhotos(ctx.state, farmId);
 
-    // Charge mon profil + la liste des membres pour les sélecteurs "Effectué par".
-    // Échec silencieux : on garde l'utilisateur courant comme seul membre.
+    // Charge mon profil + la liste des membres + les paramètres ferme.
+    // Échec silencieux : on garde l'utilisateur courant comme seul membre
+    // et les DEFAULT_SETTINGS si la table n'existe pas encore.
     Promise.all([
       getMyProfile(ctx.currentUser?.id).then(p => { ctx.myProfile = p; }).catch(() => {}),
       fetchFarmMembers(farmId, ctx.currentUser?.id)
-        .then(members => { ctx.farmMembers = members; })
+        .then(members => {
+          ctx.farmMembers = members;
+          // Déduit mon rôle depuis la liste des membres.
+          const me = members?.find(m => m.userId === ctx.currentUser?.id);
+          ctx.myRole = me?.role || 'member';
+        })
         .catch(() => { ctx.farmMembers = null; }),
+      loadFarmSettings(farmId)
+        .then(s => { ctx.farmSettings = s; })
+        .catch(() => { ctx.farmSettings = { ...DEFAULT_SETTINGS }; }),
     ]).then(() => ctx.render?.());
 
     if (isNew) await _offerMigration(ctx);
