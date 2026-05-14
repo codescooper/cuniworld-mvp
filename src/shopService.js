@@ -161,6 +161,23 @@ export async function setOrderStatus(orderId, status) {
   if (error) throw error;
 }
 
+// ── Compte des commandes en attente (réservées + payées + en route) ─────────
+// Léger : compte uniquement, pour le badge nav. Polled à intervalle régulier.
+export async function countPendingOrders(farmId) {
+  if (!farmId) return 0;
+  try {
+    const { count, error } = await supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('farm_id', farmId)
+      .in('status', ['reserve', 'paye', 'en_route']);
+    if (error) throw error;
+    return count || 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
 // ── Côté éleveur : récupérer toutes les commandes de la ferme ───────────────
 export async function listFarmOrders(farmId) {
   const { data: orders, error } = await supabase

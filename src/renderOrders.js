@@ -6,6 +6,7 @@ import { formatCurrency, getSettings } from './settingsService.js';
 import { listFarmOrders, setOrderStatus, ORDER_STATUSES, getStatusLabel } from './shopService.js';
 import { showToast, showConfirm } from './notifications.js';
 import { can } from './permissions.js';
+import { addEvent } from './actions.js';
 
 let _cache = { farmId: null, orders: null, at: 0 };
 const CACHE_TTL = 30000;
@@ -74,14 +75,38 @@ export async function renderOrders(ctx) {
     renderOrders(ctx);
   }));
 
+  // Copy + share helpers (boutique)
+  host.querySelectorAll('[data-copy-link]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const link = btn.dataset.copyLink;
+      try {
+        await navigator.clipboard.writeText(link);
+        showToast('Lien copié dans le presse-papier.', 'success');
+      } catch (_) {
+        showToast(link, 'info');
+      }
+    });
+  });
+  host.querySelectorAll('[data-share-shop]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const url = btn.dataset.shareShop;
+      const title = `Boutique CuniWorld — ${ctx.farmName || ''}`;
+      const text = `Découvrez les lapins en vente : ${url}`;
+      if (navigator.share) {
+        try { await navigator.share({ title, text, url }); return; } catch (_) { /* user cancelled */ }
+      }
+      try { await navigator.clipboard.writeText(url); showToast('Lien copié.', 'success'); }
+      catch (_) { showToast(url, 'info'); }
+    });
+  });
+
   // Transitions
   host.querySelectorAll('[data-order-action]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const orderId = btn.dataset.orderId;
       const action  = btn.dataset.orderAction;
       let confirmMsg = null;
-      if (action === 'annule') confirmMsg = 'Annuler cette commande ? Les lapins redeviendront disponibles.';
-      if (action === 'livre')  confirmMsg = 'Marquer comme livrée ? Vous pourrez ensuite enregistrer la vente sur chaque lapin.';
+      if (action === 'annule') confirmMsg = 'Annuler cette commande ? Les lapins redeviendront disponibles dans la boutique.';
       if (confirmMsg) {
         const ok = await showConfirm({
           title: 'Confirmation', message: confirmMsg,
@@ -90,8 +115,18 @@ export async function renderOrders(ctx) {
         });
         if (!ok) return;
       }
+
       try {
         await setOrderStatus(orderId, action);
+
+        // Auto-vente : à la livraison, on propose de fermer la boucle en
+        // enregistrant l'événement vente sur chaque lapin (passage en "vendu"
+        // + prix capturé). Si l'utilisateur refuse, on garde juste le statut.
+        if (action === 'livre') {
+          const order = (_cache.orders || []).find(o => o.id === orderId);
+          await _autoCreateSaleEvents(ctx, order);
+        }
+
         _cache = { farmId: null, orders: null, at: 0 };
         showToast('Statut mis à jour.', 'success');
         renderOrders(ctx);
@@ -102,19 +137,81 @@ export async function renderOrders(ctx) {
   });
 }
 
-function _shopLinks(ctx) {
+// ── Auto-vente : crée un événement vente pour chaque lapin de la commande ──
+async function _autoCreateSaleEvents(ctx, order) {
+  if (!order || !Array.isArray(order.items) || order.items.length === 0) return;
+  const cust = order.data?.customer || {};
+  const items = order.items.filter(it => it.rabbit_id);
+  if (items.length === 0) return;
+
+  // Filtre : ne propose la vente que pour les lapins encore "actif".
+  const eligibles = items.filter(it => {
+    const r = ctx.state.rabbits.find(rb => rb.id === it.rabbit_id);
+    return r && r.status === 'actif';
+  });
+  if (eligibles.length === 0) return;
+
+  const labels = eligibles.map(it => {
+    const r = ctx.state.rabbits.find(rb => rb.id === it.rabbit_id);
+    return `• ${r?.name || it.rabbit_id} (${it.unit_price || 0})`;
+  }).join('\n');
+
+  const ok = await showConfirm({
+    title: 'Enregistrer la vente ?',
+    message: `Marquer ces lapins comme vendus et enregistrer l'événement vente ?\n\n${labels}\n\nClient : ${cust.name || '—'}`,
+    confirmLabel: 'Oui, enregistrer la vente',
+    cancelLabel: 'Plus tard',
+  });
+  if (!ok) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  for (const it of eligibles) {
+    try {
+      addEvent(ctx, it.rabbit_id, {
+        type: 'vente',
+        date: today,
+        notes: `Commande #${order.id.slice(0, 8)} · ${cust.name || ''}`.trim(),
+        data: {
+          price:  Number(it.unit_price) || 0,
+          client: cust.name || '',
+        },
+      });
+    } catch (err) {
+      console.warn('[orders] auto-sale failed for', it.rabbit_id, err?.message || err);
+    }
+  }
+}
+
+export function _shopLinks(ctx) {
   const base = window.location.origin + window.location.pathname.replace(/\/$/, '');
   const farmLink = `${base}?shop=${ctx.farmId}`;
   const allLink  = `${base}?shop=all`;
+  const waMsg = `Bonjour, voici la boutique en ligne de ma ferme ${ctx.farmName || ''} : ${farmLink}`;
+  const waUrl = `https://wa.me/?text=${encodeURIComponent(waMsg)}`;
+  // QR code via service externe (pas de dépendance JS). Aperçu image légère.
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=${encodeURIComponent(farmLink)}`;
   return `
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <div class="small">Boutique de cette ferme :</div>
-      <a href="${escapeAttr(farmLink)}" target="_blank" rel="noopener" style="word-break:break-all">${escapeHTML(farmLink)}</a>
-      <button class="btn ghost" data-copy-link="${escapeAttr(farmLink)}" type="button">📋 Copier</button>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
-      <div class="small">Catalogue global :</div>
-      <a href="${escapeAttr(allLink)}" target="_blank" rel="noopener" style="word-break:break-all">${escapeHTML(allLink)}</a>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
+      <div style="flex:1;min-width:240px">
+        <div style="font-weight:700;margin-bottom:6px">📤 Partager ma boutique</div>
+        <div style="font-size:.85rem;color:#555;margin-bottom:8px">
+          Lien direct vers votre catalogue de lapins en vente. À partager par message, à imprimer en QR sur une carte de visite, etc.
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          <a class="btn" href="${escapeAttr(farmLink)}" target="_blank" rel="noopener">🏪 Ouvrir la boutique</a>
+          <button class="btn secondary" type="button" data-copy-link="${escapeAttr(farmLink)}">📋 Copier le lien</button>
+          <button class="btn secondary" type="button" data-share-shop="${escapeAttr(farmLink)}">📲 Partager…</button>
+          <a class="btn secondary" href="${escapeAttr(waUrl)}" target="_blank" rel="noopener">💬 WhatsApp</a>
+        </div>
+        <div style="font-family:monospace;font-size:.8rem;background:#f5f3eb;padding:6px 8px;border-radius:6px;word-break:break-all">${escapeHTML(farmLink)}</div>
+        <div style="margin-top:6px;font-size:.8rem;color:#888">
+          Catalogue toutes fermes : <a href="${escapeAttr(allLink)}" target="_blank" rel="noopener">${escapeHTML(allLink)}</a>
+        </div>
+      </div>
+      <div style="text-align:center">
+        <img src="${escapeAttr(qrUrl)}" alt="QR code boutique" style="width:140px;height:140px;border:1px solid #e0dccf;border-radius:8px;background:#fff;padding:4px" loading="lazy">
+        <div class="small muted" style="margin-top:4px">QR code à imprimer</div>
+      </div>
     </div>
   `;
 }

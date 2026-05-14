@@ -8,6 +8,7 @@ import { openWeightCheckModal } from "./src/weightCheck.js";
 import { openPhotoCheckModal } from "./src/photoCheck.js";
 import { getReminders } from "./src/health.js";
 import { getSettings } from "./src/settingsService.js";
+import { countPendingOrders } from "./src/shopService.js";
 import { hydrateAndMigratePhotos } from "./src/photoStorage.js";
 import { exportRabbitsCSV, exportEventsCSV } from "./src/csvExport.js";
 import { createSyncManager } from "./src/syncManager.js";
@@ -118,6 +119,26 @@ function updateNavBadges(ctx) {
     const badge = document.getElementById("badge-dashboard");
     if (badge) badge.textContent = overdue.length > 0 ? String(overdue.length) : "";
   } catch (_) {}
+
+  // Badge commandes en attente (poll au moment du render)
+  const ordersBadge = document.getElementById("badge-orders");
+  if (ordersBadge) {
+    if (!ctx.farmId) {
+      ordersBadge.textContent = "";
+    } else {
+      // Throttle : on rafraîchit au max toutes les 20 s pour ne pas spammer Supabase.
+      const now = Date.now();
+      if (!ctx._lastPendingOrdersAt || now - ctx._lastPendingOrdersAt > 20000) {
+        ctx._lastPendingOrdersAt = now;
+        countPendingOrders(ctx.farmId).then(n => {
+          ctx._pendingOrdersCount = n;
+          const b = document.getElementById("badge-orders");
+          if (b) b.textContent = n > 0 ? String(n) : "";
+        }).catch(() => {});
+      }
+      ordersBadge.textContent = ctx._pendingOrdersCount > 0 ? String(ctx._pendingOrdersCount) : "";
+    }
+  }
 }
 
 function updateBuildingsBadge(ctx) {
@@ -432,6 +453,32 @@ function wireExtra() {
   });
 
   document.getElementById("moreTournee")?.addEventListener("click", () => openTourneeModal(ctx));
+
+  // Ouvrir la boutique publique de la ferme dans un nouvel onglet
+  document.getElementById("moreShopOpen")?.addEventListener("click", () => {
+    if (!ctx.farmId) {
+      showToast("Connectez-vous à une ferme cloud pour utiliser la boutique.", "info");
+      return;
+    }
+    const base = window.location.origin + window.location.pathname.replace(/\/$/, '');
+    window.open(`${base}?shop=${ctx.farmId}`, '_blank', 'noopener');
+  });
+
+  // Partager : utilise Web Share API si dispo, sinon copie le lien
+  document.getElementById("moreShopShare")?.addEventListener("click", async () => {
+    if (!ctx.farmId) {
+      showToast("Connectez-vous à une ferme cloud pour partager.", "info");
+      return;
+    }
+    const base = window.location.origin + window.location.pathname.replace(/\/$/, '');
+    const url  = `${base}?shop=${ctx.farmId}`;
+    const text = `Découvrez les lapins en vente chez ${ctx.farmName || 'ma ferme'} : ${url}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Ma boutique', text, url }); return; } catch (_) { /* annulé */ }
+    }
+    try { await navigator.clipboard.writeText(url); showToast("Lien copié.", "success"); }
+    catch (_) { showToast(url, "info"); }
+  });
   document.getElementById("btnAddStock")?.addEventListener("click", () => openAddStockModal(ctx));
   document.getElementById("btnAddBuilding")?.addEventListener("click", () => openAddBuildingModal(ctx));
   document.getElementById("btnQuickSetup")?.addEventListener("click", () => openQuickSetupModal(ctx));
