@@ -6,6 +6,8 @@ import { escapeHTML } from './utils.js';
 import { hydrateAndMigratePhotos } from './photoStorage.js';
 import { showToast, showConfirm } from './notifications.js';
 import { fetchFarmMembers } from './membersService.js';
+import { getMyProfile, saveMyProfile } from './profileService.js';
+import { openModal, closeModal } from './modal.js';
 
 function escAttr(s) { return String(s).replace(/"/g, '&quot;'); }
 
@@ -286,11 +288,14 @@ async function _loadFarm(farmId, farmName, ctx, onReady, isNew = false) {
     ctx.state = _mergeLocalFields(farmState, preLoadLocal);
     await hydrateAndMigratePhotos(ctx.state, farmId);
 
-    // Charge la liste des membres pour les sélecteurs "Effectué par".
+    // Charge mon profil + la liste des membres pour les sélecteurs "Effectué par".
     // Échec silencieux : on garde l'utilisateur courant comme seul membre.
-    fetchFarmMembers(farmId, ctx.currentUser?.id)
-      .then(members => { ctx.farmMembers = members; ctx.render?.(); })
-      .catch(() => { ctx.farmMembers = null; });
+    Promise.all([
+      getMyProfile(ctx.currentUser?.id).then(p => { ctx.myProfile = p; }).catch(() => {}),
+      fetchFarmMembers(farmId, ctx.currentUser?.id)
+        .then(members => { ctx.farmMembers = members; })
+        .catch(() => { ctx.farmMembers = null; }),
+    ]).then(() => ctx.render?.());
 
     if (isNew) await _offerMigration(ctx);
 
@@ -428,6 +433,13 @@ function _updateTopbar(ctx, onReady) {
           <span class="user-dropdown-email">${escapeHTML(ctx.currentUser?.email || '')}</span>
         </div>
         <div class="user-dropdown-divider"></div>
+        <button class="user-dropdown-item" id="ddEditProfile">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+            <circle cx="7.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M2.5 13c0-2.5 2.2-4.5 5-4.5s5 2 5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          Mon profil (prénom / nom)
+        </button>
         <button class="user-dropdown-item" id="ddSwitchFarm">
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
             <path d="M2.5 5.5h10M2.5 9.5h10M9.5 2.5l3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
@@ -488,6 +500,12 @@ function _updateTopbar(ctx, onReady) {
   document.addEventListener('click', onDocClick);
   document.addEventListener('keydown', onDocKey);
 
+  // Mon profil
+  document.getElementById('ddEditProfile')?.addEventListener('click', () => {
+    closeDropdown();
+    _openProfileModal(ctx);
+  });
+
   // Switch farm
   document.getElementById('ddSwitchFarm')?.addEventListener('click', async () => {
     closeDropdown();
@@ -511,6 +529,52 @@ function _updateTopbar(ctx, onReady) {
     document.removeEventListener('click', onDocClick);
     document.removeEventListener('keydown', onDocKey);
   };
+}
+
+// ── Modale "Mon profil" : prénom + nom (synchronisé via la table profiles) ──
+function _openProfileModal(ctx) {
+  const me = ctx.myProfile || { firstName: '', lastName: '' };
+  openModal(ctx.el, 'Mon profil', `
+    <form id="profileForm" class="form">
+      <div class="row2">
+        <div class="field">
+          <div class="label">Prénom</div>
+          <input class="input" name="firstName" placeholder="ex: Marie" value="${escapeHTML(me.firstName || '')}" />
+        </div>
+        <div class="field">
+          <div class="label">Nom</div>
+          <input class="input" name="lastName" placeholder="ex: Diop" value="${escapeHTML(me.lastName || '')}" />
+        </div>
+      </div>
+      <p class="small muted" style="margin-top:8px">
+        Ce nom apparaît dans le sélecteur « Effectué par » des autres membres de la ferme.
+      </p>
+      <div class="row" style="justify-content:flex-end;margin-top:12px">
+        <button type="button" class="btn secondary" id="profileCancel">Annuler</button>
+        <button type="submit" class="btn">Enregistrer</button>
+      </div>
+    </form>
+  `);
+
+  document.getElementById('profileCancel')?.addEventListener('click', () => closeModal(ctx.el));
+  document.getElementById('profileForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const profile = await saveMyProfile(ctx.currentUser?.id, {
+      firstName: fd.get('firstName'),
+      lastName:  fd.get('lastName'),
+    });
+    ctx.myProfile = profile;
+    // Recharge la liste des membres pour mettre à jour le libellé partout.
+    if (ctx.farmId) {
+      fetchFarmMembers(ctx.farmId, ctx.currentUser?.id)
+        .then(members => { ctx.farmMembers = members; ctx.render?.(); })
+        .catch(() => {});
+    }
+    closeModal(ctx.el);
+    showToast('Profil enregistré.', 'success');
+    ctx.render?.();
+  });
 }
 
 // Fallback quand le clipboard est bloqué : modale avec texte sélectionnable

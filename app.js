@@ -40,6 +40,7 @@ const ctx = {
   farmName:   null,
   currentUser: null,
   farmMembers: null,   // liste des membres pour les sélecteurs "Effectué par"
+  myProfile:   null,   // { firstName, lastName } de l'utilisateur connecté
   syncStatus: "local",
   selectedRabbitId:     null,
   selectedLotId:        null,

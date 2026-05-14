@@ -1,4 +1,4 @@
-import { escapeHTML, escapeAttr, formatDate, rabbitStatusBadge, sexLabel, daysBetween, getRabbitStage, stageBadge } from "./utils.js";
+import { escapeHTML, escapeAttr, formatDate, rabbitStatusBadge, sexLabel, daysBetween, getRabbitStage, stageBadge, estimateRabbitValue, formatFCFA, PRICE_LIVE_FCFA_PER_KG, PRICE_CARCASS_FCFA_PER_KG, CARCASS_YIELD } from "./utils.js";
 import { getReproInfo } from "./repro.js";
 import { getBreedingStatus, breedingStatusBadge } from "./breeding.js";
 import { getRabbitWeightHistory, getTotalHerdWeightEvolution, renderWeightSVG } from "./weightService.js";
@@ -47,6 +47,21 @@ export function renderDashboard(ctx) {
   let dailyTasksHTML = '';
   try { dailyTasksHTML = _renderDailyTasksCard(ctx); } catch (_) {}
 
+  // ── Évaluation FCFA du cheptel actif (dernière pesée connue par lapin) ─────
+  let herdValueLive = 0;
+  let herdValueCarcass = 0;
+  let herdEvaluatedCount = 0;
+  for (const r of state.rabbits) {
+    if (r.status !== 'actif') continue;
+    const wHist = getRabbitWeightHistory(state, r.id);
+    if (wHist.length === 0) continue;
+    const lastW = wHist[wHist.length - 1].weightKg;
+    const v = estimateRabbitValue(lastW);
+    herdValueLive += v.live;
+    herdValueCarcass += v.carcass;
+    herdEvaluatedCount += 1;
+  }
+
   // KPI tiles d'abord (vue d'ensemble immédiate), actions ferme ensuite (déroulables).
   el.dash.innerHTML = `
     <div class="tile"><div class="n">${total}</div><div class="t">Lapins (total)</div></div>
@@ -58,6 +73,14 @@ export function renderDashboard(ctx) {
     <div class="tile"><div class="n">${upcoming.length}</div><div class="t">Rappels (≤7j)</div></div>
     <div class="tile"><div class="n">${overdue.length}</div><div class="t">Rappels en retard</div></div>
     <div class="tile"><div class="n">${state.rabbits.filter(r=>r.status==="mort").length}</div><div class="t">Morts</div></div>
+    <div class="tile" title="Estimation à partir des dernières pesées (${herdEvaluatedCount}/${actifs} actifs)">
+      <div class="n" style="font-size:1.1rem">${formatFCFA(herdValueLive)}</div>
+      <div class="t">Valeur vif (cheptel)</div>
+    </div>
+    <div class="tile" title="Estimation carcasse (${Math.round(CARCASS_YIELD * 100)}% × ${PRICE_CARCASS_FCFA_PER_KG.toLocaleString('fr-FR')}/kg)">
+      <div class="n" style="font-size:1.1rem">${formatFCFA(herdValueCarcass)}</div>
+      <div class="t">Valeur carcasse</div>
+    </div>
   ` + dailyTasksHTML + farmActionsHTML;
 
   // Liste mise-bas bientôt
@@ -498,13 +521,22 @@ function _buildWeightSection(r, history, _todayISO) {
       ? `${avgPerDay >= 0 ? "+" : ""}${(avgPerDay * 1000).toFixed(1)} g/j`
       : null;
 
+    const value = estimateRabbitValue(current.weightKg);
+    const valueHTML = `
+      <div class="sep"></div>
+      <div style="font-weight:700;margin:8px 0 4px">💰 Évaluation</div>
+      <div class="kv">
+        <div>Vif (${PRICE_LIVE_FCFA_PER_KG.toLocaleString('fr-FR')}/kg):</div><div><strong>${formatFCFA(value.live)}</strong></div>
+        <div>Carcasse estimée (${Math.round(CARCASS_YIELD * 100)}% × ${PRICE_CARCASS_FCFA_PER_KG.toLocaleString('fr-FR')}/kg):</div><div><strong>${formatFCFA(value.carcass)}</strong> <span class="small muted">(${value.carcassWeightKg.toFixed(2)} kg)</span></div>
+      </div>`;
+
     statsHTML = `
       <div class="kv" style="margin-bottom:10px">
         <div>Poids actuel:</div><div><strong>${current.weightKg.toFixed(3)} kg</strong></div>
         ${gainStr ? `<div>Gain total:</div><div>${gainStr}</div>` : ""}
         ${avgStr  ? `<div>Gain moyen:</div><div>${avgStr}</div>` : ""}
         <div>Pesées enregistrées:</div><div>${history.length}</div>
-      </div>`;
+      </div>${valueHTML}`;
   }
 
   // Historique condensé (max 5 dernières pesées)

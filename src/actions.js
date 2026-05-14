@@ -186,7 +186,34 @@ export function addEvent(ctx, rabbitId, data) {
   ctx.state.events.unshift(ev);
   applyEventSideEffects(ctx, ev);
   persist(ctx);
-  if (fid(ctx)) trackCloudWrite(ctx, DB.upsertEvent(fid(ctx), ev), { type: "upsertEvent", payload: { farmId: fid(ctx), event: ev } });
+  const farmId = fid(ctx);
+  if (farmId) {
+    trackCloudWrite(ctx, DB.upsertEvent(farmId, ev), { type: "upsertEvent", payload: { farmId, event: ev } });
+
+    // applyEventSideEffects peut muter le statut du lapin (décès → mort,
+    // vente → vendu) ou créer/modifier des lapereaux (mise_bas/sevrage).
+    // Sans upsert de ces lapins, le cloud garde l'ancien état et l'écrase
+    // au prochain sync. On pousse donc tous les lapins touchés.
+    const touched = new Set([rabbitId]);
+    if (ev.type === "mise_bas") {
+      for (const k of ctx.state.rabbits) {
+        if (k.litterId === ev.id) touched.add(k.id);
+      }
+    }
+    if (ev.type === "sevrage" && ev.data?.litterId) {
+      for (const k of ctx.state.rabbits) {
+        if (k.litterId === ev.data.litterId) touched.add(k.id);
+      }
+    }
+    for (const rid of touched) {
+      const rabbit = ctx.state.rabbits.find(r => r.id === rid);
+      if (!rabbit) continue;
+      trackCloudWrite(ctx, DB.upsertRabbit(farmId, rabbit), {
+        type: "upsertRabbit",
+        payload: { farmId, rabbit },
+      });
+    }
+  }
   ctx.render();
   return ev;
 }

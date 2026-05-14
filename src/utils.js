@@ -77,6 +77,31 @@ export function stageBadge(stage) {
   return `<span class="badge ${klass}">Stage: ${label}</span>`;
 }
 
+// Prix de référence pour l'évaluation du cheptel (FCFA).
+//   - Vif    : 6 000 FCFA / kg de poids vif
+//   - Carcasse : 5 000 FCFA / kg de carcasse, avec rendement moyen ~55 %
+//     (la viande utile représente en général 50–60 % du poids vif chez le lapin).
+export const PRICE_LIVE_FCFA_PER_KG    = 6000;
+export const PRICE_CARCASS_FCFA_PER_KG = 5000;
+export const CARCASS_YIELD             = 0.55;
+
+// Renvoie l'évaluation FCFA d'un lapin à partir de son poids vif courant.
+// `weightKg` <= 0 ou non fini → 0.
+export function estimateRabbitValue(weightKg) {
+  const w = Number(weightKg);
+  if (!Number.isFinite(w) || w <= 0) return { live: 0, carcass: 0, carcassWeightKg: 0 };
+  const live = Math.round(w * PRICE_LIVE_FCFA_PER_KG);
+  const carcassWeightKg = w * CARCASS_YIELD;
+  const carcass = Math.round(carcassWeightKg * PRICE_CARCASS_FCFA_PER_KG);
+  return { live, carcass, carcassWeightKg };
+}
+
+// Formate un montant FCFA avec séparateur d'espace (ex: 12 500 FCFA).
+export function formatFCFA(amount) {
+  const n = Math.round(Number(amount) || 0);
+  return `${n.toLocaleString('fr-FR').replace(/,/g, ' ')} FCFA`;
+}
+
 export function generateRabbitCode(state, sex) {
   const normalized = sex === "F" || sex === "M" ? sex : "U";
   const prefix = `CW-${normalized}`;

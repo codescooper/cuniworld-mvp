@@ -3,6 +3,7 @@
 // en local, on n'a qu'un seul "membre" virtuel (marqué `local`).
 
 import { supabase } from './supabase.js';
+import { formatMemberName } from './profileService.js';
 
 const CACHE_KEY_PREFIX = 'cuniworld_farm_members_';
 
@@ -11,17 +12,27 @@ const CACHE_KEY_PREFIX = 'cuniworld_farm_members_';
 export async function fetchFarmMembers(farmId, currentUserId) {
   if (!farmId) return _localFallback();
 
-  // 1. Essayer le RPC dédié (expose les emails via SECURITY DEFINER).
+  // 1. Essayer le RPC dédié (expose les emails via SECURITY DEFINER, et
+  //    depuis la migration 007 aussi les prénom/nom du profil).
   try {
     const { data, error } = await supabase.rpc('get_farm_members', { p_farm_id: farmId });
     if (!error && Array.isArray(data) && data.length > 0) {
-      const members = data.map(r => ({
-        userId: r.user_id,
-        email:  r.email || '',
-        role:   r.role || 'member',
-        label:  r.email || r.user_id,
-        isMe:   r.user_id === currentUserId,
-      }));
+      const members = data.map(r => {
+        const firstName = r.first_name || '';
+        const lastName  = r.last_name  || '';
+        const email     = r.email || '';
+        const label = formatMemberName({ firstName, lastName, email })
+          || r.user_id || 'Membre';
+        return {
+          userId: r.user_id,
+          email,
+          firstName,
+          lastName,
+          role:   r.role || 'member',
+          label,
+          isMe:   r.user_id === currentUserId,
+        };
+      });
       _persistCache(farmId, members);
       return members;
     }
@@ -78,9 +89,22 @@ function _readCache(farmId) {
 // membre connecté. `null` retourné quand on n'a aucune identité (offline pur).
 export function defaultActor(ctx) {
   if (ctx.farmId && ctx.currentUser) {
+    // Si on a chargé la liste des membres avec leurs profils, on utilise le
+    // libellé "Prénom Nom (email)" — sinon fallback sur l'email seul.
+    const me = Array.isArray(ctx.farmMembers)
+      ? ctx.farmMembers.find(m => m.userId === ctx.currentUser.id)
+      : null;
+    const label = me?.label
+      || formatMemberName({
+        firstName: ctx.myProfile?.firstName || '',
+        lastName:  ctx.myProfile?.lastName  || '',
+        email:     ctx.currentUser.email || '',
+      })
+      || ctx.currentUser.email
+      || 'Moi';
     return {
       userId: ctx.currentUser.id,
-      label:  ctx.currentUser.email || 'Moi',
+      label,
     };
   }
   return { userId: null, label: 'local' };
@@ -94,12 +118,19 @@ export function membersForSelect(ctx) {
       return ctx.farmMembers;
     }
     if (ctx.currentUser) {
+      const label = formatMemberName({
+        firstName: ctx.myProfile?.firstName || '',
+        lastName:  ctx.myProfile?.lastName  || '',
+        email:     ctx.currentUser.email || '',
+      }) || ctx.currentUser.email || 'Moi';
       return [{
-        userId: ctx.currentUser.id,
-        email:  ctx.currentUser.email || '',
-        role:   'member',
-        label:  ctx.currentUser.email || 'Moi',
-        isMe:   true,
+        userId:    ctx.currentUser.id,
+        email:     ctx.currentUser.email || '',
+        firstName: ctx.myProfile?.firstName || '',
+        lastName:  ctx.myProfile?.lastName  || '',
+        role:      'member',
+        label,
+        isMe:      true,
       }];
     }
   }
