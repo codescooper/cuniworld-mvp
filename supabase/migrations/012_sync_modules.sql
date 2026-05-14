@@ -104,15 +104,27 @@ CREATE POLICY lot_statuses_farm_member ON lot_statuses
   FOR ALL USING (farm_id IN (SELECT farm_id FROM farm_members WHERE user_id = auth.uid()));
 
 -- ── Realtime ──────────────────────────────────────────────────────────────────
--- Ajouter les 8 nouvelles tables à la publication realtime.
--- Si votre publication utilise FOR ALL TABLES, ces lignes ne sont pas nécessaires.
--- Si elle n'existe pas encore : CREATE PUBLICATION supabase_realtime;
+-- Ajout idempotent table par table à la publication realtime. Le batch unique
+-- d'origine échouait avec duplicate_object si une seule table était déjà
+-- publiée (cf. migration 005). On boucle avec gestion d'exception pour que la
+-- migration soit rejouable sans risque.
 DO $$
+DECLARE
+  t text;
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE
-      stock_items, stock_movements, rounds,
-      buildings, lodges, lodge_defects, lodge_events,
-      lot_statuses;
+    FOR t IN
+      SELECT unnest(ARRAY[
+        'stock_items', 'stock_movements', 'rounds',
+        'buildings', 'lodges', 'lodge_defects', 'lodge_events',
+        'lot_statuses'
+      ])
+    LOOP
+      BEGIN
+        EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', t);
+      EXCEPTION WHEN duplicate_object THEN
+        NULL;  -- déjà publiée
+      END;
+    END LOOP;
   END IF;
 END $$;
