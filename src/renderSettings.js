@@ -101,11 +101,11 @@ function _economySection(s, editable) {
       </div>
       <div class="row2">
         <div class="field">
-          <div class="label">Prix poids vif (${escapeHTML(s.currencySymbol)} / kg)</div>
+          <div class="label">Prix poids vif (<span data-currency-label>${escapeHTML(s.currencySymbol)}</span> / kg)</div>
           <input class="input" name="priceLivePerKg" type="number" min="0" step="any" value="${s.priceLivePerKg}" ${editable ? '' : 'disabled'}>
         </div>
         <div class="field">
-          <div class="label">Prix carcasse (${escapeHTML(s.currencySymbol)} / kg)</div>
+          <div class="label">Prix carcasse (<span data-currency-label>${escapeHTML(s.currencySymbol)}</span> / kg)</div>
           <input class="input" name="priceCarcassPerKg" type="number" min="0" step="any" value="${s.priceCarcassPerKg}" ${editable ? '' : 'disabled'}>
         </div>
       </div>
@@ -226,14 +226,21 @@ function _membersSection(ctx, canMembers) {
 function _wireSettings(ctx, host) {
   const canEdit = can(ctx, 'manage_settings');
 
-  // Synchronise le symbole quand on choisit une devise standard.
+  // Synchronise le symbole quand on choisit une devise standard, et met à jour
+  // en direct les libellés "Prix … (<symbole> / kg)".
   const codeSel = host.querySelector('#currencyCodeSel');
   const symInp  = host.querySelector('#currencySymbolInput');
+  const refreshCurrencyLabels = () => {
+    const sym = (symInp?.value || 'FCFA').trim() || 'FCFA';
+    host.querySelectorAll('[data-currency-label]').forEach(el => { el.textContent = sym; });
+  };
   codeSel?.addEventListener('change', () => {
     const opt = codeSel.selectedOptions[0];
     const sym = opt?.dataset?.symbol;
     if (sym && symInp) symInp.value = sym;
+    refreshCurrencyLabels();
   });
+  symInp?.addEventListener('input', refreshCurrencyLabels);
 
   // Enregistrement global
   host.querySelector('#settingsSave')?.addEventListener('click', async () => {

@@ -10,6 +10,7 @@ import { dismissActionForToday } from "./farmActionsService.js";
 import { showToast, showConfirm } from "./notifications.js";
 import { actorSelectHTML } from "./membersService.js";
 import { openTourneeModal } from "./renderTournee.js";
+import { getSettings } from "./settingsService.js";
 
 
 // wireStatic — called ONCE at startup on elements that exist in the static HTML.
@@ -943,11 +944,12 @@ function renderEventExtra(ctx, type) {
     `;
   }
   if (type === "vente") {
+    const cur = getSettings(ctx).currencySymbol || "FCFA";
     return `
       <div class="row2">
         <div class="field">
-          <div class="label">Prix (€)</div>
-          <input class="input" name="price" type="number" min="0.01" step="0.01" placeholder="ex: 25.50" required>
+          <div class="label">Prix (${escapeHTML(cur)})</div>
+          <input class="input" name="price" type="number" min="0.01" step="0.01" placeholder="ex: 2500" required>
         </div>
         <div class="field">
           <div class="label">Client (optionnel)</div>

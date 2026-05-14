@@ -18,12 +18,23 @@ export function buildLots(state) {
       const weaned = Math.max(num(e.data?.weanedCount), rabbitIds.length, num(e.data?.weaned)) || 0;
       const cage = (e.data?.destCage || "").trim() || "—";
       const id = `lot_${e.id}`;
+      // Père : dérivé du buckId des lapereaux du lot (renseigné à la mise-bas).
+      let buck = null;
+      for (const rid of rabbitIds) {
+        const kit = rabbitsById.get(rid);
+        if (kit && (kit.buckId || kit.fatherId)) {
+          buck = rabbitsById.get(kit.buckId || kit.fatherId);
+          if (buck) break;
+        }
+      }
       return {
         id,
         eventId: e.id,
         doeId: e.rabbitId,
         doeName: doe?.name || "Mère inconnue",
         doeCode: doe?.code || "—",
+        buckName: buck?.name || null,
+        buckCode: buck?.code || null,
         date: e.date || "—",
         weaned,
         rabbitIds,

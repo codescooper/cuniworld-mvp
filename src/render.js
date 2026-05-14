@@ -744,7 +744,9 @@ function getFilteredRabbits(ctx) {
     if (sex && r.sex !== sex) return false;
     if (status && r.status !== status) return false;
     if (!q) return true;
-    const hay = [r.code, r.name, r.breed, r.sex, r.cage, r.status, r.notes, r.stage].join(" ").toLowerCase();
+    // Recherche limitée aux champs visibles documentés : code, nom, race, cage.
+    // (les notes/statut/stade créaient des faux positifs — cf. rapport QA bug #5)
+    const hay = [r.code, r.name, r.breed, r.cage].join(" ").toLowerCase();
     return hay.includes(q);
   });
 }
@@ -775,11 +777,17 @@ export function renderLots(ctx) {
   } else {
     el.lotList.innerHTML = filtered.map(l => {
       const active = (ctx.selectedLotId === l.id) ? "active" : "";
+      // Si pas de cage de destination, on affiche le nom de la mère comme
+      // libellé principal plutôt qu'un "—" peu lisible.
+      const primary = l.cage && l.cage !== "—" ? l.cage : l.doeName;
+      const parents = l.buckName
+        ? `${escapeHTML(l.doeName)} × ${escapeHTML(l.buckName)}`
+        : `${escapeHTML(l.doeName)} (${escapeHTML(l.doeCode)})`;
       return `
         <div class="item ${active}" data-testid="lot-item" data-lot="${l.id}">
           <div>
-            <div><strong>${escapeHTML(l.cage)}</strong> — ${escapeHTML(l.date)}</div>
-            <div class="small">Mère: ${escapeHTML(l.doeName)} (${escapeHTML(l.doeCode)})</div>
+            <div><strong>${escapeHTML(primary)}</strong> — ${escapeHTML(formatDate(l.date))}</div>
+            <div class="small">${parents}</div>
           </div>
           <div>${lotBadge(l)}</div>
         </div>

@@ -176,6 +176,13 @@ function updateSimulationUI(ctx) {
     startTile.title = blocked
       ? "Déconnectez-vous de la ferme cloud pour démarrer une simulation."
       : "";
+    // Libellé visible expliquant la restriction (sans attendre le clic).
+    const simSub = document.getElementById("simSubLabel");
+    if (simSub) {
+      simSub.textContent = blocked
+        ? "Indisponible en mode cloud — déconnectez-vous d'abord"
+        : "Générer un élevage fictif réaliste (hors-ligne)";
+    }
   }
 }
 
