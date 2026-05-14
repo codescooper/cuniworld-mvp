@@ -179,6 +179,17 @@ export function wireDynamic(ctx) {
     });
   }
 
+  // Bouton rapide "Mettre en vente" depuis l'en-tête de la fiche lapin
+  const btnToggleShop = document.getElementById("btnToggleShop");
+  if (btnToggleShop) {
+    btnToggleShop.addEventListener("click", () => {
+      const id = btnToggleShop.dataset.toggleShop;
+      const r = ctx.state.rabbits.find(x => x.id === id);
+      if (!r) return;
+      openShopQuickModal(ctx, r);
+    });
+  }
+
   const btnDel = document.getElementById("btnDeleteRabbit");
   if (btnDel) {
     btnDel.addEventListener("click", async () => {
@@ -743,6 +754,59 @@ function wireRabbitForm(ctx, existingRabbit) {
   });
 
   setupModalFormKeyboardUX(form, '[data-testid="rabbit-form-submit"]');
+}
+
+// Mini-modal "Mettre en vente" — accessible en 1 clic depuis la fiche lapin,
+// sans ouvrir le formulaire complet d'édition.
+function openShopQuickModal(ctx, rabbit) {
+  const onSale  = !!rabbit.forSale;
+  const price   = rabbit.salePrice ? String(rabbit.salePrice) : "";
+  const desc    = rabbit.shopDescription || "";
+  openModal(ctx.el, onSale ? "Gérer la mise en vente" : "Mettre en vente", `
+    <form id="shopQuickForm" class="form">
+      <div class="small muted" style="margin-bottom:8px">
+        ${escapeHTML(rabbit.name)} (${escapeHTML(rabbit.code || "")})
+      </div>
+      <div class="field">
+        <div class="label">Prix demandé <span class="muted small">(laisser vide = calcul auto : poids × prix vif)</span></div>
+        <input class="input" name="salePrice" type="number" min="0" step="any" placeholder="ex: 12500" value="${escapeAttr(price)}">
+      </div>
+      <div class="field">
+        <div class="label">Description boutique <span class="muted small">(visible des clients)</span></div>
+        <textarea class="input" name="shopDescription" rows="2" placeholder="Reproducteur sélectionné, vacciné…">${escapeHTML(desc)}</textarea>
+      </div>
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px">
+        ${onSale ? `<button type="button" class="btn danger" id="shopQuickRemove">Retirer de la vente</button>` : `<span></span>`}
+        <div class="row" style="gap:6px">
+          <button type="button" class="btn secondary" id="shopQuickCancel">Annuler</button>
+          <button type="submit" class="btn">${onSale ? "Enregistrer" : "Mettre en vente"}</button>
+        </div>
+      </div>
+    </form>
+  `);
+
+  document.getElementById("shopQuickCancel")?.addEventListener("click", () => closeModal(ctx.el));
+
+  document.getElementById("shopQuickRemove")?.addEventListener("click", () => {
+    updateRabbit(ctx, rabbit.id, { forSale: false, salePrice: null, shopDescription: "" });
+    closeModal(ctx.el);
+    showToast("Lapin retiré de la boutique.", "info");
+  });
+
+  document.getElementById("shopQuickForm")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const priceRaw = parseFloat(fd.get("salePrice"));
+    updateRabbit(ctx, rabbit.id, {
+      forSale: true,
+      salePrice: Number.isFinite(priceRaw) && priceRaw > 0 ? priceRaw : null,
+      shopDescription: (fd.get("shopDescription") || "").toString().trim(),
+    });
+    closeModal(ctx.el);
+    showToast("Lapin mis en vente sur la boutique.", "success");
+  });
+
+  setupModalFormKeyboardUX(document.getElementById("shopQuickForm"), 'button[type="submit"]');
 }
 
 function eventFormHTML(preType = "autre", ctx = null) {

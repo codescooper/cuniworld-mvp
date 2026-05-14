@@ -161,6 +161,7 @@ export function renderRabbitList(ctx) {
     const stage  = getRabbitStage(r);
     const repro  = getReproInfo(ctx.state, r);
     const pregnantBadge = repro?.isPregnant ? `<span class="badge accent">🤰</span>` : "";
+    const saleBadge = r.forSale ? `<span class="badge" style="background:#f0d28a;color:#7a5a10" title="En vente sur la boutique">🏪</span>` : "";
     const thumb = rabbitThumbHTML(ctx.state, r, { size: 40 });
     return `
       <div class="item rl-item ${active}" data-testid="rabbit-item" data-rabbit="${r.id}" style="cursor:pointer;display:flex;align-items:center;gap:10px">
@@ -172,6 +173,7 @@ export function renderRabbitList(ctx) {
             <span class="badge">${sexLabel(r.sex)}</span>
             ${stageBadge(stage)}
             ${pregnantBadge}
+            ${saleBadge}
             ${rabbitStatusBadge(r.status)}
           </div>
           <div class="small" style="margin-top:2px;color:var(--color-muted)">
@@ -331,10 +333,17 @@ export function renderRabbitDetails(ctx) {
       </div>`
     : `<div class="small muted" style="margin:6px 0">Aucune photo enregistrée.</div>`;
 
+  const forSaleBtnLabel = r.forSale ? "🏪 En vente ✓" : "🏪 Mettre en vente";
+  const forSaleBtnClass = r.forSale ? "btn" : "btn secondary";
+  const forSaleBadge = r.forSale
+    ? `<span class="badge" style="background:#f0d28a;color:#7a5a10">🏪 En vente</span>`
+    : "";
+
   el.rabbitDetails.innerHTML = `
-    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
       <button class="btn secondary" id="btnBack" data-testid="btn-back">← Retour</button>
-      <div class="row">
+      <div class="row" style="flex-wrap:wrap;gap:6px">
+        <button class="${forSaleBtnClass}" id="btnToggleShop" data-toggle-shop="${escapeAttr(r.id)}" title="Gérer la mise en vente sur la boutique">${forSaleBtnLabel}</button>
         <button class="btn secondary" id="btnEditRabbit">Modifier</button>
         <button class="btn danger" id="btnDeleteRabbit">Supprimer</button>
       </div>
@@ -344,7 +353,7 @@ export function renderRabbitDetails(ctx) {
       <div class="rabbit-avatar">${avatarHTML}</div>
       <div class="rabbit-detail-info">
         <div style="font-size:18px;font-weight:900">${escapeHTML(r.name)} <span class="badge">${escapeHTML(r.code)}</span></div>
-        <div class="small" style="margin-bottom:4px">${rabbitStatusBadge(r.status)} <span class="badge">${sexLabel(r.sex)}</span></div>
+        <div class="small" style="margin-bottom:4px">${rabbitStatusBadge(r.status)} <span class="badge">${sexLabel(r.sex)}</span> ${forSaleBadge}</div>
       </div>
     </div>
 
