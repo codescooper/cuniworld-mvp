@@ -345,6 +345,11 @@ async function _autoMigrateLocalModules(ctx, freshCloud, localState) {
   const fid = ctx.farmId;
   const ops = [];
 
+  // Régénère les id du state local avant de pousser quoi que ce soit — même
+  // raison que dans _offerMigration : éviter de réécrire le farm_id de lignes
+  // appartenant à une autre ferme.
+  const m = _remapStateIds(localState || {});
+
   // Pour chaque module : migrer seulement si Supabase est vide ET local a des données.
   // (freshCloud[key] === null signifie que la table SQL n'existe pas encore.)
   const needsArr = (cloudArr, localArr, fn) => {
@@ -353,23 +358,110 @@ async function _autoMigrateLocalModules(ctx, freshCloud, localState) {
     for (const item of (localArr || [])) ops.push(fn(item).catch(() => {}));
   };
 
-  needsArr(freshCloud.buildings,      localState?.buildings,      b => DB.upsertBuilding(fid, b));
-  needsArr(freshCloud.lodges,         localState?.lodges,         l => DB.upsertLodge(fid, l));
-  needsArr(freshCloud.lodgeDefects,   localState?.lodgeDefects,   d => DB.upsertLodgeDefect(fid, d));
-  needsArr(freshCloud.lodgeEvents,    localState?.lodgeEvents,    e => DB.upsertLodgeEvent(fid, e));
-  needsArr(freshCloud.stock,          localState?.stock,          s => DB.upsertStockItem(fid, s));
-  needsArr(freshCloud.stockMovements, localState?.stockMovements, m => DB.upsertStockMovement(fid, m));
-  needsArr(freshCloud.rounds,         localState?.rounds,         r => DB.upsertRound(fid, r));
+  needsArr(freshCloud.buildings,      m.buildings,      b => DB.upsertBuilding(fid, b));
+  needsArr(freshCloud.lodges,         m.lodges,         l => DB.upsertLodge(fid, l));
+  needsArr(freshCloud.lodgeDefects,   m.lodgeDefects,   d => DB.upsertLodgeDefect(fid, d));
+  needsArr(freshCloud.lodgeEvents,    m.lodgeEvents,    e => DB.upsertLodgeEvent(fid, e));
+  needsArr(freshCloud.stock,          m.stock,          s => DB.upsertStockItem(fid, s));
+  needsArr(freshCloud.stockMovements, m.stockMovements, mv => DB.upsertStockMovement(fid, mv));
+  needsArr(freshCloud.rounds,         m.rounds,         r => DB.upsertRound(fid, r));
 
   const cloudStatuses = freshCloud.lotStatuses;
   if (cloudStatuses !== null && Object.keys(cloudStatuses).length === 0) {
-    for (const [lotId, status] of Object.entries(localState?.lotStatuses || {})) {
+    for (const [lotId, status] of Object.entries(m.lotStatuses)) {
       ops.push(DB.setLotStatus(fid, lotId, status).catch(() => {}));
     }
   }
 
   if (ops.length > 0) await Promise.all(ops);
   localStorage.setItem(key, '1');
+}
+
+// ── Régénération d'identifiants avant import dans une ferme cloud ────────────
+// CRITIQUE : les id de `rabbits`, `events`, `buildings`, `lodges`, etc. sont
+// des clés primaires GLOBALES (pas scopées par farm_id). Importer des données
+// locales en réutilisant leurs id d'origine fait que l'`upsert ... onConflict
+// 'id'` RÉÉCRIT le farm_id de lignes existantes — donc « vole » les lapins
+// d'une autre ferme. On régénère donc tous les id et on remappe les références
+// internes (généalogie, portées, saillies, loges, lots...).
+function _remapStateIds(local) {
+  const newId = (p) => `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const rMap = new Map(), eMap = new Map(), bMap = new Map(), lMap = new Map(), sMap = new Map();
+
+  for (const r of (local.rabbits   || [])) rMap.set(r.id, newId('rb'));
+  for (const e of (local.events    || [])) eMap.set(e.id, newId('ev'));
+  for (const b of (local.buildings || [])) bMap.set(b.id, newId('bld'));
+  for (const l of (local.lodges    || [])) lMap.set(l.id, newId('lg'));
+  for (const s of (local.stock     || [])) sMap.set(s.id, newId('st'));
+
+  const rid = (id) => (id && rMap.get(id)) || id;
+  const eid = (id) => (id && eMap.get(id)) || id;
+  const bid = (id) => (id && bMap.get(id)) || id;
+  const lid = (id) => (id && lMap.get(id)) || id;
+
+  const rabbits = (local.rabbits || []).map((r) => {
+    const d = { ...r, id: rMap.get(r.id) };
+    if (d.motherId) d.motherId = rid(d.motherId);
+    if (d.fatherId) d.fatherId = rid(d.fatherId);
+    if (d.doeId)    d.doeId    = rid(d.doeId);
+    if (d.buckId)   d.buckId   = rid(d.buckId);
+    if (d.litterId) d.litterId = eid(d.litterId);
+    return d;
+  });
+
+  const events = (local.events || []).map((e) => {
+    const d = { ...e, id: eMap.get(e.id), rabbitId: rid(e.rabbitId), data: { ...(e.data || {}) } };
+    if (d.data.maleId)   d.data.maleId   = rid(d.data.maleId);
+    if (d.data.litterId) d.data.litterId = eid(d.data.litterId);
+    if (Array.isArray(d.data.rabbitIds)) d.data.rabbitIds = d.data.rabbitIds.map(rid);
+    return d;
+  });
+
+  const photos = (local.photos || []).map((p) => {
+    const d = { ...p, id: newId('ph'), rabbitId: rid(p.rabbitId) };
+    if (d.eventId) d.eventId = eid(d.eventId);
+    return d;
+  });
+
+  const usedNames = {};
+  for (const [name, rabbitId] of Object.entries(local.usedNames || {})) usedNames[name] = rid(rabbitId);
+
+  const buildings = (local.buildings || []).map((b) => ({ ...b, id: bMap.get(b.id) }));
+  const lodges = (local.lodges || []).map((l) => {
+    const d = { ...l, id: lMap.get(l.id) };
+    if (d.buildingId) d.buildingId = bid(d.buildingId);
+    return d;
+  });
+  const lodgeDefects = (local.lodgeDefects || []).map((x) => {
+    const d = { ...x, id: newId('ldf') };
+    if (d.targetId) d.targetId = (d.targetType === 'batiment' ? bid(d.targetId) : lid(d.targetId));
+    return d;
+  });
+  const lodgeEvents = (local.lodgeEvents || []).map((x) => {
+    const d = { ...x, id: newId('lev') };
+    if (d.lodgeId) d.lodgeId = lid(d.lodgeId);
+    return d;
+  });
+  const stock = (local.stock || []).map((s) => ({ ...s, id: sMap.get(s.id) }));
+  const stockMovements = (local.stockMovements || []).map((m) => {
+    const d = { ...m, id: newId('mv') };
+    if (d.stockItemId) d.stockItemId = (sMap.get(d.stockItemId) || d.stockItemId);
+    return d;
+  });
+  const rounds = (local.rounds || []).map((r) => {
+    const d = { ...r, id: newId('rd') };
+    if (Array.isArray(d.feedings)) d.feedings = d.feedings.map((f) => ({ ...f, rabbitId: rid(f.rabbitId) }));
+    return d;
+  });
+  // lotStatuses : clé = `lot_${eventId}` → on remappe l'id d'événement.
+  const lotStatuses = {};
+  for (const [lotId, status] of Object.entries(local.lotStatuses || {})) {
+    const m = /^lot_(.+)$/.exec(lotId);
+    lotStatuses[m ? `lot_${eid(m[1])}` : lotId] = status;
+  }
+
+  return { rabbits, events, photos, usedNames, buildings, lodges,
+           lodgeDefects, lodgeEvents, stock, stockMovements, rounds, lotStatuses };
 }
 
 // ── Migration localStorage → Supabase ────────────────────────────
@@ -392,18 +484,26 @@ async function _offerMigration(ctx) {
     });
     if (!ok) return;
 
-    for (const r of (local.rabbits         || [])) await DB.upsertRabbit(ctx.farmId, r).catch(() => {});
-    for (const e of (local.events          || [])) await DB.upsertEvent(ctx.farmId, e).catch(() => {});
-    for (const p of (local.photos          || [])) await DB.upsertPhoto(ctx.farmId, p).catch(() => {});
-    for (const [n, rid] of Object.entries(local.usedNames || {})) await DB.setUsedName(ctx.farmId, n, rid).catch(() => {});
-    for (const b of (local.buildings       || [])) await DB.upsertBuilding(ctx.farmId, b).catch(() => {});
-    for (const l of (local.lodges          || [])) await DB.upsertLodge(ctx.farmId, l).catch(() => {});
-    for (const d of (local.lodgeDefects    || [])) await DB.upsertLodgeDefect(ctx.farmId, d).catch(() => {});
-    for (const e of (local.lodgeEvents     || [])) await DB.upsertLodgeEvent(ctx.farmId, e).catch(() => {});
-    for (const s of (local.stock           || [])) await DB.upsertStockItem(ctx.farmId, s).catch(() => {});
-    for (const m of (local.stockMovements  || [])) await DB.upsertStockMovement(ctx.farmId, m).catch(() => {});
-    for (const r of (local.rounds          || [])) await DB.upsertRound(ctx.farmId, r).catch(() => {});
-    for (const [lid, st] of Object.entries(local.lotStatuses || {})) await DB.setLotStatus(ctx.farmId, lid, st).catch(() => {});
+    // Régénération des id AVANT import — sinon on réécrit le farm_id de lignes
+    // existantes et on « vole » les données d'une autre ferme.
+    const m = _remapStateIds(local);
+
+    for (const r of m.rabbits)        await DB.upsertRabbit(ctx.farmId, r).catch(() => {});
+    for (const e of m.events)         await DB.upsertEvent(ctx.farmId, e).catch(() => {});
+    for (const p of m.photos)         await DB.upsertPhoto(ctx.farmId, p).catch(() => {});
+    for (const [n, rid] of Object.entries(m.usedNames)) await DB.setUsedName(ctx.farmId, n, rid).catch(() => {});
+    for (const b of m.buildings)      await DB.upsertBuilding(ctx.farmId, b).catch(() => {});
+    for (const l of m.lodges)         await DB.upsertLodge(ctx.farmId, l).catch(() => {});
+    for (const d of m.lodgeDefects)   await DB.upsertLodgeDefect(ctx.farmId, d).catch(() => {});
+    for (const e of m.lodgeEvents)    await DB.upsertLodgeEvent(ctx.farmId, e).catch(() => {});
+    for (const s of m.stock)          await DB.upsertStockItem(ctx.farmId, s).catch(() => {});
+    for (const mv of m.stockMovements) await DB.upsertStockMovement(ctx.farmId, mv).catch(() => {});
+    for (const r of m.rounds)         await DB.upsertRound(ctx.farmId, r).catch(() => {});
+    for (const [lid, st] of Object.entries(m.lotStatuses)) await DB.setLotStatus(ctx.farmId, lid, st).catch(() => {});
+
+    // L'import couvre déjà tous les modules → on marque la migration auto comme
+    // faite pour éviter un double-import par _autoMigrateLocalModules.
+    try { localStorage.setItem(`cuniworld_sync2_${ctx.farmId}`, '1'); } catch (_) {}
 
     await new Promise(r => setTimeout(r, 800));
     const afterImport = await DB.loadFarmState(ctx.farmId);
