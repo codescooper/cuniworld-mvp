@@ -733,6 +733,28 @@ textarea.input { min-height: 90px; resize: vertical }
   flex: 1;
   overflow-y: auto;
   padding: var(--space-4);
+  position: relative;
+}
+
+/* Navigation lapin précédent/suivant : barre fixée en bas de la fiche
+   pour permettre de passer rapidement au lapin de la cage suivante. */
+.rabbit-nav-bar {
+  position: sticky;
+  bottom: 0;
+  margin: 16px -16px -16px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(255,255,255,0) 0%, var(--color-bg, #fff) 30%);
+  display: flex;
+  gap: 8px;
+  z-index: 5;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+.rabbit-nav-bar .btn { flex: 1; }
+.rabbit-nav-bar .rabbit-nav-cage {
+  font-size: .8rem;
+  color: var(--color-muted);
+  display: block;
+  font-weight: 400;
 }
 
 /* Message état vide dans la colonne droite */

@@ -42,8 +42,9 @@ export function getRabbitsDueForWeightCheck(state, thresholdHours = 48) {
 // ── Modal assisté ────────────────────────────────────────────────
 
 export function openWeightCheckModal(ctx) {
-  // Seuil paramétrable par ferme : Paramètres → Soins → Pesée en retard après X jours
-  const thresholdHours = (getSettings(ctx).weightCheckOverdueDays || 7) * 24;
+  // Seuil paramétrable par ferme : Paramètres → Soins → Cycle de pesée (j)
+  const thresholdDays  = getSettings(ctx).weightCheckOverdueDays ?? 7;
+  const thresholdHours = thresholdDays * 24;
   const due = getRabbitsDueForWeightCheck(ctx.state, thresholdHours);
 
   if (due.length === 0) {
@@ -51,7 +52,7 @@ export function openWeightCheckModal(ctx) {
       <div style="text-align:center;padding:24px 0">
         <div style="font-size:2.5rem;margin-bottom:12px">✅</div>
         <p style="font-size:1.1rem;font-weight:600">Tous les lapins ont été pesés récemment !</p>
-        <p class="muted">Aucun lapin n'est en attente de pesée (seuil : 48 h).</p>
+        <p class="muted">Aucun lapin n'est en attente de pesée (cycle : ${thresholdDays} j).</p>
       </div>`);
     return;
   }

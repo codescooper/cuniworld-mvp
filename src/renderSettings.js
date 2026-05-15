@@ -155,8 +155,9 @@ function _caresSection(s, editable) {
       <div class="settings-section-title">🩺 Soins & rappels</div>
       <div class="row2">
         <div class="field">
-          <div class="label">Pesée en retard après (j)</div>
-          <input class="input" name="weightCheckOverdueDays" type="number" min="1" max="30" value="${s.weightCheckOverdueDays}" ${editable ? '' : 'disabled'}>
+          <div class="label">Cycle de pesée — peser après (j)</div>
+          <input class="input" name="weightCheckOverdueDays" type="number" min="0" max="30" value="${s.weightCheckOverdueDays}" ${editable ? '' : 'disabled'}>
+          <div class="small muted" style="margin-top:4px">0 = tous les lapins sont à peser immédiatement (utile pour tester la fonctionnalité)</div>
         </div>
         <div class="field">
           <div class="label">Photo à reprendre après (j)</div>

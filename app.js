@@ -540,7 +540,7 @@ function wireExtra() {
       }
       showToast('Notifications activées !', 'success');
     }
-    checkAndFireNotifications(ctx.state);
+    checkAndFireNotifications(ctx.state, ctx.farmSettings);
     showToast('Vérification des alertes effectuée.', 'info');
   });
 
@@ -698,7 +698,7 @@ async function initApp() {
     }
     if (!isE2E) {
       setActivePanel(savedPanel);
-      if (notificationsGranted()) checkAndFireNotifications(ctx.state);
+      if (notificationsGranted()) checkAndFireNotifications(ctx.state, ctx.farmSettings);
     } else {
       setActivePanel("dashboard");
     }
@@ -725,7 +725,7 @@ async function initApp() {
     import("./src/wireAuth.js").then(({ bootWithAuth }) => {
       bootWithAuth(ctx, () => {
         setActivePanel(savedPanel);
-        if (notificationsGranted()) checkAndFireNotifications(ctx.state);
+        if (notificationsGranted()) checkAndFireNotifications(ctx.state, ctx.farmSettings);
       }, joinFarmId);
     }).catch((err) => {
       console.error("[CuniWorld] Impossible de charger l'auth Supabase:", err);

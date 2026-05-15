@@ -170,6 +170,20 @@ export function wireDynamic(ctx) {
     });
   }
 
+  // Navigation cage précédente / suivante depuis la fiche lapin
+  document.querySelectorAll("[data-prev-rabbit], [data-next-rabbit]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.prevRabbit || btn.dataset.nextRabbit;
+      if (!id) return;
+      ctx.selectedRabbitId = id;
+      ctx.selectedGeneRabbitId = id;
+      ctx.render();
+      // Remonter en haut de la fiche pour voir le nouveau lapin
+      document.querySelector(".rl-right")?.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
+
   const btnEdit = document.getElementById("btnEditRabbit");
   if (btnEdit) {
     btnEdit.addEventListener("click", () => {

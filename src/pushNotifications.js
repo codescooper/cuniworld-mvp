@@ -67,10 +67,10 @@ function _fire(title, body, tag) {
 
 // ── Check and fire all pending notifications ──────────────────────────────────
 
-export function checkAndFireNotifications(state) {
+export function checkAndFireNotifications(state, settings) {
   if (!notificationsGranted()) return;
   const fired = _getFired();
-  const { urgent } = getTodayFarmActions(state);
+  const { urgent } = getTodayFarmActions(state, undefined, settings);
 
   for (const action of urgent) {
     const key = `u_${action.id}`;

@@ -4,6 +4,7 @@ import { getPhotoHistory } from './photos.js';
 import { getReproInfo } from './repro.js';
 import { getBreedingStatus } from './breeding.js';
 import { getOverdueInspections, getOpenDefects } from './buildingService.js';
+import { DEFAULT_SETTINGS } from './settingsService.js';
 
 const DISMISSED_KEY = 'dismissedTodayActions';
 
@@ -27,14 +28,17 @@ function _getDismissed() {
 
 // ── Main entry point ──────────────────────────────────────────────────────────
 
-// One-entry cache: keyed on (state reference, date). Store.save() always returns
-// a new object via spreading, so any mutation automatically invalidates this.
-let _cache = { stateRef: null, date: null, result: null };
+// One-entry cache: keyed on (state reference, date, weightCycle). Store.save()
+// always returns a new object via spreading, so any mutation automatically
+// invalidates this. The cycle is also part of the key so changing
+// `weightCheckOverdueDays` in settings immediately refreshes the actions.
+let _cache = { stateRef: null, date: null, weightCycle: null, result: null };
 
-export function getTodayFarmActions(state, currentDate) {
+export function getTodayFarmActions(state, currentDate, settings) {
   const today = currentDate || new Date().toISOString().slice(0, 10);
+  const s = { ...DEFAULT_SETTINGS, ...(settings || {}) };
 
-  if (_cache.stateRef === state && _cache.date === today) {
+  if (_cache.stateRef === state && _cache.date === today && _cache.weightCycle === s.weightCheckOverdueDays) {
     return _cache.result;
   }
 
@@ -42,7 +46,7 @@ export function getTodayFarmActions(state, currentDate) {
     ...getHealthActions(state, today),
     ...getWeaningActions(state, today),
     ...getBreedingActions(state, today),
-    ...getWeightActions(state, today),
+    ...getWeightActions(state, today, s),
     ...getPhotoActions(state, today),
     ...getBuildingActions(state, today),
   ].filter(a => !isActionDismissedToday(a.id, today));
@@ -62,14 +66,18 @@ export function getTodayFarmActions(state, currentDate) {
     total: all.length,
     summary: `${u} urgence${u !== 1 ? 's' : ''} · ${t} action${t !== 1 ? 's' : ''} · ${o} opportunité${o !== 1 ? 's' : ''}`,
   };
-  _cache = { stateRef: state, date: today, result };
+  _cache = { stateRef: state, date: today, weightCycle: s.weightCheckOverdueDays, result };
   return result;
 }
 
 // ── Weight ────────────────────────────────────────────────────────────────────
 
-export function getWeightActions(state, currentDate) {
+export function getWeightActions(state, currentDate, settings) {
   const today = currentDate || new Date().toISOString().slice(0, 10);
+  const s = { ...DEFAULT_SETTINGS, ...(settings || {}) };
+  const cycle = Math.max(0, Number(s.weightCheckOverdueDays) || 0);
+  // Pré-alerte "à peser aujourd'hui" : à partir de 2 j avant la fin du cycle.
+  const todayThreshold = Math.max(1, cycle - 2);
   const actions = [];
 
   for (const r of (state.rabbits || [])) {
@@ -89,7 +97,7 @@ export function getWeightActions(state, currentDate) {
         rabbitId: r.id,
         action: 'weightCheck',
       });
-    } else if (daysSince >= 7) {
+    } else if (daysSince >= cycle) {
       actions.push({
         id: `weight_${r.id}`,
         type: 'weight',
@@ -100,7 +108,7 @@ export function getWeightActions(state, currentDate) {
         rabbitId: r.id,
         action: 'weightCheck',
       });
-    } else if (daysSince >= 2) {
+    } else if (daysSince >= todayThreshold) {
       actions.push({
         id: `weight_${r.id}`,
         type: 'weight',

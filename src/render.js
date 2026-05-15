@@ -16,6 +16,7 @@ import { getTodayRoundSummary } from "./roundService.js";
 import { formatPerformedBy } from "./membersService.js";
 import { renderSettings } from "./renderSettings.js";
 import { renderOrders } from "./renderOrders.js";
+import { sortByCage } from "./cageSort.js";
 
 
 
@@ -339,6 +340,27 @@ export function renderRabbitDetails(ctx) {
     ? `<span class="badge" style="background:#f0d28a;color:#7a5a10">🏪 En vente</span>`
     : "";
 
+  // Navigation cage suivante / précédente — parcourt tous les lapins triés par
+  // cage (A1, A2…B1…). Boucle en fin de liste pour rester accessible.
+  const navOrder = sortByCage(state.rabbits || [], x => x.cage);
+  const navIdx   = navOrder.findIndex(x => x.id === r.id);
+  const prevRabbit = navOrder.length > 1 ? navOrder[(navIdx - 1 + navOrder.length) % navOrder.length] : null;
+  const nextRabbit = navOrder.length > 1 ? navOrder[(navIdx + 1) % navOrder.length] : null;
+  const navBarHTML = (prevRabbit || nextRabbit) ? `
+    <div class="rabbit-nav-bar">
+      ${prevRabbit ? `
+        <button class="btn secondary" id="btnPrevRabbit" data-prev-rabbit="${escapeAttr(prevRabbit.id)}" title="Cage précédente">
+          ← Précédent
+          <span class="rabbit-nav-cage">🏠 ${escapeHTML(prevRabbit.cage || '—')} · ${escapeHTML(prevRabbit.name)}</span>
+        </button>` : ''}
+      ${nextRabbit ? `
+        <button class="btn" id="btnNextRabbit" data-next-rabbit="${escapeAttr(nextRabbit.id)}" title="Cage suivante">
+          Suivant →
+          <span class="rabbit-nav-cage">🏠 ${escapeHTML(nextRabbit.cage || '—')} · ${escapeHTML(nextRabbit.name)}</span>
+        </button>` : ''}
+    </div>
+  ` : '';
+
   el.rabbitDetails.innerHTML = `
     <div class="row" style="justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
       <button class="btn secondary" id="btnBack" data-testid="btn-back">← Retour</button>
@@ -411,6 +433,8 @@ export function renderRabbitDetails(ctx) {
     <label class="btn secondary" style="cursor:pointer;margin-top:8px;display:inline-flex;align-items:center;gap:6px;display:none">
       <input type="file" id="inputProfilePhoto" accept="image/*" style="display:none">
     </label>
+
+    ${navBarHTML}
   `;
 }
 
@@ -594,7 +618,7 @@ function _buildWeightSection(r, history, _todayISO, _rabbitSettings) {
 
 function _renderFarmActionsCard(ctx) {
   const today = new Date().toISOString().slice(0, 10);
-  const { urgent, today: todayList, opportunities, total, summary } = getTodayFarmActions(ctx.state, today);
+  const { urgent, today: todayList, opportunities, total, summary } = getTodayFarmActions(ctx.state, today, getSettings(ctx));
 
   if (total === 0) {
     return `
