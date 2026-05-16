@@ -158,6 +158,17 @@
                   <option value="mort">Mort</option>
                 </select>
               </div>
+              <div class="row" style="gap:var(--space-2)">
+                <input id="weightMin" class="input" type="number" min="0" step="0.1" placeholder="Poids min (kg)" data-testid="filter-weight-min" style="flex:1">
+                <input id="weightMax" class="input" type="number" min="0" step="0.1" placeholder="Poids max (kg)" data-testid="filter-weight-max" style="flex:1">
+                <select id="sortBy" class="input" data-testid="sort-by" style="flex:1.2">
+                  <option value="cage">Tri: Cage</option>
+                  <option value="name">Tri: Nom</option>
+                  <option value="weight-asc">Tri: Poids ↑</option>
+                  <option value="weight-desc">Tri: Poids ↓</option>
+                  <option value="birth">Tri: Naissance</option>
+                </select>
+              </div>
             </div>
             <div id="rabbitList" class="list" data-testid="rabbit-list"></div>
           </div>

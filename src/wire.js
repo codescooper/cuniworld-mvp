@@ -10,7 +10,8 @@ import { dismissActionForToday } from "./farmActionsService.js";
 import { showToast, showConfirm } from "./notifications.js";
 import { actorSelectHTML } from "./membersService.js";
 import { openTourneeModal } from "./renderTournee.js";
-import { getSettings } from "./settingsService.js";
+import { getSettings, formatCurrency, estimateRabbitValue } from "./settingsService.js";
+import { getRabbitsByBudget } from "./weightSearch.js";
 
 
 // wireStatic — called ONCE at startup on elements that exist in the static HTML.
@@ -64,6 +65,9 @@ export function wireStatic(ctx) {
   el.q.addEventListener("input", () => ctx.render());
   el.sexFilter.addEventListener("change", () => ctx.render());
   el.statusFilter.addEventListener("change", () => ctx.render());
+  el.weightMin?.addEventListener("input", () => ctx.render());
+  el.weightMax?.addEventListener("input", () => ctx.render());
+  el.sortBy?.addEventListener("change", () => ctx.render());
   el.geneQ?.addEventListener("input", () => ctx.render());
 
   // modal
@@ -120,6 +124,12 @@ export function wireDynamic(ctx) {
   const btnWeightCheck = document.getElementById("btnWeightCheck");
   if (btnWeightCheck) {
     btnWeightCheck.addEventListener("click", () => openWeightCheckModal(ctx));
+  }
+
+  // Bouton "🎯 Budget client" depuis le dashboard
+  const btnBudgetSearch = document.getElementById("btnBudgetSearch");
+  if (btnBudgetSearch) {
+    btnBudgetSearch.addEventListener("click", () => openBudgetSearchModal(ctx));
   }
 
   // Bouton "Ouvrir la tournée" depuis la carte Tâches du jour
@@ -1221,4 +1231,157 @@ function bindExtraHandlers(type) {
 
 function refreshAllowedTypes() {
   // Placeholder: ancienne logique supprimée, on garde le hook pour éviter les erreurs.
+}
+
+/* -------- Modal "🎯 Trouver un lapin par budget client" -------- */
+
+function openBudgetSearchModal(ctx) {
+  const settings = getSettings(ctx);
+  const sym = settings.currencySymbol || "FCFA";
+
+  // Budget initial : médiane des prix vifs du cheptel pesé en vente, ou 10 000.
+  const initialBudget = (() => {
+    const inSale = (ctx.state.rabbits || [])
+      .filter(r => r.status === 'actif' && r.forSale)
+      .map(r => {
+        const w = (ctx.state.events || [])
+          .filter(e => e.rabbitId === r.id && e.type === 'pesée' && Number(e.data?.weight) > 0)
+          .sort((a, b) => b.date.localeCompare(a.date))[0];
+        return w ? Number(w.data.weight) : null;
+      })
+      .filter(w => w != null)
+      .map(w => estimateRabbitValue(w, settings).live);
+    if (inSale.length === 0) return 10000;
+    inSale.sort((a, b) => a - b);
+    return Math.round(inSale[Math.floor(inSale.length / 2)] / 500) * 500;
+  })();
+
+  openModal(ctx.el, "🎯 Trouver un lapin par budget", `
+    <div class="field">
+      <div class="label">Budget du client (${escapeHTML(sym)})</div>
+      <div class="row" style="gap:6px;align-items:center">
+        <button class="btn secondary" type="button" id="bsMinus" title="−500" style="font-size:1.1rem;padding:6px 14px">−</button>
+        <input id="bsBudget" class="input" type="number" min="0" step="500" value="${initialBudget}"
+               style="flex:1;text-align:center;font-size:1.2rem;font-weight:600">
+        <button class="btn secondary" type="button" id="bsPlus" title="+500" style="font-size:1.1rem;padding:6px 14px">+</button>
+      </div>
+    </div>
+
+    <div class="row2" style="margin-top:10px">
+      <div class="field">
+        <div class="label">Type de prix</div>
+        <select id="bsType" class="input">
+          <option value="live" selected>Vif (sur pied)</option>
+          <option value="carcass">Carcasse</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="label">Tolérance (±%)</div>
+        <input id="bsTolerance" class="input" type="number" min="0" max="100" step="1" value="10">
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:6px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input id="bsForSale" type="checkbox" checked>
+        <span>Uniquement les lapins en vente</span>
+      </label>
+    </div>
+
+    <div id="bsResults" style="margin-top:14px"></div>
+  `);
+
+  const $b = (id) => document.getElementById(id);
+  const refresh = () => _renderBudgetResults(ctx, settings);
+
+  $b("bsBudget").addEventListener("input", refresh);
+  $b("bsType").addEventListener("change", refresh);
+  $b("bsTolerance").addEventListener("input", refresh);
+  $b("bsForSale").addEventListener("change", refresh);
+
+  $b("bsMinus").addEventListener("click", () => {
+    const inp = $b("bsBudget");
+    const v = Math.max(0, (Number(inp.value) || 0) - 500);
+    inp.value = v;
+    refresh();
+  });
+  $b("bsPlus").addEventListener("click", () => {
+    const inp = $b("bsBudget");
+    const v = (Number(inp.value) || 0) + 500;
+    inp.value = v;
+    refresh();
+  });
+
+  refresh();
+}
+
+function _renderBudgetResults(ctx, settings) {
+  const host = document.getElementById("bsResults");
+  if (!host) return;
+
+  const budget    = Number(document.getElementById("bsBudget")?.value);
+  const type      = document.getElementById("bsType")?.value === "carcass" ? "carcass" : "live";
+  const tolPct    = Math.max(0, Number(document.getElementById("bsTolerance")?.value) || 0);
+  const forSaleOnly = !!document.getElementById("bsForSale")?.checked;
+
+  if (!Number.isFinite(budget) || budget <= 0) {
+    host.innerHTML = `<div class="muted small">Saisis un budget supérieur à 0 pour lancer la recherche.</div>`;
+    return;
+  }
+
+  const matches = getRabbitsByBudget(ctx.state, {
+    budget,
+    type,
+    tolerance: tolPct / 100,
+    forSaleOnly,
+    settings,
+  });
+
+  if (matches.length === 0) {
+    host.innerHTML = `
+      <div class="muted small" style="padding:10px;text-align:center;border:1px dashed var(--color-border, #ddd);border-radius:8px">
+        Aucun lapin ${forSaleOnly ? 'en vente ' : ''}entre ${formatCurrency(budget * (1 - tolPct / 100), settings)}
+        et ${formatCurrency(budget * (1 + tolPct / 100), settings)}.<br>
+        <span class="small">Augmente le budget ou la tolérance.</span>
+      </div>`;
+    return;
+  }
+
+  const items = matches.slice(0, 12).map(m => {
+    const r       = m.rabbit;
+    const deltaPc = Math.round(m.deltaPct * 100);
+    const sign    = deltaPc > 0 ? '+' : '';
+    const color   = Math.abs(deltaPc) <= 3 ? '#4f7942' : Math.abs(deltaPc) <= 7 ? '#a06b00' : '#999';
+    const cage    = r.cage ? ` · 🏠 ${escapeHTML(r.cage)}` : '';
+    return `
+      <div class="item" style="display:flex;align-items:center;gap:10px;padding:8px">
+        <div style="flex:1;min-width:0">
+          <div><strong>${escapeHTML(r.name)}</strong> <span class="badge">${escapeHTML(r.code)}</span></div>
+          <div class="small" style="color:var(--color-muted)">
+            ⚖️ ${m.weightKg.toFixed(2)} kg${cage} → <strong>${formatCurrency(m.value, settings)}</strong>
+            <span style="color:${color};margin-left:6px">(${sign}${deltaPc}%)</span>
+          </div>
+        </div>
+        <button class="btn secondary" data-bs-open="${escapeAttr(r.id)}" style="font-size:.85rem;padding:4px 10px">Voir</button>
+      </div>`;
+  }).join("");
+
+  host.innerHTML = `
+    <div class="small muted" style="margin-bottom:6px">
+      ${matches.length} lapin${matches.length > 1 ? 's' : ''} trouvé${matches.length > 1 ? 's' : ''} ·
+      tri par proximité du budget
+    </div>
+    <div class="list">${items}</div>
+  `;
+
+  host.querySelectorAll("[data-bs-open]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.bsOpen;
+      ctx.selectedRabbitId = id;
+      ctx.selectedGeneRabbitId = id;
+      closeModal(ctx.el);
+      if (ctx.navigate) ctx.navigate("rabbits");
+      else ctx.render();
+    });
+  });
 }

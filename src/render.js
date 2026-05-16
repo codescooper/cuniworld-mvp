@@ -2,7 +2,7 @@ import { escapeHTML, escapeAttr, formatDate, rabbitStatusBadge, sexLabel, daysBe
 import { estimateRabbitValue, formatCurrency, getSettings } from "./settingsService.js";
 import { getReproInfo } from "./repro.js";
 import { getBreedingStatus, breedingStatusBadge } from "./breeding.js";
-import { getRabbitWeightHistory, getTotalHerdWeightEvolution, renderWeightSVG } from "./weightService.js";
+import { getRabbitWeightHistory, getTotalHerdWeightEvolution, renderWeightSVG, getCurrentWeight } from "./weightService.js";
 import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
 import { buildLots, lotBadge, LOT_STATUSES } from "./lots.js";
 import { renderGenealogy3D } from "./genealogy3d.js";
@@ -17,6 +17,7 @@ import { formatPerformedBy } from "./membersService.js";
 import { renderSettings } from "./renderSettings.js";
 import { renderOrders } from "./renderOrders.js";
 import { sortByCage } from "./cageSort.js";
+import { getWeightExtremes } from "./weightSearch.js";
 
 
 
@@ -134,17 +135,60 @@ export function renderDashboard(ctx) {
       <div style="grid-column:1/-1;margin-top:18px;padding-top:14px;border-top:1px solid #eee">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
           <div style="font-weight:700">⚖️ Poids total du cheptel</div>
-          <button class="btn secondary" id="btnWeightCheck" style="font-size:.85rem;padding:4px 12px">⚖️ Peser les lapins</button>
+          <div class="row" style="gap:6px;flex-wrap:wrap">
+            <button class="btn secondary" id="btnBudgetSearch" style="font-size:.85rem;padding:4px 12px" title="Trouver un lapin pour le budget d'un client">🎯 Budget client</button>
+            <button class="btn secondary" id="btnWeightCheck" style="font-size:.85rem;padding:4px 12px">⚖️ Peser les lapins</button>
+          </div>
         </div>
         <div class="kv" style="margin-bottom:10px;max-width:380px">
           <div>Poids total actuel :</div><div><strong>${last.toFixed(2)} kg</strong></div>
           <div>Lapins pris en compte :</div><div>${rabbitsWeighed} / ${rabbitsActive} actifs</div>
           ${evoLine}
         </div>
+        ${_renderWeightExtremesCards(ctx)}
         ${renderWeightSVG(herdPoints, { id: "herd", color: "#4f7942" })}
       </div>
     `;
   }
+}
+
+// ── Cartes "Plus petit / Plus gros" (consolidées : cheptel + en vente) ───────
+
+function _renderWeightExtremesCards(ctx) {
+  const { state } = ctx;
+  const all  = getWeightExtremes(state, { forSaleOnly: false });
+  const sale = getWeightExtremes(state, { forSaleOnly: true });
+  if (!all.lightest && !all.heaviest) return "";
+
+  const settings = getSettings(ctx);
+
+  function _line(item, { showPrice = false } = {}) {
+    if (!item) return `<span class="muted">—</span>`;
+    const r = item.rabbit;
+    const cage = r.cage ? ` · 🏠 ${escapeHTML(r.cage)}` : "";
+    const price = showPrice
+      ? ` · <strong>${formatCurrency(estimateRabbitValue(item.weightKg, settings).live, settings)}</strong>`
+      : "";
+    return `
+      <button class="linkbtn" data-open-rabbit="${escapeAttr(r.id)}" style="text-align:left">
+        <strong>${escapeHTML(r.name)}</strong> (${escapeHTML(r.code)}) — <strong>${item.weightKg.toFixed(2)} kg</strong>${cage}${price}
+      </button>`;
+  }
+
+  return `
+    <div class="weight-extremes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:12px 0">
+      <div class="section-card" style="padding:10px 12px">
+        <div style="font-weight:700;margin-bottom:4px">🐇 Plus petit</div>
+        <div class="small" style="margin-bottom:4px">Cheptel : ${_line(all.lightest)}</div>
+        <div class="small">🏪 En vente : ${_line(sale.lightest, { showPrice: true })}</div>
+      </div>
+      <div class="section-card" style="padding:10px 12px">
+        <div style="font-weight:700;margin-bottom:4px">🦏 Plus gros</div>
+        <div class="small" style="margin-bottom:4px">Cheptel : ${_line(all.heaviest)}</div>
+        <div class="small">🏪 En vente : ${_line(sale.heaviest, { showPrice: true })}</div>
+      </div>
+    </div>
+  `;
 }
 
 
@@ -164,6 +208,8 @@ export function renderRabbitList(ctx) {
     const pregnantBadge = repro?.isPregnant ? `<span class="badge accent">🤰</span>` : "";
     const saleBadge = r.forSale ? `<span class="badge" style="background:#f0d28a;color:#7a5a10" title="En vente sur la boutique">🏪</span>` : "";
     const thumb = rabbitThumbHTML(ctx.state, r, { size: 40 });
+    const w = getCurrentWeight(ctx.state, r.id);
+    const wTxt = w != null ? `⚖️ ${w.toFixed(2)} kg` : "⚖️ —";
     return `
       <div class="item rl-item ${active}" data-testid="rabbit-item" data-rabbit="${r.id}" style="cursor:pointer;display:flex;align-items:center;gap:10px">
         ${thumb}
@@ -178,7 +224,7 @@ export function renderRabbitList(ctx) {
             ${rabbitStatusBadge(r.status)}
           </div>
           <div class="small" style="margin-top:2px;color:var(--color-muted)">
-            ${escapeHTML(r.breed || "—")} · ${escapeHTML(r.cage || "—")} · ${escapeHTML(formatDate(r.birthDate))}
+            ${escapeHTML(r.breed || "—")} · ${escapeHTML(r.cage || "—")} · ${escapeHTML(formatDate(r.birthDate))} · ${wTxt}
           </div>
         </div>
         <button class="btn ghost rl-event-btn" type="button" data-add-event="${r.id}" title="Nouvel événement" style="flex-shrink:0;padding:4px 8px;font-size:1rem">＋</button>
@@ -763,16 +809,54 @@ function getFilteredRabbits(ctx) {
   const q = (el.q.value || "").toLowerCase().trim();
   const sex = el.sexFilter.value;
   const status = el.statusFilter.value;
+  const wMinRaw = el.weightMin?.value;
+  const wMaxRaw = el.weightMax?.value;
+  const wMin = wMinRaw === "" || wMinRaw == null ? null : Number(wMinRaw);
+  const wMax = wMaxRaw === "" || wMaxRaw == null ? null : Number(wMaxRaw);
+  const sortBy = el.sortBy?.value || "cage";
 
-  return state.rabbits.filter(r => {
+  let list = state.rabbits.filter(r => {
     if (sex && r.sex !== sex) return false;
     if (status && r.status !== status) return false;
-    if (!q) return true;
-    // Recherche limitée aux champs visibles documentés : code, nom, race, cage.
-    // (les notes/statut/stade créaient des faux positifs — cf. rapport QA bug #5)
-    const hay = [r.code, r.name, r.breed, r.cage].join(" ").toLowerCase();
-    return hay.includes(q);
+    if (q) {
+      // Recherche limitée aux champs visibles documentés : code, nom, race, cage.
+      // (les notes/statut/stade créaient des faux positifs — cf. rapport QA bug #5)
+      const hay = [r.code, r.name, r.breed, r.cage].join(" ").toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    // Filtre fourchette de poids : exige une pesée connue dans [min, max].
+    // Lapins jamais pesés exclus dès qu'au moins une borne est posée.
+    if (Number.isFinite(wMin) || Number.isFinite(wMax)) {
+      const w = getCurrentWeight(state, r.id);
+      if (w == null) return false;
+      if (Number.isFinite(wMin) && w < wMin) return false;
+      if (Number.isFinite(wMax) && w > wMax) return false;
+    }
+    return true;
   });
+
+  // Tri
+  if (sortBy === "name") {
+    list = [...list].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+  } else if (sortBy === "birth") {
+    list = [...list].sort((a, b) => (b.birthDate || "").localeCompare(a.birthDate || ""));
+  } else if (sortBy === "weight-asc" || sortBy === "weight-desc") {
+    const dir = sortBy === "weight-desc" ? -1 : 1;
+    // Lapins pesés triés par poids, puis lapins jamais pesés en fin.
+    const withW = [];
+    const withoutW = [];
+    for (const r of list) {
+      const w = getCurrentWeight(state, r.id);
+      if (w == null) withoutW.push(r);
+      else withW.push({ r, w });
+    }
+    withW.sort((a, b) => dir * (a.w - b.w));
+    list = [...withW.map(x => x.r), ...withoutW];
+  } else {
+    // 'cage' (défaut)
+    list = sortByCage(list, r => r.cage);
+  }
+  return list;
 }
 
 function getFilteredLots(ctx, lots) {
