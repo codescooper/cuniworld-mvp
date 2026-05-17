@@ -18,7 +18,7 @@
  *        triés par proximité du budget
  */
 
-import { getCurrentWeight } from './weightService.js';
+import { getCurrentWeight, buildCurrentWeightIndex } from './weightService.js';
 import { estimateRabbitValue } from './settingsService.js';
 
 // ── Lecture de base ──────────────────────────────────────────────────────────
@@ -29,11 +29,14 @@ import { estimateRabbitValue } from './settingsService.js';
  * @param {{ forSaleOnly?: boolean }} [opts]
  */
 export function getRabbitsWithWeight(state, { forSaleOnly = false } = {}) {
+  // Indexation en un seul passage pour éviter O(rabbits × events) — sans ça
+  // les dashboards/recherches devenaient injouables au-delà de 200 lapins.
+  const weightIndex = buildCurrentWeightIndex(state);
   const out = [];
   for (const r of (state?.rabbits || [])) {
     if (r.status !== 'actif') continue;
     if (forSaleOnly && !r.forSale) continue;
-    const w = getCurrentWeight(state, r.id);
+    const w = weightIndex.get(r.id);
     if (w == null) continue;
     out.push({ rabbit: r, weightKg: w });
   }

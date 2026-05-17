@@ -31,4 +31,17 @@ export default defineConfig({
     __APP_COMMIT__:  JSON.stringify(commit),
     __APP_BUILD_TIME__: JSON.stringify(buildTime),
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Code-splitting des vendors lourds. Le SDK Supabase pèse ~100 kB
+        // gzip à lui seul ; l'isoler dans son propre chunk allège le
+        // bundle initial et donne un cache HTTP plus efficace (le SDK
+        // change rarement, le code métier souvent).
+        manualChunks: {
+          supabase: ["@supabase/supabase-js"],
+        },
+      },
+    },
+  },
 });

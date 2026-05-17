@@ -1,8 +1,8 @@
 import { escapeHTML, escapeAttr, formatDate, rabbitStatusBadge, sexLabel, daysBetween, getRabbitStage, stageBadge } from "./utils.js";
 import { estimateRabbitValue, formatCurrency, getSettings } from "./settingsService.js";
-import { getReproInfo } from "./repro.js";
+import { getReproInfo, getReproInfoFromIndex, buildLatestEventIndex } from "./repro.js";
 import { getBreedingStatus, breedingStatusBadge } from "./breeding.js";
-import { getRabbitWeightHistory, getTotalHerdWeightEvolution, renderWeightSVG, getCurrentWeight } from "./weightService.js";
+import { getRabbitWeightHistory, getTotalHerdWeightEvolution, renderWeightSVG, getCurrentWeight, buildCurrentWeightIndex } from "./weightService.js";
 import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
 import { buildLots, lotBadge, LOT_STATUSES } from "./lots.js";
 // genealogy3d.js : ~80 kB de logique 3D, chargé à la demande (panneau Généalogie)
@@ -38,9 +38,14 @@ export function renderDashboard(ctx) {
     return diff >= 0 && diff <= 7;
   }).length;
 
+  // Index pré-calculé pour éviter O(rabbits × events) : la version naïve
+  // appelait getReproInfo() pour chaque femelle, et chaque appel scannait
+  // tous les events. À 1000 lapins / 5000 events, c'était ~70 s.
+  const matingIdx = buildLatestEventIndex(state, "saillie");
+  const birthIdx  = buildLatestEventIndex(state, "mise_bas");
   const dueSoon = state.rabbits
     .filter(r => r.sex === "F" && r.status === "actif")
-    .map(r => ({ r, info: getReproInfo(state, r) }))
+    .map(r => ({ r, info: getReproInfoFromIndex(r, matingIdx, birthIdx) }))
     .filter(x => x.info && x.info.dueDate)
     .map(x => ({ ...x, daysLeft: daysBetween(todayISO, x.info.dueDate) }))
     .filter(x => x.daysLeft >= 0 && x.daysLeft <= 7)
@@ -54,67 +59,49 @@ export function renderDashboard(ctx) {
 
   // ── Évaluation du cheptel actif (dernière pesée connue par lapin) ──
   // Utilise les paramètres de la ferme : devise, prix vif/carcasse, rendement.
+  // Important : on indexe les pesées une SEULE fois (O(events)) plutôt que
+  // d'appeler getRabbitWeightHistory pour chaque lapin (O(rabbits × events)).
+  // Sans ça, le dashboard mettait > 100 s avec 1000 lapins / 5000 events.
   const settings = getSettings(ctx);
+  const weightIndex = buildCurrentWeightIndex(state);
   let herdValueLive = 0;
   let herdValueCarcass = 0;
   let herdEvaluatedCount = 0;
   for (const r of state.rabbits) {
     if (r.status !== 'actif') continue;
-    const wHist = getRabbitWeightHistory(state, r.id);
-    if (wHist.length === 0) continue;
-    const lastW = wHist[wHist.length - 1].weightKg;
+    const lastW = weightIndex.get(r.id);
+    if (lastW == null) continue;
     const v = estimateRabbitValue(lastW, settings);
     herdValueLive += v.live;
     herdValueCarcass += v.carcass;
     herdEvaluatedCount += 1;
   }
 
-  // KPI tiles d'abord (vue d'ensemble immédiate), actions ferme ensuite (déroulables).
-  el.dash.innerHTML = `
-    <div class="tile"><div class="n">${total}</div><div class="t">Lapins (total)</div></div>
-    <div class="tile"><div class="n">${actifs}</div><div class="t">Actifs</div></div>
-    <div class="tile"><div class="n">${femelles}</div><div class="t">Femelles actives</div></div>
-    <div class="tile"><div class="n">${males}</div><div class="t">Mâles actifs</div></div>
-    <div class="tile"><div class="n">${recent7}</div><div class="t">Événements (7 jours)</div></div>
-    <div class="tile"><div class="n">${dueSoon.length}</div><div class="t">Mise-bas bientôt (≤7j)</div></div>
-    <div class="tile"><div class="n">${upcoming.length}</div><div class="t">Rappels (≤7j)</div></div>
-    <div class="tile"><div class="n">${overdue.length}</div><div class="t">Rappels en retard</div></div>
-    <div class="tile"><div class="n">${state.rabbits.filter(r=>r.status==="mort").length}</div><div class="t">Morts</div></div>
-    <div class="tile" title="Estimation à partir des dernières pesées (${herdEvaluatedCount}/${actifs} actifs)">
-      <div class="n" style="font-size:1.1rem">${formatCurrency(herdValueLive, settings)}</div>
-      <div class="t">Valeur vif (cheptel)</div>
-    </div>
-    <div class="tile" title="Estimation carcasse (${Math.round(settings.carcassYield * 100)}% × ${settings.priceCarcassPerKg.toLocaleString('fr-FR')} ${settings.currencySymbol}/kg)">
-      <div class="n" style="font-size:1.1rem">${formatCurrency(herdValueCarcass, settings)}</div>
-      <div class="t">Valeur carcasse</div>
-    </div>
-  ` + dailyTasksHTML + farmActionsHTML;
-
-  // Liste mise-bas bientôt
+  // ── Liste mise-bas bientôt
+  let dueSoonHTML;
   if (dueSoon.length > 0) {
     const list = dueSoon.slice(0,6).map(x =>
       `<div class="small">• <strong>${escapeHTML(x.r.name)}</strong> (${escapeHTML(x.r.code)}) — mise-bas: <strong>${escapeHTML(x.info.dueDate)}</strong> (J-${x.daysLeft})</div>`
     ).join("");
-    el.dash.innerHTML += `<div style="grid-column:1/-1;margin-top:6px">${list}</div>`;
+    dueSoonHTML = `<div style="grid-column:1/-1;margin-top:6px">${list}</div>`;
   } else {
-    el.dash.innerHTML += `<div style="grid-column:1/-1;margin-top:6px" class="small">Aucune mise-bas prévue dans les 7 prochains jours.</div>`;
+    dueSoonHTML = `<div style="grid-column:1/-1;margin-top:6px" class="small">Aucune mise-bas prévue dans les 7 prochains jours.</div>`;
   }
 
-  // Liste rappels urgents (retard + ≤7j)
+  // ── Liste rappels urgents (retard + ≤7j)
   const urgent = [...overdue, ...upcoming].slice(0, 6);
+  let urgentHTML;
   if (urgent.length > 0) {
-    const list = urgent
-      .map(r => `<div class="small">• ${reminderLabel(r)}</div>`)
-      .join("");
-    el.dash.innerHTML += `<div style="grid-column:1/-1;margin-top:6px">${list}</div>`;
+    const list = urgent.map(r => `<div class="small">• ${reminderLabel(r)}</div>`).join("");
+    urgentHTML = `<div style="grid-column:1/-1;margin-top:6px">${list}</div>`;
   } else {
-    el.dash.innerHTML += `<div style="grid-column:1/-1;margin-top:6px" class="small">Aucun rappel vaccin/traitement à venir.</div>`;
+    urgentHTML = `<div style="grid-column:1/-1;margin-top:6px" class="small">Aucun rappel vaccin/traitement à venir.</div>`;
   }
 
-  // ── Tendance poids cheptel ───────────────────────────────────────────────────
+  // ── Tendance poids cheptel
   const herdEvo    = getTotalHerdWeightEvolution(state);
   const herdPoints = herdEvo.map(p => ({ label: p.date, value: p.totalWeightKg }));
-
+  let herdHTML = "";
   if (herdEvo.length > 0) {
     const first   = herdEvo[0].totalWeightKg;
     const last    = herdEvo[herdEvo.length - 1].totalWeightKg;
@@ -124,14 +111,11 @@ export function renderDashboard(ctx) {
       ? `<div>Évolution (1ère → dernière pesée):</div><div>${first.toFixed(2)} → ${last.toFixed(2)} kg <strong>(${gainStr})</strong></div>`
       : "";
 
-    // Lapins actifs ayant au moins une pesée
-    const weighedIds = new Set(
-      state.events.filter(e => e.type === "pesée" && Number(e.data?.weight) > 0).map(e => e.rabbitId)
-    );
-    const rabbitsWeighed = state.rabbits.filter(r => r.status === "actif" && weighedIds.has(r.id)).length;
+    // Réutilise l'index pesée pour ne pas re-scanner state.events.
+    const rabbitsWeighed = state.rabbits.filter(r => r.status === "actif" && weightIndex.has(r.id)).length;
     const rabbitsActive  = state.rabbits.filter(r => r.status === "actif").length;
 
-    el.dash.innerHTML += `
+    herdHTML = `
       <div style="grid-column:1/-1;margin-top:18px;padding-top:14px;border-top:1px solid #eee">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
           <div style="font-weight:700">⚖️ Poids total du cheptel</div>
@@ -150,6 +134,34 @@ export function renderDashboard(ctx) {
       </div>
     `;
   }
+
+  // KPI tiles + sections, en UN SEUL assignment pour éviter de re-parser le
+  // DOM à chaque `innerHTML +=` (≈ 5 re-parses précédemment, perte de plusieurs
+  // secondes sur des dashboards riches).
+  el.dash.innerHTML = `
+    <div class="tile"><div class="n">${total}</div><div class="t">Lapins (total)</div></div>
+    <div class="tile"><div class="n">${actifs}</div><div class="t">Actifs</div></div>
+    <div class="tile"><div class="n">${femelles}</div><div class="t">Femelles actives</div></div>
+    <div class="tile"><div class="n">${males}</div><div class="t">Mâles actifs</div></div>
+    <div class="tile"><div class="n">${recent7}</div><div class="t">Événements (7 jours)</div></div>
+    <div class="tile"><div class="n">${dueSoon.length}</div><div class="t">Mise-bas bientôt (≤7j)</div></div>
+    <div class="tile"><div class="n">${upcoming.length}</div><div class="t">Rappels (≤7j)</div></div>
+    <div class="tile"><div class="n">${overdue.length}</div><div class="t">Rappels en retard</div></div>
+    <div class="tile"><div class="n">${state.rabbits.filter(r=>r.status==="mort").length}</div><div class="t">Morts</div></div>
+    <div class="tile" title="Estimation à partir des dernières pesées (${herdEvaluatedCount}/${actifs} actifs)">
+      <div class="n" style="font-size:1.1rem">${formatCurrency(herdValueLive, settings)}</div>
+      <div class="t">Valeur vif (cheptel)</div>
+    </div>
+    <div class="tile" title="Estimation carcasse (${Math.round(settings.carcassYield * 100)}% × ${settings.priceCarcassPerKg.toLocaleString('fr-FR')} ${settings.currencySymbol}/kg)">
+      <div class="n" style="font-size:1.1rem">${formatCurrency(herdValueCarcass, settings)}</div>
+      <div class="t">Valeur carcasse</div>
+    </div>
+    ${dailyTasksHTML}
+    ${farmActionsHTML}
+    ${dueSoonHTML}
+    ${urgentHTML}
+    ${herdHTML}
+  `;
 }
 
 // ── Cartes "Plus petit / Plus gros" (consolidées : cheptel + en vente) ───────
@@ -201,14 +213,20 @@ export function renderRabbitList(ctx) {
     return;
   }
 
+  // Indexation des pesées + repro en un seul passage pour éviter
+  // O(rabbits × events) dans la map ci-dessous (cf. dashboard).
+  const weightIndex = buildCurrentWeightIndex(ctx.state);
+  const matingIdx   = buildLatestEventIndex(ctx.state, "saillie");
+  const birthIdx    = buildLatestEventIndex(ctx.state, "mise_bas");
+
   el.rabbitList.innerHTML = rabbits.map(r => {
     const active = r.id === ctx.selectedRabbitId ? "active" : "";
     const stage  = getRabbitStage(r);
-    const repro  = getReproInfo(ctx.state, r);
+    const repro  = getReproInfoFromIndex(r, matingIdx, birthIdx);
     const pregnantBadge = repro?.isPregnant ? `<span class="badge accent">🤰</span>` : "";
     const saleBadge = r.forSale ? `<span class="badge" style="background:#f0d28a;color:#7a5a10" title="En vente sur la boutique">🏪</span>` : "";
     const thumb = rabbitThumbHTML(ctx.state, r, { size: 40 });
-    const w = getCurrentWeight(ctx.state, r.id);
+    const w = weightIndex.get(r.id) ?? null;
     const wTxt = w != null ? `⚖️ ${w.toFixed(2)} kg` : "⚖️ —";
     return `
       <div class="item rl-item ${active}" data-testid="rabbit-item" data-rabbit="${r.id}" style="cursor:pointer;display:flex;align-items:center;gap:10px">
@@ -693,12 +711,19 @@ function _renderFarmActionsCard(ctx) {
 }
 
 const FARM_SECTION_DEFAULT_LIMIT = 5;
+// Cap absolu pour éviter de générer plusieurs centaines de KB de HTML
+// au premier rendu quand un éleveur a 1000+ lapins jamais pesés ou jamais
+// photographiés. Au-delà, on indique le total mais on n'affiche que les
+// premiers — l'éleveur traite par paquets de toute façon.
+const FARM_SECTION_HIDDEN_CAP = 30;
 
 function _farmSectionHTML(key, title, actions, open) {
   const limit = FARM_SECTION_DEFAULT_LIMIT;
   const hasMore = actions.length > limit;
   const visible = hasMore ? actions.slice(0, limit) : actions;
-  const hidden  = hasMore ? actions.slice(limit) : [];
+  const hiddenAll = hasMore ? actions.slice(limit) : [];
+  const hidden = hiddenAll.slice(0, FARM_SECTION_HIDDEN_CAP);
+  const overflow = hiddenAll.length - hidden.length;
   return `
     <details class="farm-section farm-section-${key}" ${open ? 'open' : ''}>
       <summary class="farm-section-header">
@@ -706,8 +731,9 @@ function _farmSectionHTML(key, title, actions, open) {
       </summary>
       <div class="farm-section-list" data-farm-section="${escapeAttr(key)}">
         ${visible.map(_farmActionCardHTML).join('')}
-        ${hasMore ? `<div class="farm-section-extra" hidden>${hidden.map(_farmActionCardHTML).join('')}</div>` : ''}
-        ${hasMore ? `<button class="btn ghost farm-section-toggle" type="button" data-farm-section-toggle="${escapeAttr(key)}">Voir les ${hidden.length} autre(s) ▾</button>` : ''}
+        ${hidden.length ? `<div class="farm-section-extra" hidden>${hidden.map(_farmActionCardHTML).join('')}</div>` : ''}
+        ${hidden.length ? `<button class="btn ghost farm-section-toggle" type="button" data-farm-section-toggle="${escapeAttr(key)}">Voir les ${hidden.length} autre(s) ▾</button>` : ''}
+        ${overflow > 0 ? `<div class="small muted" style="margin-top:6px">+${overflow} actions supplémentaires non affichées (traitez les premières d'abord).</div>` : ''}
       </div>
     </details>
   `;

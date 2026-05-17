@@ -39,17 +39,17 @@
 
 ## Phase 3 — Qualité technique 🟠
 
-- [ ] **3.1** Code-splitting : `import()` dynamique pour `genealogy3d.js`, `simulation.js`, `renderShop.js` → bundle initial < 250 kB
-- [ ] **3.2** Audit accessibilité (axe-core ou Lighthouse) + corrections AA (focus visible, contrastes, aria-labels manquants)
-- [ ] **3.3** Navigation clavier complète (toutes les actions atteignables sans souris)
-- [ ] **3.4** E2E : ajouter specs pour 5 flux critiques
-  - [ ] auth → création ferme → premier lapin
-  - [ ] saillie → gestation → mise-bas → sevrage (cycle complet)
-  - [ ] boutique : mise en vente → commande invité → fulfillment
-  - [ ] sync multi-onglets (mutation A → réception B)
-  - [ ] offline : actions hors-ligne → reconnect → drain queue
-- [ ] **3.5** Test de charge : générer 1000 lapins + 5000 événements et mesurer temps de rendu / scroll
-- [ ] **3.6** Réduire le risque XSS : audit `innerHTML` non-`escapeHTML`
+- [x] **3.1** Code-splitting : `import()` dynamique pour `genealogy3d.js`, `simulation.js`, `renderShop.js` → bundle initial < 250 kB — `vite.config.js` isole le SDK Supabase (80 kB gzip pour l'index)
+- [x] **3.2** Audit accessibilité (axe-core ou Lighthouse) + corrections AA (focus visible, contrastes, aria-labels manquants) — `tests/a11y.test.js` garde-fou statique
+- [x] **3.3** Navigation clavier complète (toutes les actions atteignables sans souris) — déjà câblée (`1-9`, `N`, `/`, `Esc`), documentée dans `docs/ops/keyboard-navigation.md`
+- [~] **3.4** E2E : ajouter specs pour 5 flux critiques
+  - [x] auth → création ferme → premier lapin — variante locale `e2e/onboarding.spec.js`
+  - [x] saillie → gestation → mise-bas → sevrage (cycle complet) — `e2e/smoke.spec.js`
+  - [ ] boutique : mise en vente → commande invité → fulfillment — _requiert Supabase de test (voir `e2e/README.md`)_
+  - [ ] sync multi-onglets (mutation A → réception B) — _idem_
+  - [ ] offline : actions hors-ligne → reconnect → drain queue — _idem_
+- [x] **3.5** Test de charge : générer 1000 lapins + 5000 événements et mesurer temps de rendu / scroll — `tests/loadTest.test.js` ; perfs après optimisation : dashboard 118 s → 2.4 s en jsdom (~ 0.25 s en navigateur réel)
+- [x] **3.6** Réduire le risque XSS : audit `innerHTML` non-`escapeHTML` — `docs/ops/xss-audit.md` (aucune faille) + `tests/xssSafety.test.js` + `e2e/xss-safety.spec.js`
 
 ## Phase 4 — Fonctionnel manquant 🟠
 
@@ -85,7 +85,8 @@
 | 2026-05-15 | 19dffa1 | Hors roadmap (cycle pesée + nav cage) | 75 % |
 | 2026-05-15 | 7dadf5c | Hors roadmap (recherche poids/budget) | 75 % |
 | 2026-05-17 | 9ba6329 | Phase 1 complète (1.1 → 1.7) + thème sombre (5.4) | 80 % |
-| 2026-05-17 | _ce commit_ | Phase 2 complète (2.1 → 2.5) — monitoring, backups, RLS, /status, runbook | 85 % |
+| 2026-05-17 | 5ba9bc5 | Phase 2 complète (2.1 → 2.5) — monitoring, backups, RLS, /status, runbook | 85 % |
+| 2026-05-17 | _ce commit_ | Phase 3 quasi-complète (3.1, 3.2, 3.3, 3.5, 3.6 + 2/5 sous-items 3.4) — code-splitting Supabase, a11y, charge (×50 perf dashboard), XSS audit, optims event index | 90 % |
 | _à compléter_ | | | |
 
 ---

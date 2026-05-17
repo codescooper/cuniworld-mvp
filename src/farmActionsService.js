@@ -1,10 +1,38 @@
 import { daysBetween } from './utils.js';
-import { getRabbitWeightHistory } from './weightService.js';
+import { getRabbitWeightHistory, buildCurrentWeightIndex } from './weightService.js';
 import { getPhotoHistory } from './photos.js';
-import { getReproInfo } from './repro.js';
+import { getReproInfo, getReproInfoFromIndex, buildLatestEventIndex } from './repro.js';
 import { getBreedingStatus } from './breeding.js';
 import { getOverdueInspections, getOpenDefects } from './buildingService.js';
 import { DEFAULT_SETTINGS } from './settingsService.js';
+
+// ── Indexes : construits une seule fois par getTodayFarmActions ─────────────
+// Sans ces indexes, chaque getXActions itérait sur les events POUR CHAQUE
+// lapin, dégradant le rendu à plusieurs minutes au-delà de 500 lapins.
+
+function _buildIndexes(state) {
+  const photos = (state.photos || []);
+  // Photos par rabbitId triées DESC sur date
+  const photosByRabbit = new Map();
+  for (const p of photos) {
+    if (!p.rabbitId) continue;
+    const arr = photosByRabbit.get(p.rabbitId) || [];
+    arr.push(p);
+    photosByRabbit.set(p.rabbitId, arr);
+  }
+  for (const arr of photosByRabbit.values()) {
+    arr.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }
+
+  // Dernier événement par (type, rabbitId) — un seul passage sur les events.
+  return {
+    lastWeighing:  buildLatestEventIndex(state, 'pesée'),
+    lastMating:    buildLatestEventIndex(state, 'saillie'),
+    lastBirth:     buildLatestEventIndex(state, 'mise_bas'),
+    lastWeaning:   buildLatestEventIndex(state, 'sevrage'),
+    photosByRabbit,
+  };
+}
 
 const DISMISSED_KEY = 'dismissedTodayActions';
 
@@ -42,12 +70,15 @@ export function getTodayFarmActions(state, currentDate, settings) {
     return _cache.result;
   }
 
+  // Construits une fois ici plutôt que dans chaque sub-fonction.
+  const idx = _buildIndexes(state);
+
   const all = [
     ...getHealthActions(state, today),
-    ...getWeaningActions(state, today),
-    ...getBreedingActions(state, today),
-    ...getWeightActions(state, today, s),
-    ...getPhotoActions(state, today),
+    ...getWeaningActions(state, today, idx),
+    ...getBreedingActions(state, today, idx),
+    ...getWeightActions(state, today, s, idx),
+    ...getPhotoActions(state, today, idx),
     ...getBuildingActions(state, today),
   ].filter(a => !isActionDismissedToday(a.id, today));
 
@@ -72,7 +103,7 @@ export function getTodayFarmActions(state, currentDate, settings) {
 
 // ── Weight ────────────────────────────────────────────────────────────────────
 
-export function getWeightActions(state, currentDate, settings) {
+export function getWeightActions(state, currentDate, settings, idx) {
   const today = currentDate || new Date().toISOString().slice(0, 10);
   const s = { ...DEFAULT_SETTINGS, ...(settings || {}) };
   const cycle = Math.max(0, Number(s.weightCheckOverdueDays) || 0);
@@ -80,10 +111,17 @@ export function getWeightActions(state, currentDate, settings) {
   const todayThreshold = Math.max(1, cycle - 2);
   const actions = [];
 
+  // Si pas d'index fourni (anciens appelants), retombe sur la version O(rabbits × events).
+  const weighingIdx = idx?.lastWeighing;
+
   for (const r of (state.rabbits || [])) {
     if (r.status !== 'actif') continue;
-    const history  = getRabbitWeightHistory(state, r.id);
-    const last     = history.length > 0 ? history[history.length - 1] : null;
+    const last = weighingIdx
+      ? (weighingIdx.get(r.id) || null)
+      : (() => {
+          const h = getRabbitWeightHistory(state, r.id);
+          return h.length > 0 ? { date: h[h.length - 1].date } : null;
+        })();
     const daysSince = last ? daysBetween(last.date, today) : null;
 
     if (!last) {
@@ -127,13 +165,14 @@ export function getWeightActions(state, currentDate, settings) {
 
 // ── Photo ─────────────────────────────────────────────────────────────────────
 
-export function getPhotoActions(state, currentDate) {
+export function getPhotoActions(state, currentDate, idx) {
   const today = currentDate || new Date().toISOString().slice(0, 10);
   const actions = [];
+  const photosByRabbit = idx?.photosByRabbit;
 
   for (const r of (state.rabbits || [])) {
     if (r.status !== 'actif') continue;
-    const history   = getPhotoHistory(state, r.id);
+    const history   = photosByRabbit ? (photosByRabbit.get(r.id) || []) : getPhotoHistory(state, r.id);
     const last      = history[0] || null;
     const daysSince = last ? daysBetween(last.date, today) : null;
     const rabbitAge = r.birthDate ? daysBetween(r.birthDate, today) : 999;
@@ -168,13 +207,17 @@ export function getPhotoActions(state, currentDate) {
 
 // ── Breeding ──────────────────────────────────────────────────────────────────
 
-export function getBreedingActions(state, currentDate) {
+export function getBreedingActions(state, currentDate, idx) {
   const today = currentDate || new Date().toISOString().slice(0, 10);
   const actions = [];
+  const matingIdx = idx?.lastMating;
+  const birthIdx  = idx?.lastBirth;
 
   for (const r of (state.rabbits || [])) {
     if (r.status !== 'actif') continue;
-    const repro = getReproInfo(state, r);
+    const repro = (matingIdx && birthIdx)
+      ? getReproInfoFromIndex(r, matingIdx, birthIdx)
+      : getReproInfo(state, r);
     if (!repro) continue;
 
     if (repro.isPregnant && repro.dueDate) {
@@ -235,24 +278,37 @@ export function getBreedingActions(state, currentDate) {
 
 // ── Weaning ───────────────────────────────────────────────────────────────────
 
-export function getWeaningActions(state, currentDate) {
+export function getWeaningActions(state, currentDate, idx) {
   const today = currentDate || new Date().toISOString().slice(0, 10);
   const actions = [];
+  const birthIdx   = idx?.lastBirth;
+  const weaningIdx = idx?.lastWeaning;
 
   for (const r of (state.rabbits || [])) {
     if (r.status !== 'actif' || r.sex !== 'F') continue;
 
-    const births = (state.events || [])
-      .filter(e => e.rabbitId === r.id && e.type === 'mise_bas')
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    let lastBirth = null;
+    if (birthIdx) {
+      lastBirth = birthIdx.get(r.id) || null;
+    } else {
+      const births = (state.events || [])
+        .filter(e => e.rabbitId === r.id && e.type === 'mise_bas')
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      lastBirth = births[0] || null;
+    }
+    if (!lastBirth) continue;
 
-    if (!births.length) continue;
-    const lastBirth = births[0];
-
-    const hasWeaning = (state.events || []).some(
-      e => e.rabbitId === r.id && e.type === 'sevrage' && (e.date || '') >= (lastBirth.date || '')
-    );
-    if (hasWeaning) continue;
+    // Sevrage déjà réalisé pour cette portée ?
+    let lastWeaning = null;
+    if (weaningIdx) {
+      lastWeaning = weaningIdx.get(r.id) || null;
+    } else {
+      const wean = (state.events || []).find(
+        e => e.rabbitId === r.id && e.type === 'sevrage' && (e.date || '') >= (lastBirth.date || '')
+      );
+      lastWeaning = wean || null;
+    }
+    if (lastWeaning && (lastWeaning.date || '') >= (lastBirth.date || '')) continue;
 
     const daysSinceBirth = daysBetween(lastBirth.date, today);
     if (daysSinceBirth < 0) continue;

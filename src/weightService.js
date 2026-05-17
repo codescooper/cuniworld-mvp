@@ -46,6 +46,35 @@ export function getCurrentWeight(state, rabbitId) {
   return h.length > 0 ? h[h.length - 1].weightKg : null;
 }
 
+/**
+ * Indexe les pesées par rabbitId en UN SEUL passage sur state.events.
+ * Retourne une Map<rabbitId, lastWeightKg> — le poids actuel de chaque lapin.
+ *
+ * Utilisé par les renderers qui itèrent sur tous les lapins (dashboard,
+ * liste). Sans cet index, chaque renderRabbitList sur 1000 lapins refait
+ * 1000 × O(events) lookups, soit O(rabbits × events). Ici on a O(events).
+ */
+export function buildCurrentWeightIndex(state) {
+  const events = state.events || [];
+  // Pour chaque rabbitId, on garde l'événement pesée le plus récent
+  // (date desc, puis createdAt desc en cas d'égalité).
+  const latest = new Map();
+  for (const e of events) {
+    if (e.type !== "pesée") continue;
+    const w = Number(e.data?.weight);
+    if (!(w > 0)) continue;
+    const prev = latest.get(e.rabbitId);
+    if (!prev) { latest.set(e.rabbitId, e); continue; }
+    const cmp = (e.date || "").localeCompare(prev.date || "");
+    if (cmp > 0 || (cmp === 0 && (e.createdAt || "").localeCompare(prev.createdAt || "") > 0)) {
+      latest.set(e.rabbitId, e);
+    }
+  }
+  const out = new Map();
+  for (const [id, e] of latest) out.set(id, Number(e.data.weight));
+  return out;
+}
+
 // ─── Évolution globale du cheptel ─────────────────────────────────────────────
 
 /**
