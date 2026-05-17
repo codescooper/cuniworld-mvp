@@ -29,11 +29,13 @@
 
 ## Phase 2 — Monitoring & ops 🔴
 
-- [ ] **2.1** Intégrer Sentry (ou alternative : Vercel monitoring) — capture des erreurs JS prod
-- [ ] **2.2** Backup quotidien Supabase + script restore documenté (`docs/ops/backup-restore.md`)
-- [ ] **2.3** Audit RLS : revue ligne par ligne des policies sur toutes les tables, tests d'isolement cross-ferme
-- [ ] **2.4** Health-check : page `/status` minimaliste (build version + supabase ping)
-- [ ] **2.5** Procédure incident documentée (`docs/ops/incident-runbook.md`)
+- [x] **2.1** Intégrer Sentry (ou alternative : Vercel monitoring) — capture des erreurs JS prod — wrapper `src/monitoring.js` (sans SDK, payload natif)
+- [x] **2.2** Backup quotidien Supabase + script restore documenté (`docs/ops/backup-restore.md`) — script `scripts/backup-supabase.sh`
+- [x] **2.3** Audit RLS : revue ligne par ligne des policies sur toutes les tables, tests d'isolement cross-ferme — `docs/ops/rls-audit.md` + `tests/rlsAudit.test.js`
+- [x] **2.4** Health-check : page `/status` minimaliste (build version + supabase ping) — accessible via `?status=1`
+- [x] **2.5** Procédure incident documentée (`docs/ops/incident-runbook.md`)
+
+> **À activer en prod** : définir `VITE_SENTRY_DSN` dans Vercel env vars pour activer le monitoring + planifier le cron du script `scripts/backup-supabase.sh` sur la machine du mainteneur.
 
 ## Phase 3 — Qualité technique 🟠
 
@@ -82,7 +84,8 @@
 |---|---|---|---|
 | 2026-05-15 | 19dffa1 | Hors roadmap (cycle pesée + nav cage) | 75 % |
 | 2026-05-15 | 7dadf5c | Hors roadmap (recherche poids/budget) | 75 % |
-| 2026-05-17 | _ce commit_ | Phase 1 complète (1.1 → 1.7) + thème sombre (5.4) | 80 % |
+| 2026-05-17 | 9ba6329 | Phase 1 complète (1.1 → 1.7) + thème sombre (5.4) | 80 % |
+| 2026-05-17 | _ce commit_ | Phase 2 complète (2.1 → 2.5) — monitoring, backups, RLS, /status, runbook | 85 % |
 | _à compléter_ | | | |
 
 ---

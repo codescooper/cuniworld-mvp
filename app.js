@@ -29,6 +29,7 @@ import { openAddBuildingModal, openQuickSetupModal } from "./src/renderBuildings
 // renderSimulation.js / renderShop.js : modules lourds chargés à la demande.
 import { isSimulationState } from "./src/simulation.js";
 import { openPhotoDiagnosticModal } from "./src/renderPhotoDiagnostic.js";
+import { initMonitoring } from "./src/monitoring.js";
 
 const _lazySimulation = () => import("./src/renderSimulation.js");
 const _lazyShop       = () => import("./src/renderShop.js");
@@ -808,6 +809,17 @@ function wireSimulationBanner() {
 }
 
 async function initApp() {
+  // Monitoring : init le plus tôt possible pour capturer les erreurs
+  // d'amorçage (auth, sync). No-op si VITE_SENTRY_DSN n'est pas défini.
+  initMonitoring();
+
+  // Page /status : vue dédiée minimaliste pour health-check.
+  if (/[?&]status=/.test(window.location.search)) {
+    const { renderStatusPage } = await import("./src/statusPage.js");
+    renderStatusPage();
+    return;
+  }
+
   // Mode boutique publique : si l'URL contient ?shop=…, on monte une vue
   // dédiée et on n'initialise pas le reste de l'app (pas d'auth, pas de
   // hooks). Permet l'accès anon pour les clients de la boutique.
