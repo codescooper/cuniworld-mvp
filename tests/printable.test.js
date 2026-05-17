@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { buildSanitaryRecordHTML, buildInvoiceHTML } from "../src/printable.js";
+import { describe, it, expect, vi } from "vitest";
+import { buildSanitaryRecordHTML, buildInvoiceHTML, printSanitaryRecord, printInvoice } from "../src/printable.js";
 
 describe("printable.js — carnet sanitaire", () => {
   const rabbit = {
@@ -99,5 +99,51 @@ describe("printable.js — facture", () => {
     const html = buildInvoiceHTML(o, ctx);
     expect(html).not.toContain('<img src=x onerror=alert(1)>');
     expect(html).toContain('&lt;img');
+  });
+
+  it("écrit dans une fenêtre pré-ouverte (pattern user-gesture safe)", () => {
+    // Stub minimaliste d'une fenêtre window pré-ouverte
+    let writtenHTML = '';
+    const fakeWindow = {
+      document: {
+        open: vi.fn(),
+        write: vi.fn((s) => { writtenHTML += s; }),
+        close: vi.fn(),
+      },
+    };
+    const ok = printInvoice(order, ctx, fakeWindow);
+    expect(ok).toBe(true);
+    expect(writtenHTML).toContain('FACTURE n°');
+    expect(writtenHTML).toContain('Jean Dupont');
+  });
+});
+
+describe("printable.js — chemin pré-ouvert (carnet)", () => {
+  it("printSanitaryRecord avec fenêtre pré-ouverte écrit le HTML", () => {
+    let writtenHTML = '';
+    const fakeWindow = {
+      document: {
+        open: vi.fn(),
+        write: vi.fn((s) => { writtenHTML += s; }),
+        close: vi.fn(),
+      },
+    };
+    const rabbit = { id: 'r1', code: 'CW-F001', name: 'Naya', sex: 'F' };
+    const state = { rabbits: [rabbit], events: [] };
+    const ok = printSanitaryRecord(state, rabbit, fakeWindow);
+    expect(ok).toBe(true);
+    expect(writtenHTML).toContain('Carnet sanitaire');
+    expect(writtenHTML).toContain('Naya');
+  });
+
+  it("retombe sur openPrintWindow si pas de fenêtre fournie", () => {
+    // En env vitest sans window.open natif, on s'attend simplement à un retour
+    // truthy/falsy sans crash.
+    const rabbit = { id: 'r1', code: 'CW-F001', name: 'Naya', sex: 'F' };
+    const state = { rabbits: [rabbit], events: [] };
+    // jsdom: window.open existe mais retourne null par défaut → openPrintWindow
+    // renvoie false, ce qui est l'API attendue.
+    const result = printSanitaryRecord(state, rabbit);
+    expect(typeof result).toBe('boolean');
   });
 });

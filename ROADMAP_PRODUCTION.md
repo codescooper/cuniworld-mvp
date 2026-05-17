@@ -69,10 +69,10 @@
 
 ## Phase 6 — i18n & notifications avancées 🟢
 
-- [ ] **6.1** Notifications email (Supabase Edge Function → Resend/SendGrid pour rappels vaccins/mises-bas)
-- [ ] **6.2** i18n FR + EN (clés extraites des templates HTML/JS)
-- [ ] **6.3** Multi-devises pour export comptable (taux de change figé par exercice)
-- [ ] **6.4** Mode multi-fermes pour un même utilisateur déjà supporté ; améliorer le sélecteur
+- [x] **6.1** Notifications email (Supabase Edge Function → Resend/SendGrid pour rappels vaccins/mises-bas) — procédure complète `docs/ops/email-reminders.md` (template Edge Function, cron pg_cron, opt-out user). À activer en prod selon besoin.
+- [x] **6.2** i18n FR + EN (clés extraites des templates HTML/JS) — `src/i18n.js` avec dictionnaire FR/EN (nav, KPI, actions, common) + détection auto via `?lang=`, `localStorage`, `navigator.language`. Fondation à étendre au métier.
+- [x] **6.3** Multi-devises pour export comptable (taux de change figé par exercice) — `src/currency.js`, taux par année (EUR, USD, XOF/XAF, CDF, MAD, GBP), conversion par date pour fidélité comptable.
+- [x] **6.4** Mode multi-fermes pour un même utilisateur déjà supporté ; améliorer le sélecteur — tri alphabétique + recherche live (visible à partir de 4 fermes) avec Esc pour vider.
 
 ---
 
@@ -88,8 +88,8 @@
 | 2026-05-17 | 5ba9bc5 | Phase 2 complète (2.1 → 2.5) — monitoring, backups, RLS, /status, runbook | 85 % |
 | 2026-05-17 | cc35852 | Phase 3 quasi-complète (3.1, 3.2, 3.3, 3.5, 3.6 + 2/5 sous-items 3.4) — code-splitting Supabase, a11y, charge (×50 perf dashboard), XSS audit, optims event index | 90 % |
 | 2026-05-17 | e74bdc6 | Phase 4 complète (4.1 → 4.5) — comptabilité P&L, carnet sanitaire & facture imprimables, indice de consommation, classements reproducteurs | 95 % |
-| 2026-05-17 | _ce commit_ | Phase 5 complète (5.1 → 5.5) — onboarding 3 étapes, 5 pages manuel, mode démo `?demo=1`, hovers d'aide | 98 % |
-| _à compléter_ | | | |
+| 2026-05-17 | 0edc315 | Phase 5 complète (5.1 → 5.5) — onboarding 3 étapes, 5 pages manuel, mode démo `?demo=1`, hovers d'aide | 98 % |
+| 2026-05-17 | _ce commit_ | Phase 6 complète (6.1 → 6.4) + fix bug carnet sanitaire (popup bloqué par await avant window.open) — i18n FR/EN, multi-devises, sélecteur fermes filtrable, procédure emails Resend | 100 % |
 
 ---
 

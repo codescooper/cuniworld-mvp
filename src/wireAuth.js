@@ -229,6 +229,30 @@ function _wireFarmSelector(overlay, ctx, onReady) {
     btn.addEventListener('click', () => _loadFarm(btn.dataset.farmId, btn.dataset.farmName, ctx, onReady));
   });
 
+  // Recherche live (affichée seulement si > 3 fermes — cf. _farmSelectorHTML).
+  // Filtre simple par sous-chaîne sur le nom (data-farm-search déjà
+  // normalisé en minuscule dans le HTML).
+  const search = overlay.querySelector('#farmSearch');
+  if (search) {
+    const empty = overlay.querySelector('#farmSearchEmpty');
+    const items = overlay.querySelectorAll('[data-farm-id]');
+    const filter = () => {
+      const q = search.value.trim().toLowerCase();
+      let visible = 0;
+      items.forEach(btn => {
+        const match = !q || (btn.dataset.farmSearch || '').includes(q);
+        btn.style.display = match ? '' : 'none';
+        if (match) visible++;
+      });
+      if (empty) empty.style.display = visible === 0 ? '' : 'none';
+    };
+    search.addEventListener('input', filter);
+    // Raccourci Esc dans le champ vide le filtre.
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && search.value) { e.preventDefault(); search.value = ''; filter(); }
+    });
+  }
+
   // Créer une ferme
   overlay.querySelector('#createFarmForm')?.addEventListener('submit', async e => {
     e.preventDefault();
@@ -731,9 +755,17 @@ function _authShellHTML(joinFarmId = null) {
 }
 
 function _farmSelectorHTML(farms, email) {
-  const list = farms.length
-    ? farms.map(f => `
-        <button class="farm-item" data-farm-id="${escAttr(f.id)}" data-farm-name="${escAttr(f.name)}">
+  // Tri alphabétique pour stabilité visuelle (les API peuvent renvoyer dans
+  // un ordre arbitraire selon le backend / les ajouts de membres).
+  const sorted = [...(farms || [])].sort((a, b) =>
+    (a.name || '').localeCompare(b.name || '', 'fr', { sensitivity: 'base' })
+  );
+  // Recherche visible uniquement au-delà de 3 fermes (sinon bruit visuel).
+  const showSearch = sorted.length > 3;
+
+  const list = sorted.length
+    ? sorted.map(f => `
+        <button class="farm-item" data-farm-id="${escAttr(f.id)}" data-farm-name="${escAttr(f.name)}" data-farm-search="${escAttr((f.name || '').toLowerCase())}">
           <span class="farm-item-icon">🏡</span>
           <span class="farm-item-name">${escapeHTML(f.name)}</span>
           <span class="badge farm-item-role">${f.role === 'owner' ? 'Propriétaire' : 'Membre'}</span>
@@ -746,7 +778,14 @@ function _farmSelectorHTML(farms, email) {
       <h2 class="auth-title" style="font-size:1.3rem">Choisir une ferme</h2>
       <p class="auth-sub">${escapeHTML(email || '')}</p>
 
-      <div class="farm-list">${list}</div>
+      ${showSearch ? `
+        <div class="field" style="margin-bottom:8px">
+          <input id="farmSearch" class="input" type="search" placeholder="🔍 Filtrer (${sorted.length} fermes)" autocomplete="off" />
+        </div>
+        <div id="farmSearchEmpty" class="muted small" style="text-align:center;padding:6px 0;display:none">Aucune ferme ne correspond.</div>
+      ` : ''}
+
+      <div class="farm-list" id="farmList">${list}</div>
 
       <div class="farm-sep"><span>Créer</span></div>
       <form id="createFarmForm" class="auth-form">

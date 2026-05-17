@@ -215,15 +215,27 @@ export function wireDynamic(ctx) {
     });
   }
 
-  // Carnet sanitaire imprimable
+  // Carnet sanitaire imprimable. CRITIQUE : on ouvre la fenêtre about:blank
+  // SYNCHRONIQUEMENT dans le handler — pas d'`await` avant `window.open`,
+  // sinon le navigateur considère que ce n'est plus une action utilisateur
+  // et bloque le popup. Le lazy import ne tourne qu'APRÈS l'ouverture.
   const btnPrintSanitary = document.getElementById("btnPrintSanitary");
   if (btnPrintSanitary) {
-    btnPrintSanitary.addEventListener("click", async () => {
+    btnPrintSanitary.addEventListener("click", () => {
       const r = ctx.state.rabbits.find(x => x.id === ctx.selectedRabbitId);
       if (!r) return;
-      const { printSanitaryRecord } = await import("./printable.js");
-      const ok = printSanitaryRecord(ctx.state, r);
-      if (!ok) showToast("Le navigateur a bloqué la fenêtre d'impression. Autorisez les popups pour ce site.", "error");
+      const w = window.open('about:blank', '_blank', 'width=900,height=1000');
+      if (!w) {
+        showToast("Le navigateur a bloqué la fenêtre d'impression. Autorisez les popups pour ce site.", "error");
+        return;
+      }
+      try { w.document.write('<!doctype html><meta charset="utf-8"><title>Préparation…</title><p style="font-family:sans-serif;padding:24px">Préparation du carnet sanitaire…</p>'); w.document.close(); } catch (_) {}
+      import("./printable.js").then(mod => {
+        mod.printSanitaryRecord(ctx.state, r, w);
+      }).catch(err => {
+        try { w.close(); } catch (_) {}
+        showToast("Impossible de générer le carnet : " + (err?.message || err), "error");
+      });
     });
   }
 

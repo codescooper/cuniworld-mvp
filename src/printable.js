@@ -37,12 +37,30 @@ const BASE_CSS = `
 `;
 
 /**
- * Ouvre une nouvelle fenêtre/onglet avec le HTML donné et déclenche
- * l'impression. Retourne true si la fenêtre a pu être créée, false si bloquée
- * (popup-blocker) — le caller peut alors fallback sur un toast d'erreur.
+ * Pré-ouvre une fenêtre about:blank — DOIT être appelé synchroniquement dans
+ * un handler de click (sinon le navigateur bloque le popup). Retourne la
+ * référence à passer ensuite à `writePrintWindow()` une fois le contenu prêt.
+ *
+ * @returns {Window|null} null si bloqué par le popup-blocker.
  */
-function openPrintWindow(title, bodyHTML) {
-  const w = window.open('', '_blank', 'noopener,width=900,height=1000');
+export function preparePrintWindow() {
+  // On évite `noopener` ici car on a besoin de la référence pour écrire
+  // après coup. Le contenu reste isolé sur about:blank en attendant.
+  const w = window.open('about:blank', '_blank', 'width=900,height=1000');
+  if (!w) return null;
+  // Placeholder visible pendant le chargement éventuel.
+  try {
+    w.document.write('<!doctype html><meta charset="utf-8"><title>Préparation…</title><p style="font-family:sans-serif;padding:24px">Préparation du document…</p>');
+    w.document.close();
+  } catch (_) { /* certaines configs strictes bloquent write : on tente quand même writeContent ensuite */ }
+  return w;
+}
+
+/**
+ * Écrit le contenu d'impression dans une fenêtre déjà ouverte par
+ * `preparePrintWindow()`. Si `w` est null (popup bloqué), retourne false.
+ */
+export function writePrintWindow(w, title, bodyHTML) {
   if (!w) return false;
   const html = `<!doctype html>
 <html lang="fr">
@@ -60,9 +78,24 @@ ${bodyHTML}
 <div class="footer">Document généré par CuniWorld le ${escapeHTML(new Date().toLocaleString('fr-FR'))}</div>
 </body>
 </html>`;
-  w.document.write(html);
-  w.document.close();
-  return true;
+  try {
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Helper synchrone : ouvre + écrit en une seule étape. À utiliser uniquement
+ * quand l'appelant peut TOUT préparer dans le même tick que le click (pas
+ * d'`await` entre les deux). Sinon, utiliser preparePrintWindow + writePrintWindow.
+ */
+function openPrintWindow(title, bodyHTML) {
+  const w = preparePrintWindow();
+  return writePrintWindow(w, title, bodyHTML);
 }
 
 // ── 1) Carnet sanitaire par lapin ──────────────────────────────────────────
@@ -149,9 +182,12 @@ export function buildSanitaryRecordHTML(state, rabbit) {
   `;
 }
 
-export function printSanitaryRecord(state, rabbit) {
+export function printSanitaryRecord(state, rabbit, preOpenedWindow = null) {
   const html = buildSanitaryRecordHTML(state, rabbit);
   const title = `Carnet sanitaire — ${rabbit?.name || rabbit?.code || 'lapin'}`;
+  if (preOpenedWindow !== undefined && preOpenedWindow !== null) {
+    return writePrintWindow(preOpenedWindow, title, html);
+  }
   return openPrintWindow(title, html);
 }
 
@@ -235,9 +271,12 @@ export function buildInvoiceHTML(order, ctx) {
   `;
 }
 
-export function printInvoice(order, ctx) {
+export function printInvoice(order, ctx, preOpenedWindow = null) {
   const html = buildInvoiceHTML(order, ctx);
   const title = `Facture ${_invoiceNumber(order)}`;
+  if (preOpenedWindow !== undefined && preOpenedWindow !== null) {
+    return writePrintWindow(preOpenedWindow, title, html);
+  }
   return openPrintWindow(title, html);
 }
 

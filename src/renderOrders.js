@@ -100,14 +100,20 @@ export async function renderOrders(ctx) {
     });
   });
 
-  // Impression facture (commandes livrées)
+  // Impression facture (commandes livrées). Handler SYNCHRONE jusqu'au
+  // window.open pour ne pas perdre le contexte user-gesture (cf. carnet
+  // sanitaire dans wire.js). Le lazy import se fait après.
   host.querySelectorAll('[data-print-invoice]').forEach(btn => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', () => {
       const orderId = btn.dataset.printInvoice;
       const order = (_cache.orders || []).find(o => o.id === orderId);
       if (!order) { showToast('Commande introuvable.', 'error'); return; }
-      // Normalise customer pour `printable.buildInvoiceHTML` (qui attend
-      // customer_name/phone/email/address au niveau de order.data).
+      const w = window.open('about:blank', '_blank', 'width=900,height=1000');
+      if (!w) {
+        showToast("Le navigateur a bloqué la fenêtre d'impression. Autorisez les popups pour ce site.", 'error');
+        return;
+      }
+      try { w.document.write('<!doctype html><meta charset="utf-8"><title>Préparation…</title><p style="font-family:sans-serif;padding:24px">Préparation de la facture…</p>'); w.document.close(); } catch (_) {}
       const cust = order.data?.customer || {};
       const normalized = {
         ...order,
@@ -120,9 +126,12 @@ export async function renderOrders(ctx) {
           totalAmount: (order.items || []).reduce((s, it) => s + (Number(it.unit_price) || 0), 0),
         },
       };
-      const { printInvoice } = await import('./printable.js');
-      const ok = printInvoice(normalized, ctx);
-      if (!ok) showToast("Le navigateur a bloqué la fenêtre d'impression. Autorisez les popups pour ce site.", 'error');
+      import('./printable.js').then(mod => {
+        mod.printInvoice(normalized, ctx, w);
+      }).catch(err => {
+        try { w.close(); } catch (_) {}
+        showToast('Impossible de générer la facture : ' + (err?.message || err), 'error');
+      });
     });
   });
 
