@@ -5,7 +5,7 @@ import { getBreedingStatus, breedingStatusBadge } from "./breeding.js";
 import { getRabbitWeightHistory, getTotalHerdWeightEvolution, renderWeightSVG, getCurrentWeight } from "./weightService.js";
 import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
 import { buildLots, lotBadge, LOT_STATUSES } from "./lots.js";
-import { renderGenealogy3D } from "./genealogy3d.js";
+// genealogy3d.js : ~80 kB de logique 3D, chargé à la demande (panneau Généalogie)
 import { getReminders, reminderLabel } from "./health.js";
 import { getPhotoHistory, getProfilePhoto, rabbitThumbHTML } from "./photos.js";
 import { getTodayFarmActions } from "./farmActionsService.js";
@@ -575,7 +575,9 @@ export function renderAll(ctx) {
 
   // Panneaux lourds : rendus uniquement quand actifs
   if (active === 'genealogy') {
-    try { renderGenealogy3D(ctx); } catch(e) { console.error("[renderGenealogy3D]", e); }
+    import("./genealogy3d.js")
+      .then(m => { try { m.renderGenealogy3D(ctx); } catch (e) { console.error("[renderGenealogy3D]", e); } })
+      .catch(e => console.error("[lazy genealogy3d]", e));
   }
   if (active === 'stats') {
     try { renderStats(ctx); } catch(e) { console.error("[renderStats]", e); }

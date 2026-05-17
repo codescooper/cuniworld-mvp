@@ -26,10 +26,12 @@ import {
 import { openAddStockModal } from "./src/renderStock.js";
 import { openTourneeModal, _updateTourneeLabel } from "./src/renderTournee.js";
 import { openAddBuildingModal, openQuickSetupModal } from "./src/renderBuildings.js";
-import { openSimulationModal, exitSimulation } from "./src/renderSimulation.js";
-import { openPhotoDiagnosticModal } from "./src/renderPhotoDiagnostic.js";
+// renderSimulation.js / renderShop.js : modules lourds chargés à la demande.
 import { isSimulationState } from "./src/simulation.js";
-import { bootShopView } from "./src/renderShop.js";
+import { openPhotoDiagnosticModal } from "./src/renderPhotoDiagnostic.js";
+
+const _lazySimulation = () => import("./src/renderSimulation.js");
+const _lazyShop       = () => import("./src/renderShop.js");
 
 const el = getEls();
 
@@ -492,8 +494,64 @@ function wireExtra() {
   document.getElementById("morePhotoCheck")?.addEventListener("click", () => openPhotoCheckModal(ctx));
   document.getElementById("moreWeightCheck")?.addEventListener("click", () => openWeightCheckModal(ctx));
   document.getElementById("moreReset")?.addEventListener("click", () => ctx.el.btnReset?.click());
-  document.getElementById("moreSimulation")?.addEventListener("click", () => openSimulationModal(ctx));
-  document.getElementById("moreExitSimulation")?.addEventListener("click", () => exitSimulation(ctx));
+
+  // ── Suppression compte (RGPD) ───────────────────────────────────────────────
+  // Double confirmation : modal d'avertissement puis saisie de "SUPPRIMER"
+  // pour éviter tout déclenchement accidentel. Action irréversible.
+  document.getElementById("moreDeleteAccount")?.addEventListener("click", async () => {
+    if (!ctx.farmId && !ctx.currentUser) {
+      showToast("Mode local — aucun compte cloud à supprimer.", "info");
+      return;
+    }
+    const [{ openModal, closeModal }, { deleteMyAccount }] = await Promise.all([
+      import("./src/modal.js"),
+      import("./src/accountService.js"),
+    ]);
+    openModal(ctx.el, "Supprimer mon compte", `
+      <div class="legal-warning" role="alert" style="margin-bottom:14px">
+        ⚠️ Action <strong>irréversible</strong>. Toutes vos fermes (dont vous êtes
+        l'unique propriétaire), lapins, événements, photos et paramètres seront
+        définitivement supprimés. Vous serez retiré des fermes partagées.
+      </div>
+      <p>Avant de continuer, vous pouvez <strong>exporter vos données</strong>
+      depuis le panneau Actions (« Exporter les données »).</p>
+      <p style="margin-top:14px">Saisissez <code>SUPPRIMER</code> ci-dessous pour confirmer :</p>
+      <input id="deleteAccountConfirm" class="input" type="text" autocomplete="off" placeholder="SUPPRIMER" />
+      <div class="row" style="justify-content:flex-end;margin-top:14px;gap:8px">
+        <button type="button" class="btn secondary" id="deleteAccountCancel">Annuler</button>
+        <button type="button" class="btn" id="deleteAccountConfirmBtn" disabled
+          style="background:#b91c1c;border-color:#b91c1c">Supprimer définitivement</button>
+      </div>
+    `);
+    const input = document.getElementById("deleteAccountConfirm");
+    const okBtn = document.getElementById("deleteAccountConfirmBtn");
+    input?.addEventListener("input", () => {
+      okBtn.disabled = input.value.trim() !== "SUPPRIMER";
+    });
+    document.getElementById("deleteAccountCancel")?.addEventListener("click", () => closeModal(ctx.el));
+    okBtn?.addEventListener("click", async () => {
+      okBtn.disabled = true;
+      okBtn.textContent = "Suppression en cours…";
+      try {
+        await deleteMyAccount();
+        closeModal(ctx.el);
+        showToast("Compte supprimé. À bientôt.", "success");
+        setTimeout(() => location.reload(), 1200);
+      } catch (err) {
+        okBtn.disabled = false;
+        okBtn.textContent = "Supprimer définitivement";
+        showToast("Suppression impossible : " + (err?.message || err), "error");
+      }
+    });
+  });
+  document.getElementById("moreSimulation")?.addEventListener("click", async () => {
+    const { openSimulationModal } = await _lazySimulation();
+    openSimulationModal(ctx);
+  });
+  document.getElementById("moreExitSimulation")?.addEventListener("click", async () => {
+    const { exitSimulation } = await _lazySimulation();
+    exitSimulation(ctx);
+  });
   document.getElementById("morePhotoDiagnostic")?.addEventListener("click", () => openPhotoDiagnosticModal(ctx));
   document.getElementById("moreRetrySync")?.addEventListener("click", async () => {
     if (!ctx.farmId) return;
@@ -623,6 +681,90 @@ const savedPanel = (() => {
   } catch (_) { return "dashboard"; }
 })();
 
+// ── Thème (clair / sombre / système) ─────────────────────────────────────────
+// Cycle : système (aucun data-theme) → clair → sombre → système.
+// Stocké dans localStorage 'themePref' ∈ {auto, light, dark}.
+
+function _applyThemePref(pref) {
+  const html = document.documentElement;
+  if (pref === 'light') html.setAttribute('data-theme', 'light');
+  else if (pref === 'dark') html.setAttribute('data-theme', 'dark');
+  else html.removeAttribute('data-theme');
+}
+
+function _renderThemeUI(pref) {
+  const labels = { auto: 'Suit le système', light: 'Mode clair', dark: 'Mode sombre' };
+  const icons  = { auto: '🌗', light: '☀️', dark: '🌙' };
+  const lbl = document.getElementById('themeStatusLabel');
+  const icn = document.getElementById('themeIcon');
+  if (lbl) lbl.textContent = labels[pref] || labels.auto;
+  if (icn) icn.textContent = icons[pref] || icons.auto;
+}
+
+function wireThemeToggle() {
+  let pref = 'auto';
+  try { pref = localStorage.getItem('themePref') || 'auto'; } catch (_) {}
+  _applyThemePref(pref);
+  _renderThemeUI(pref);
+  const btn = document.getElementById('moreToggleTheme');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    pref = pref === 'auto' ? 'light' : pref === 'light' ? 'dark' : 'auto';
+    try { localStorage.setItem('themePref', pref); } catch (_) {}
+    _applyThemePref(pref);
+    _renderThemeUI(pref);
+  });
+}
+
+// Appliquer le thème dès le chargement (avant init pour éviter le flash).
+(function _earlyTheme() {
+  try {
+    const p = localStorage.getItem('themePref');
+    if (p === 'light' || p === 'dark') document.documentElement.setAttribute('data-theme', p);
+  } catch (_) {}
+})();
+
+// ── Bandeau consentement RGPD ────────────────────────────────────────────────
+// Affiché tant que l'utilisateur n'a pas cliqué (accept ou decline). On
+// mémorise le choix pour ne plus l'afficher. CuniWorld n'utilise pas de
+// traceur publicitaire — le bandeau est purement informatif et RGPD.
+
+function wireConsentBanner() {
+  const banner = document.getElementById('consentBanner');
+  if (!banner) return;
+  let stored = null;
+  try { stored = localStorage.getItem('consentChoice'); } catch (_) {}
+  if (stored === 'accepted' || stored === 'declined') return;
+  banner.classList.remove('hidden');
+  const close = (choice) => {
+    banner.classList.add('hidden');
+    try { localStorage.setItem('consentChoice', choice); } catch (_) {}
+  };
+  document.getElementById('consentAccept')?.addEventListener('click', () => close('accepted'));
+  document.getElementById('consentDecline')?.addEventListener('click', () => close('declined'));
+}
+
+// ── Liens légaux globaux (footer + bandeau consentement) ─────────────────────
+// Délégation : tout élément avec data-legal-page="legal|cgu|privacy" ouvre
+// un modal contenant la page correspondante.
+
+function wireLegalLinks(ctx) {
+  // legal.js est lazy-chargé (texte rarement consulté, plusieurs kB de markup).
+  document.addEventListener('click', async (e) => {
+    const link = e.target.closest('[data-legal-page]');
+    if (!link) return;
+    e.preventDefault();
+    const slug = link.dataset.legalPage;
+    if (!slug) return;
+    const [{ openModal }, { renderLegalPage }] = await Promise.all([
+      import('./src/modal.js'),
+      import('./src/legal.js'),
+    ]);
+    const titles = { legal: 'Mentions légales', cgu: 'CGU', privacy: 'Confidentialité' };
+    openModal(ctx.el, titles[slug] || 'Information', renderLegalPage(slug));
+  });
+}
+
 function wireBetaBanner() {
   const banner = document.getElementById('betaBanner');
   const close  = document.getElementById('betaBannerClose');
@@ -669,11 +811,19 @@ async function initApp() {
   // Mode boutique publique : si l'URL contient ?shop=…, on monte une vue
   // dédiée et on n'initialise pas le reste de l'app (pas d'auth, pas de
   // hooks). Permet l'accès anon pour les clients de la boutique.
-  if (await bootShopView()) return;
+  // Boutique publique : ne charge le module shop que si l'URL le requiert.
+  const isShopUrl = /[?&]shop=/.test(window.location.search);
+  if (isShopUrl) {
+    const { bootShopView } = await _lazyShop();
+    if (await bootShopView()) return;
+  }
 
   registerServiceWorker().catch(() => {});
   wireBetaBanner();
   wireSimulationBanner();
+  wireConsentBanner();
+  wireLegalLinks(ctx);
+  wireThemeToggle();
   wireSyncBadge(ctx);
   renderVersionFooter();
   wireNav();

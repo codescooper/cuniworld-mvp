@@ -380,6 +380,14 @@
               </span>
             </button>
 
+            <button id="moreDeleteAccount" class="more-action-tile danger-tile" type="button">
+              <span class="tile-icon">🗑️</span>
+              <span class="tile-body">
+                <span class="tile-title">Supprimer mon compte</span>
+                <span class="tile-sub">Droit à l'effacement RGPD — irréversible</span>
+              </span>
+            </button>
+
             <button id="moreTournee" class="more-action-tile" type="button">
               <span class="tile-icon">📋</span>
               <span class="tile-body">
@@ -409,6 +417,14 @@
               <span class="tile-body">
                 <span class="tile-title">Notifications push</span>
                 <span class="tile-sub" id="notifStatusLabel">Activer les alertes élevage</span>
+              </span>
+            </button>
+
+            <button id="moreToggleTheme" class="more-action-tile" type="button">
+              <span class="tile-icon" id="themeIcon">🌙</span>
+              <span class="tile-body">
+                <span class="tile-title">Apparence</span>
+                <span class="tile-sub" id="themeStatusLabel">Suit le système</span>
               </span>
             </button>
 
@@ -938,7 +954,27 @@
 
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
 
+  <!-- ===== BANDEAU CONSENTEMENT (RGPD) ===== -->
+  <div id="consentBanner" class="consent-banner hidden" role="region" aria-label="Consentement aux cookies et stockage">
+    <div class="consent-text">
+      🍪 CuniWorld stocke vos données localement (paramètres, brouillons hors-ligne) et utilise
+      Supabase pour la synchronisation cloud. Aucun traceur publicitaire, aucun cookie tiers.
+      <a href="#" data-legal-page="privacy">En savoir plus</a>.
+    </div>
+    <div class="consent-actions">
+      <button class="btn secondary" id="consentDecline" type="button">Refuser non-essentiels</button>
+      <button class="btn" id="consentAccept" type="button">J'ai compris</button>
+    </div>
+  </div>
+
   <footer id="appVersionFooter" class="app-version-footer" aria-label="Version de l'application"></footer>
+  <div class="legal-links-footer" id="legalLinksFooter">
+    <a href="#" data-legal-page="legal">Mentions légales</a>
+    <span aria-hidden="true">·</span>
+    <a href="#" data-legal-page="cgu">CGU</a>
+    <span aria-hidden="true">·</span>
+    <a href="#" data-legal-page="privacy">Confidentialité</a>
+  </div>
 
   <script type="module" src="app.js"></script>
 </body>

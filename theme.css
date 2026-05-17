@@ -60,3 +60,59 @@
   --z-nav: 25;
   --z-modal: 30;
 }
+
+/* ── Mode sombre — activé via [data-theme="dark"] sur <html> ──
+   On garde la même grammaire de variables ; tout le reste de
+   l'app reste inchangé (les styles utilisent var(--color-*)). */
+html[data-theme="dark"] {
+  --color-primary: #4caf50;
+  --color-primary-dark: #2e7d32;
+  --color-primary-light: rgba(76, 175, 80, 0.18);
+
+  --color-text: #e8eae3;
+  --color-bg: #121613;
+  --color-bg-alt: #1a1f1c;
+  --color-surface: #1f2521;
+
+  --color-accent: #f0b545;
+  --color-accent-light: rgba(240, 181, 69, 0.16);
+
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-muted: rgba(232, 234, 227, 0.55);
+  --color-muted-strong: rgba(232, 234, 227, 0.80);
+
+  --color-danger: #f06262;
+  --color-danger-light: rgba(240, 98, 98, 0.16);
+
+  --color-warn: #f4a73a;
+  --color-warn-light: rgba(244, 167, 58, 0.16);
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.35);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.55), 0 2px 4px rgba(0,0,0,0.35);
+  --shadow-lg: 0 10px 28px rgba(0,0,0,0.65), 0 4px 10px rgba(0,0,0,0.45);
+}
+
+/* Quand l'utilisateur n'a fait aucun choix, suivre la préférence système. */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    --color-primary: #4caf50;
+    --color-primary-dark: #2e7d32;
+    --color-primary-light: rgba(76, 175, 80, 0.18);
+    --color-text: #e8eae3;
+    --color-bg: #121613;
+    --color-bg-alt: #1a1f1c;
+    --color-surface: #1f2521;
+    --color-accent: #f0b545;
+    --color-accent-light: rgba(240, 181, 69, 0.16);
+    --color-border: rgba(255, 255, 255, 0.12);
+    --color-muted: rgba(232, 234, 227, 0.55);
+    --color-muted-strong: rgba(232, 234, 227, 0.80);
+    --color-danger: #f06262;
+    --color-danger-light: rgba(240, 98, 98, 0.16);
+    --color-warn: #f4a73a;
+    --color-warn-light: rgba(244, 167, 58, 0.16);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.35);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.55), 0 2px 4px rgba(0,0,0,0.35);
+    --shadow-lg: 0 10px 28px rgba(0,0,0,0.65), 0 4px 10px rgba(0,0,0,0.45);
+  }
+}
