@@ -680,6 +680,7 @@ function renderBackupList(_ctx) {
 // ================================================================
 const params     = new URLSearchParams(window.location.search);
 const isE2E      = params.has("e2e");
+const isDemo     = params.has("demo");
 const joinFarmId = params.get("join") || null;
 
 const savedPanel = (() => {
@@ -815,6 +816,24 @@ function wireSimulationBanner() {
   banner.appendChild(close);
 }
 
+async function _bootDemoMode(ctx) {
+  try {
+    const { generateSimulation, isSimulationState } = await import("./src/simulation.js");
+    const hasRealData = (ctx.state.rabbits || []).length > 0 && !isSimulationState(ctx.state);
+    if (hasRealData) {
+      showToast("Vos données locales sont conservées. Pour voir la démo, videz d'abord vos données.", "info");
+      return;
+    }
+    // Petite démo : 2 bâtiments × 6 loges, 4 femelles, 2 mâles, 6 mois d'historique.
+    const simState = generateSimulation({ buildings: 2, lodgesPerBuilding: 6, does: 4, bucks: 2, monthsHistory: 6 });
+    ctx.state = Store.save(simState);
+    ctx.render();
+    showToast(`Mode démo : ${simState.rabbits.length} lapins, ${simState.events.length} événements générés. Cliquez "Quitter la simulation" pour reprendre.`, "success");
+  } catch (err) {
+    showToast("Impossible de générer la démo : " + (err?.message || err), "error");
+  }
+}
+
 async function initApp() {
   // Monitoring : init le plus tôt possible pour capturer les erreurs
   // d'amorçage (auth, sync). No-op si VITE_SENTRY_DSN n'est pas défini.
@@ -868,6 +887,20 @@ async function initApp() {
     if (!isE2E) {
       setActivePanel(savedPanel);
       if (notificationsGranted()) checkAndFireNotifications(ctx.state, ctx.farmSettings);
+      if (isDemo) {
+        // Mode démo : génère un état réaliste si state local vide ou déjà
+        // simulation. Permet aux visiteurs de tester l'app sans rien saisir.
+        // Le bandeau simulation et le bouton "Quitter la simulation" sont
+        // déjà câblés par updateSimulationUI.
+        _bootDemoMode(ctx);
+      } else {
+        // Onboarding : déclenché uniquement en mode local après le 1er render,
+        // si state est vide. Chargé à la demande (jamais utile à un éleveur
+        // existant). Reste no-op si l'utilisateur a déjà cliqué "Passer".
+        import("./src/onboarding.js")
+          .then(m => m.showOnboardingIfNeeded(ctx))
+          .catch(() => {});
+      }
     } else {
       setActivePanel("dashboard");
     }

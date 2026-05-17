@@ -89,32 +89,36 @@ function _economySection(s, editable) {
       <div class="settings-section-title">💰 Économie</div>
       <div class="row2">
         <div class="field">
-          <div class="label">Devise (code ISO)</div>
+          <div class="label">Devise (code ISO) ${_hint("Code ISO 4217 (XOF pour FCFA, EUR, USD…). Utilisé pour formater toutes les valeurs monétaires de l'app et de la facture PDF.")}</div>
           <select class="input" name="currencyCode" id="currencyCodeSel" ${editable ? '' : 'disabled'}>
             ${currencyOptions}${customOpt}
           </select>
         </div>
         <div class="field">
-          <div class="label">Symbole affiché</div>
+          <div class="label">Symbole affiché ${_hint("Symbole de la devise affiché à côté des prix (ex : « FCFA », « € »). Peut différer du code ISO pour les devises locales.")}</div>
           <input class="input" name="currencySymbol" id="currencySymbolInput" value="${escapeAttr(s.currencySymbol)}" ${editable ? '' : 'disabled'}>
         </div>
       </div>
       <div class="row2">
         <div class="field">
-          <div class="label">Prix poids vif (<span data-currency-label>${escapeHTML(s.currencySymbol)}</span> / kg)</div>
+          <div class="label">Prix poids vif (<span data-currency-label>${escapeHTML(s.currencySymbol)}</span> / kg) ${_hint("Prix de vente du lapin vivant au kilo. Sert à estimer la valeur du cheptel et à pré-remplir le prix lors d'une mise en vente.")}</div>
           <input class="input" name="priceLivePerKg" type="number" min="0" step="any" value="${s.priceLivePerKg}" ${editable ? '' : 'disabled'}>
         </div>
         <div class="field">
-          <div class="label">Prix carcasse (<span data-currency-label>${escapeHTML(s.currencySymbol)}</span> / kg)</div>
+          <div class="label">Prix carcasse (<span data-currency-label>${escapeHTML(s.currencySymbol)}</span> / kg) ${_hint("Prix de la viande au kilo après abattage et habillage. Utilisé pour calculer la valeur carcasse du cheptel.")}</div>
           <input class="input" name="priceCarcassPerKg" type="number" min="0" step="any" value="${s.priceCarcassPerKg}" ${editable ? '' : 'disabled'}>
         </div>
       </div>
       <div class="field">
-        <div class="label">Rendement carcasse (fraction du poids vif, ex : 0.55 = 55 %)</div>
+        <div class="label">Rendement carcasse (fraction du poids vif, ex : 0.55 = 55 %) ${_hint("Proportion du poids vif qui devient de la viande commercialisable. Norme cuniculture : 0.50 à 0.55. La valeur carcasse = poids vif × rendement × prix carcasse au kg.")}</div>
         <input class="input" name="carcassYield" type="number" min="0.2" max="1" step="0.01" value="${s.carcassYield}" ${editable ? '' : 'disabled'}>
       </div>
     </div>
   `;
+}
+
+function _hint(text) {
+  return `<span class="help-hint" tabindex="0" role="img" aria-label="Aide" title="${escapeAttr(text)}">?</span>`;
 }
 
 function _reproSection(s, editable) {
@@ -123,26 +127,26 @@ function _reproSection(s, editable) {
       <div class="settings-section-title">🤰 Reproduction</div>
       <div class="row2">
         <div class="field">
-          <div class="label">Durée de gestation (j)</div>
+          <div class="label">Durée de gestation (j) ${_hint("Nombre de jours entre saillie et mise-bas. Standard cuniculture : 28 à 31 jours. Sert au calcul de la date de mise-bas estimée.")}</div>
           <input class="input" name="gestationDays" type="number" min="20" max="40" value="${s.gestationDays}" ${editable ? '' : 'disabled'}>
         </div>
         <div class="field">
-          <div class="label">Âge maturité saillie (j)</div>
+          <div class="label">Âge maturité saillie (j) ${_hint("Âge à partir duquel une femelle est considérée mature pour la reproduction. Sert à colorer les lapines « à mettre en repro » dans les actions du dashboard.")}</div>
           <input class="input" name="maturityDays" type="number" min="60" max="240" value="${s.maturityDays}" ${editable ? '' : 'disabled'}>
         </div>
       </div>
       <div class="row2">
         <div class="field">
-          <div class="label">Sevrage min (j)</div>
+          <div class="label">Sevrage min (j) ${_hint("Âge minimum auquel on peut sevrer une portée (souvent 28-30 j). Empêche un sevrage prématuré accidentel.")}</div>
           <input class="input" name="minWeanDays" type="number" min="20" max="50" value="${s.minWeanDays}" ${editable ? '' : 'disabled'}>
         </div>
         <div class="field">
-          <div class="label">Sevrage recommandé (j)</div>
+          <div class="label">Sevrage recommandé (j) ${_hint("Âge cible pour le sevrage (souvent 35 j). Apparaît en orange dans les actions du dashboard à partir de cet âge.")}</div>
           <input class="input" name="recommendedWeanDays" type="number" min="20" max="50" value="${s.recommendedWeanDays}" ${editable ? '' : 'disabled'}>
         </div>
       </div>
       <div class="field">
-        <div class="label">Sevrage en retard à partir de (j)</div>
+        <div class="label">Sevrage en retard à partir de (j) ${_hint("Au-delà de cet âge, le sevrage est marqué « urgent » (rouge). Au-delà, la mère reprend rarement bien et la croissance des jeunes ralentit.")}</div>
         <input class="input" name="overdueWeanDays" type="number" min="25" max="60" value="${s.overdueWeanDays}" ${editable ? '' : 'disabled'}>
       </div>
     </div>
@@ -155,22 +159,22 @@ function _caresSection(s, editable) {
       <div class="settings-section-title">🩺 Soins & rappels</div>
       <div class="row2">
         <div class="field">
-          <div class="label">Cycle de pesée — peser après (j)</div>
+          <div class="label">Cycle de pesée — peser après (j) ${_hint("Intervalle souhaité entre deux pesées d'un même lapin. Un lapin non pesé depuis plus longtemps apparaît dans les actions « à peser » du dashboard.")}</div>
           <input class="input" name="weightCheckOverdueDays" type="number" min="0" max="30" value="${s.weightCheckOverdueDays}" ${editable ? '' : 'disabled'}>
           <div class="small muted" style="margin-top:4px">0 = tous les lapins sont à peser immédiatement (utile pour tester la fonctionnalité)</div>
         </div>
         <div class="field">
-          <div class="label">Photo à reprendre après (j)</div>
+          <div class="label">Photo à reprendre après (j) ${_hint("Intervalle souhaité entre deux photos d'un même lapin. Permet de constituer l'évolution visuelle dans la fiche.")}</div>
           <input class="input" name="photoCheckOverdueDays" type="number" min="1" max="60" value="${s.photoCheckOverdueDays}" ${editable ? '' : 'disabled'}>
         </div>
       </div>
       <div class="row2">
         <div class="field">
-          <div class="label">Fenêtre rappel vaccin/traitement (j)</div>
+          <div class="label">Fenêtre rappel vaccin/traitement (j) ${_hint("Nombre de jours avant l'échéance d'un rappel pour qu'il apparaisse dans la liste « Rappels » du dashboard et déclenche les notifications.")}</div>
           <input class="input" name="healthReminderWindowDays" type="number" min="1" max="30" value="${s.healthReminderWindowDays}" ${editable ? '' : 'disabled'}>
         </div>
         <div class="field">
-          <div class="label">Inspection loge par défaut (j)</div>
+          <div class="label">Inspection loge par défaut (j) ${_hint("Intervalle entre deux inspections visuelles d'une loge. Permet de détecter défauts, salissures, problèmes de température.")}</div>
           <input class="input" name="inspectionDefaultDays" type="number" min="1" max="60" value="${s.inspectionDefaultDays}" ${editable ? '' : 'disabled'}>
         </div>
       </div>

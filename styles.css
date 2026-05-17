@@ -2804,6 +2804,93 @@ img.rabbit-thumb { padding: 0 }
   border-radius: 4px;
 }
 .legal-warning code { background: rgba(0,0,0,.06); padding: 1px 4px; border-radius: 3px; }
+
+/* ── Onboarding overlay ──────────────────────────────────────────── */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3500;
+  background: rgba(15, 23, 42, .55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.onboarding-card {
+  position: relative;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #111);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .35);
+  padding: 28px 22px 22px;
+  max-width: 460px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.onboarding-close {
+  position: absolute;
+  top: 8px; right: 10px;
+  background: transparent;
+  border: 0;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: inherit;
+  opacity: .6;
+}
+.onboarding-close:hover { opacity: 1; }
+.onboarding-icon {
+  font-size: 2.4rem;
+  text-align: center;
+  margin-bottom: 6px;
+}
+.onboarding-card h2 {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+  text-align: center;
+}
+.onboarding-card p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.onboarding-list {
+  margin: 0 0 16px;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.onboarding-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+/* ── Hover d'aide « ? » sur les labels ──────────────────────────── */
+.help-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: var(--color-border, #d4d4d8);
+  color: var(--color-text, #444);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: help;
+  user-select: none;
+  vertical-align: middle;
+  line-height: 1;
+}
+.help-hint:hover, .help-hint:focus {
+  background: var(--color-accent, #f0b545);
+  color: #fff;
+  outline: none;
+}
+
 .app-version-footer .v-sep { margin: 0 6px; opacity: 0.5; }
 .app-version-footer .v-stale { color: #b45309; }
 @media (max-width: 480px) {

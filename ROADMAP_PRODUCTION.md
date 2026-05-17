@@ -61,11 +61,11 @@
 
 ## Phase 5 — UX / onboarding 🟡
 
-- [ ] **5.1** Onboarding guidé première connexion (3-4 étapes : ferme, 1er bâtiment, 1er lapin)
-- [ ] **5.2** Manuel utilisateur dans `docs/manuel/` (5 pages : démarrer, gérer le cheptel, suivre santé, vendre, sauvegarder)
-- [ ] **5.3** Mode démo (compte démo public, données réinitialisées chaque nuit)
+- [x] **5.1** Onboarding guidé première connexion (3-4 étapes : ferme, 1er bâtiment, 1er lapin) — `src/onboarding.js`, overlay déclenché si state vide + pas de flag
+- [x] **5.2** Manuel utilisateur dans `docs/manuel/` (5 pages : démarrer, gérer le cheptel, suivre santé, vendre, sauvegarder) — liens depuis le panneau Documentation
+- [x] **5.3** Mode démo (compte démo public, données réinitialisées chaque nuit) — URL `?demo=1` (mode local). Procédure compte démo cloud + cron `pg_cron` documentée dans `docs/ops/demo-mode.md`
 - [x] **5.4** Mode sombre (variables CSS déjà en place, ajouter toggle)
-- [ ] **5.5** Aide contextuelle (`?` hovers sur chaque champ paramètre)
+- [x] **5.5** Aide contextuelle (`?` hovers sur chaque champ paramètre) — `_hint()` dans `renderSettings.js`, badge `.help-hint` stylé
 
 ## Phase 6 — i18n & notifications avancées 🟢
 
@@ -87,7 +87,8 @@
 | 2026-05-17 | 9ba6329 | Phase 1 complète (1.1 → 1.7) + thème sombre (5.4) | 80 % |
 | 2026-05-17 | 5ba9bc5 | Phase 2 complète (2.1 → 2.5) — monitoring, backups, RLS, /status, runbook | 85 % |
 | 2026-05-17 | cc35852 | Phase 3 quasi-complète (3.1, 3.2, 3.3, 3.5, 3.6 + 2/5 sous-items 3.4) — code-splitting Supabase, a11y, charge (×50 perf dashboard), XSS audit, optims event index | 90 % |
-| 2026-05-17 | _ce commit_ | Phase 4 complète (4.1 → 4.5) — comptabilité P&L, carnet sanitaire & facture imprimables, indice de consommation, classements reproducteurs | 95 % |
+| 2026-05-17 | e74bdc6 | Phase 4 complète (4.1 → 4.5) — comptabilité P&L, carnet sanitaire & facture imprimables, indice de consommation, classements reproducteurs | 95 % |
+| 2026-05-17 | _ce commit_ | Phase 5 complète (5.1 → 5.5) — onboarding 3 étapes, 5 pages manuel, mode démo `?demo=1`, hovers d'aide | 98 % |
 | _à compléter_ | | | |
 
 ---
