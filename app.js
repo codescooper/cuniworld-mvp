@@ -464,6 +464,13 @@ function wireExtra() {
 
   document.getElementById("moreTournee")?.addEventListener("click", () => openTourneeModal(ctx));
 
+  // Comptabilité : module chargé à la demande (jamais utilisé par tous les
+  // élevages, et porte ses propres exports textuels lourds).
+  document.getElementById("moreAccounting")?.addEventListener("click", async () => {
+    const { openAccountingModal } = await import("./src/renderAccounting.js");
+    openAccountingModal(ctx);
+  });
+
   // Ouvrir la boutique publique de la ferme dans un nouvel onglet
   document.getElementById("moreShopOpen")?.addEventListener("click", () => {
     if (!ctx.farmId) {

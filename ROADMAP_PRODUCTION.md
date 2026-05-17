@@ -53,11 +53,11 @@
 
 ## Phase 4 — Fonctionnel manquant 🟠
 
-- [ ] **4.1** Module **Comptabilité** : recettes (auto depuis ventes shop) + dépenses manuelles (aliments, véto, eau, électricité, main d'œuvre) → P&L mensuel
-- [ ] **4.2** **Carnet sanitaire PDF** imprimable par lapin (jsPDF ou print CSS) — pour le vétérinaire
-- [ ] **4.3** **Facture PDF** pour chaque vente boutique (numérotée, devise, mentions légales du vendeur)
-- [ ] **4.4** **Suivi alimentation** : lier consommation stock aliments → lots/cages, calcul indice de consommation (kg aliment / kg vif produit)
-- [ ] **4.5** Stats reproducteurs : classement femelles par fertilité (portées/an, sevrés/portée, survie), classement mâles par paternité confirmée
+- [x] **4.1** Module **Comptabilité** : recettes (auto depuis ventes shop) + dépenses manuelles (aliments, véto, eau, électricité, main d'œuvre) → P&L mensuel — `src/accounting.js` + modal `renderAccounting.js` (tile 📊 dans Actions)
+- [x] **4.2** **Carnet sanitaire PDF** imprimable par lapin (jsPDF ou print CSS) — pour le vétérinaire — `src/printable.js#printSanitaryRecord` via `window.print()` (pas de jsPDF)
+- [x] **4.3** **Facture PDF** pour chaque vente boutique (numérotée, devise, mentions légales du vendeur) — `src/printable.js#printInvoice`, bouton sur commandes livrées
+- [x] **4.4** **Suivi alimentation** : lier consommation stock aliments → lots/cages, calcul indice de consommation (kg aliment / kg vif produit) — `src/feedTracking.js`, affichage dans Stats
+- [x] **4.5** Stats reproducteurs : classement femelles par fertilité (portées/an, sevrés/portée, survie), classement mâles par paternité confirmée — `src/breederStats.js`, affichage dans Stats
 
 ## Phase 5 — UX / onboarding 🟡
 
@@ -86,7 +86,8 @@
 | 2026-05-15 | 7dadf5c | Hors roadmap (recherche poids/budget) | 75 % |
 | 2026-05-17 | 9ba6329 | Phase 1 complète (1.1 → 1.7) + thème sombre (5.4) | 80 % |
 | 2026-05-17 | 5ba9bc5 | Phase 2 complète (2.1 → 2.5) — monitoring, backups, RLS, /status, runbook | 85 % |
-| 2026-05-17 | _ce commit_ | Phase 3 quasi-complète (3.1, 3.2, 3.3, 3.5, 3.6 + 2/5 sous-items 3.4) — code-splitting Supabase, a11y, charge (×50 perf dashboard), XSS audit, optims event index | 90 % |
+| 2026-05-17 | cc35852 | Phase 3 quasi-complète (3.1, 3.2, 3.3, 3.5, 3.6 + 2/5 sous-items 3.4) — code-splitting Supabase, a11y, charge (×50 perf dashboard), XSS audit, optims event index | 90 % |
+| 2026-05-17 | _ce commit_ | Phase 4 complète (4.1 → 4.5) — comptabilité P&L, carnet sanitaire & facture imprimables, indice de consommation, classements reproducteurs | 95 % |
 | _à compléter_ | | | |
 
 ---

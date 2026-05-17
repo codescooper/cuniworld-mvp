@@ -215,6 +215,18 @@ export function wireDynamic(ctx) {
     });
   }
 
+  // Carnet sanitaire imprimable
+  const btnPrintSanitary = document.getElementById("btnPrintSanitary");
+  if (btnPrintSanitary) {
+    btnPrintSanitary.addEventListener("click", async () => {
+      const r = ctx.state.rabbits.find(x => x.id === ctx.selectedRabbitId);
+      if (!r) return;
+      const { printSanitaryRecord } = await import("./printable.js");
+      const ok = printSanitaryRecord(ctx.state, r);
+      if (!ok) showToast("Le navigateur a bloqué la fenêtre d'impression. Autorisez les popups pour ce site.", "error");
+    });
+  }
+
   const btnDel = document.getElementById("btnDeleteRabbit");
   if (btnDel) {
     btnDel.addEventListener("click", async () => {

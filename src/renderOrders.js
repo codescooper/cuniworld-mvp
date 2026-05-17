@@ -100,6 +100,32 @@ export async function renderOrders(ctx) {
     });
   });
 
+  // Impression facture (commandes livrées)
+  host.querySelectorAll('[data-print-invoice]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const orderId = btn.dataset.printInvoice;
+      const order = (_cache.orders || []).find(o => o.id === orderId);
+      if (!order) { showToast('Commande introuvable.', 'error'); return; }
+      // Normalise customer pour `printable.buildInvoiceHTML` (qui attend
+      // customer_name/phone/email/address au niveau de order.data).
+      const cust = order.data?.customer || {};
+      const normalized = {
+        ...order,
+        data: {
+          ...(order.data || {}),
+          customer_name:    cust.name    || order.data?.customer_name,
+          customer_phone:   cust.phone   || order.data?.customer_phone,
+          customer_email:   cust.email   || order.data?.customer_email,
+          customer_address: cust.address || order.data?.customer_address,
+          totalAmount: (order.items || []).reduce((s, it) => s + (Number(it.unit_price) || 0), 0),
+        },
+      };
+      const { printInvoice } = await import('./printable.js');
+      const ok = printInvoice(normalized, ctx);
+      if (!ok) showToast("Le navigateur a bloqué la fenêtre d'impression. Autorisez les popups pour ce site.", 'error');
+    });
+  });
+
   // Transitions
   host.querySelectorAll('[data-order-action]').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -238,6 +264,7 @@ function _orderCard(ctx, o) {
   const transitions = allowed ? `
     ${next && o.status !== 'annule' && o.status !== 'livre' ? `<button class="btn" data-order-action="${next}" data-order-id="${escapeAttr(o.id)}">→ ${getStatusLabel(next).icon} ${getStatusLabel(next).label}</button>` : ''}
     ${o.status !== 'annule' && o.status !== 'livre' ? `<button class="btn ghost" data-order-action="annule" data-order-id="${escapeAttr(o.id)}">❌ Annuler</button>` : ''}
+    ${o.status === 'livre' ? `<button class="btn secondary" data-print-invoice="${escapeAttr(o.id)}">🧾 Facture PDF</button>` : ''}
   ` : '';
 
   return `

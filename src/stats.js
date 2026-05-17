@@ -1,5 +1,7 @@
 import { daysBetween, escapeHTML } from './utils.js';
 import { getRabbitWeightHistory } from './weightService.js';
+import { rankFemales, rankMales } from './breederStats.js';
+import { computeConsumptionIndex } from './feedTracking.js';
 
 export function renderStats(ctx) {
   const host = document.getElementById('statsDash');
@@ -205,8 +207,89 @@ export function renderStats(ctx) {
       </div>
       ` : ''}
 
+      ${_renderBreederRankings(state)}
+      ${_renderConsumptionIndex(state)}
+
     </div>
   `;
+}
+
+// ── Classements reproducteurs (item roadmap 4.5) ────────────────────────────
+function _renderBreederRankings(state) {
+  const does  = rankFemales(state).slice(0, 8);
+  const bucks = rankMales(state).slice(0, 8);
+  if (does.length === 0 && bucks.length === 0) return '';
+
+  const doesHTML = does.length === 0
+    ? '<div class="muted small">Aucune femelle avec portée enregistrée.</div>'
+    : `<table style="width:100%;font-size:.85rem;border-collapse:collapse">
+        <thead><tr style="border-bottom:1px solid var(--color-border)">
+          <th style="text-align:left;padding:4px">Femelle</th>
+          <th style="text-align:right;padding:4px" title="Nombre de portées">Por.</th>
+          <th style="text-align:right;padding:4px" title="Sevrés / portée">S/P</th>
+          <th style="text-align:right;padding:4px" title="Taux de survie naissance → vivants">Surv.</th>
+          <th style="text-align:right;padding:4px" title="Portées extrapolées sur 1 an">Por./an</th>
+          <th style="text-align:right;padding:4px" title="Score composite (plus haut = meilleure)">Score</th>
+        </tr></thead>
+        <tbody>${does.map(d => `
+          <tr>
+            <td style="padding:4px"><strong>${escapeHTML(d.rabbit.name)}</strong> <span class="muted small">${escapeHTML(d.rabbit.code || '')}</span></td>
+            <td style="text-align:right;padding:4px">${d.litters}</td>
+            <td style="text-align:right;padding:4px">${d.weanedPerLitter}</td>
+            <td style="text-align:right;padding:4px">${d.survival}%</td>
+            <td style="text-align:right;padding:4px">${d.littersPerYear ?? '—'}</td>
+            <td style="text-align:right;padding:4px;font-weight:700">${d.score}</td>
+          </tr>`).join('')}</tbody>
+      </table>`;
+
+  const bucksHTML = bucks.length === 0
+    ? '<div class="muted small">Aucun mâle avec saillie ou descendance enregistrée.</div>'
+    : `<table style="width:100%;font-size:.85rem;border-collapse:collapse">
+        <thead><tr style="border-bottom:1px solid var(--color-border)">
+          <th style="text-align:left;padding:4px">Mâle</th>
+          <th style="text-align:right;padding:4px" title="Saillies enregistrées">Saillies</th>
+          <th style="text-align:right;padding:4px" title="Descendants confirmés (buckId des lapereaux)">Descend.</th>
+        </tr></thead>
+        <tbody>${bucks.map(m => `
+          <tr>
+            <td style="padding:4px"><strong>${escapeHTML(m.rabbit.name)}</strong> <span class="muted small">${escapeHTML(m.rabbit.code || '')}</span></td>
+            <td style="text-align:right;padding:4px">${m.matings}</td>
+            <td style="text-align:right;padding:4px;font-weight:700">${m.offspring}</td>
+          </tr>`).join('')}</tbody>
+      </table>`;
+
+  return `
+    <div class="stats-two-col">
+      <div class="stats-card">
+        <div class="stats-card-title">🏆 Top reproductrices</div>
+        ${doesHTML}
+      </div>
+      <div class="stats-card">
+        <div class="stats-card-title">🏆 Top mâles reproducteurs</div>
+        ${bucksHTML}
+      </div>
+    </div>`;
+}
+
+// ── Indice de consommation (item roadmap 4.4) ──────────────────────────────
+function _renderConsumptionIndex(state) {
+  const r = computeConsumptionIndex(state);
+  if (r.feedKg === 0 && r.producedKg === 0) return '';
+  const ic = r.indice;
+  const cls = ic == null ? '' : (ic <= 3.5 ? 'ok' : ic <= 4.5 ? 'warn' : 'bad');
+  return `
+    <div class="stats-card">
+      <div class="stats-card-title">🌾 Indice de consommation</div>
+      <div class="stats-kpi-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stats-kpi"><div class="stats-kpi-n">${r.feedKg.toFixed(1)} kg</div><div class="stats-kpi-t">Aliments consommés</div></div>
+        <div class="stats-kpi"><div class="stats-kpi-n">${r.producedKg.toFixed(1)} kg</div><div class="stats-kpi-t">Vif produit (ventes + cheptel)</div></div>
+        <div class="stats-kpi${cls ? ' stats-kpi--' + cls : ''}"><div class="stats-kpi-n">${ic == null ? '—' : ic}</div><div class="stats-kpi-t">IC (kg aliment / kg vif)</div></div>
+      </div>
+      <div class="stats-card-footer">
+        Un IC entre 3 et 4 est attendu en cuniculture saine.
+        L'unité "sac" est convertie à 25 kg par défaut.
+      </div>
+    </div>`;
 }
 
 function kpi(value, label, cls = '') {

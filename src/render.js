@@ -430,6 +430,7 @@ export function renderRabbitDetails(ctx) {
       <button class="btn secondary" id="btnBack" data-testid="btn-back">← Retour</button>
       <div class="row" style="flex-wrap:wrap;gap:6px">
         <button class="${forSaleBtnClass}" id="btnToggleShop" data-toggle-shop="${escapeAttr(r.id)}" title="Gérer la mise en vente sur la boutique">${forSaleBtnLabel}</button>
+        <button class="btn secondary" id="btnPrintSanitary" title="Carnet sanitaire imprimable">🖨️ Carnet</button>
         <button class="btn secondary" id="btnEditRabbit">Modifier</button>
         <button class="btn danger" id="btnDeleteRabbit">Supprimer</button>
       </div>
