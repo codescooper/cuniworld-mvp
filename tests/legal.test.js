@@ -13,11 +13,18 @@ describe("legal.js — pages RGPD", () => {
 
     expect(cgu).toContain("Conditions générales");
     expect(cgu).toContain("Objet");
-    expect(cgu).toContain("Responsabilité");
+    expect(cgu).toContain("responsabilité"); // "Limitation de responsabilité"
 
     expect(privacy).toContain("Politique de confidentialité");
     expect(privacy).toContain("Données collectées");
-    expect(privacy).toContain("Vos droits (RGPD)");
+    expect(privacy).toContain("Vos droits");
+
+    // Alignement Côte d'Ivoire + standards internationaux
+    expect(privacy).toContain("2013-450"); // Loi ivoirienne sur les données
+    expect(privacy).toContain("RGPD");
+    expect(privacy).toContain("ARTCI");
+    expect(privacy).toContain("Malabo");   // Convention Union Africaine
+    expect(cgu).toContain("OHADA");
   });
 
   it("renderLegalPage retourne 'introuvable' pour un slug inconnu", () => {

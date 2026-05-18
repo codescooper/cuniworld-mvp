@@ -265,8 +265,13 @@ export function buildInvoiceHTML(order, ctx) {
     </table>
 
     <p class="meta" style="margin-top:18px">
-      <strong>TVA non applicable</strong>, art. 293 B du CGI (auto-entrepreneur / micro-entreprise) — à adapter selon le régime fiscal du vendeur.<br>
-      Paiement à la livraison sauf convention contraire. Tout retard de paiement entraîne une pénalité au taux légal en vigueur.
+      <strong>Régime fiscal</strong> : à préciser selon le statut du vendeur (entreprise
+      individuelle, SARL, etc.) et l'éventuelle franchise de TVA (régime du réel simplifié
+      ou de l'impôt synthétique en Côte d'Ivoire).<br>
+      Conformément aux Actes uniformes OHADA, cette facture doit être conservée pendant
+      <strong>10 ans</strong> à compter de la fin de l'exercice comptable.<br>
+      Paiement à la livraison sauf convention contraire. Tout retard de paiement entraîne
+      des pénalités au taux légal en vigueur.
     </p>
   `;
 }
