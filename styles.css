@@ -906,6 +906,18 @@ textarea.input { min-height: 90px; resize: vertical }
   overflow: hidden;
   height: 100%;
 }
+/* Le conteneur des onglets/vues doit prendre toute la place ET scroller :
+   sans ça, le contenu rendu (pedigree, comparer…) est clippé par
+   `overflow:hidden` du parent. */
+#geneViews {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-3);
+}
+/* Override : quand on est sur l'onglet "Vue d'ensemble" qui injecte
+   gene-viewport, on garde sa propre logique flex (pas de double scroll). */
+#geneViews .gene-viewport { flex: 1; min-height: 380px; }
 .gene-controls {
   display: flex;
   gap: var(--space-2);
