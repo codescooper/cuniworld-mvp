@@ -143,31 +143,46 @@
 
           <div class="rl-left">
             <div class="rl-search">
-              <input id="q" class="input" placeholder="Rechercher…" data-testid="rabbit-search" />
-              <div class="row" style="gap:var(--space-2)">
-                <select id="sexFilter" class="input" data-testid="filter-sex" style="flex:1">
-                  <option value="">Sexe: Tous</option>
-                  <option value="F">Femelle</option>
-                  <option value="M">Mâle</option>
-                  <option value="U">Inconnu</option>
-                </select>
-                <select id="statusFilter" class="input" data-testid="filter-status" style="flex:1">
-                  <option value="">Statut: Tous</option>
-                  <option value="actif">Actif</option>
-                  <option value="vendu">Vendu</option>
-                  <option value="mort">Mort</option>
-                </select>
+              <div class="rl-search-row">
+                <input id="q" class="input rl-search-input" placeholder="Rechercher…" data-testid="rabbit-search" />
+                <button id="btnToggleFilters" class="btn secondary rl-filters-toggle"
+                        type="button" aria-expanded="false" aria-controls="rlAdvancedFilters"
+                        title="Filtres et tri">
+                  <span>⚙️</span>
+                  <span class="rl-filters-toggle-label">Filtres</span>
+                  <span id="rlActiveFiltersBadge" class="rl-filters-badge" hidden>0</span>
+                </button>
               </div>
-              <div class="row" style="gap:var(--space-2)">
-                <input id="weightMin" class="input" type="number" min="0" step="0.1" placeholder="Poids min (kg)" data-testid="filter-weight-min" style="flex:1">
-                <input id="weightMax" class="input" type="number" min="0" step="0.1" placeholder="Poids max (kg)" data-testid="filter-weight-max" style="flex:1">
-                <select id="sortBy" class="input" data-testid="sort-by" style="flex:1.2">
-                  <option value="cage">Tri: Cage</option>
-                  <option value="name">Tri: Nom</option>
-                  <option value="weight-asc">Tri: Poids ↑</option>
-                  <option value="weight-desc">Tri: Poids ↓</option>
-                  <option value="birth">Tri: Naissance</option>
-                </select>
+              <div id="rlAdvancedFilters" class="rl-advanced-filters" hidden>
+                <div class="row" style="gap:var(--space-2)">
+                  <select id="sexFilter" class="input" data-testid="filter-sex" style="flex:1">
+                    <option value="">Sexe: Tous</option>
+                    <option value="F">Femelle</option>
+                    <option value="M">Mâle</option>
+                    <option value="U">Inconnu</option>
+                  </select>
+                  <select id="statusFilter" class="input" data-testid="filter-status" style="flex:1">
+                    <option value="">Statut: Tous</option>
+                    <option value="actif">Actif</option>
+                    <option value="vendu">Vendu</option>
+                    <option value="mort">Mort</option>
+                  </select>
+                </div>
+                <div class="row" style="gap:var(--space-2)">
+                  <input id="weightMin" class="input" type="number" min="0" step="0.1" placeholder="Poids min (kg)" data-testid="filter-weight-min" style="flex:1">
+                  <input id="weightMax" class="input" type="number" min="0" step="0.1" placeholder="Poids max (kg)" data-testid="filter-weight-max" style="flex:1">
+                  <select id="sortBy" class="input" data-testid="sort-by" style="flex:1.2">
+                    <option value="cage">Tri: Cage</option>
+                    <option value="name">Tri: Nom</option>
+                    <option value="weight-asc">Tri: Poids ↑</option>
+                    <option value="weight-desc">Tri: Poids ↓</option>
+                    <option value="birth">Tri: Naissance</option>
+                  </select>
+                </div>
+                <div class="row" style="justify-content:space-between;gap:var(--space-2);margin-top:4px">
+                  <button id="btnResetFilters" class="btn ghost" type="button" style="font-size:.8rem;padding:4px 10px">↻ Réinitialiser</button>
+                  <button id="btnCloseFilters" class="btn secondary" type="button" style="font-size:.8rem;padding:4px 10px">Masquer ▴</button>
+                </div>
               </div>
             </div>
             <div id="rabbitList" class="list" data-testid="rabbit-list"></div>

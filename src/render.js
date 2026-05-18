@@ -404,10 +404,16 @@ export function renderRabbitDetails(ctx) {
     ? `<span class="badge" style="background:#f0d28a;color:#7a5a10">🏪 En vente</span>`
     : "";
 
-  // Navigation cage suivante / précédente — parcourt tous les lapins triés par
-  // cage (A1, A2…B1…). Boucle en fin de liste pour rester accessible.
-  const navOrder = sortByCage(state.rabbits || [], x => x.cage);
-  const navIdx   = navOrder.findIndex(x => x.id === r.id);
+  // Navigation cage suivante / précédente — parcourt la LISTE FILTRÉE
+  // courante (mêmes recherches/filtres/tri appliqués que dans le panneau
+  // de gauche). Si le lapin sélectionné n'appartient pas au filtre actif,
+  // on retombe sur le tri par cage de tout le cheptel comme fallback.
+  let navOrder = getFilteredRabbits(ctx);
+  let navIdx   = navOrder.findIndex(x => x.id === r.id);
+  if (navIdx === -1) {
+    navOrder = sortByCage(state.rabbits || [], x => x.cage);
+    navIdx   = navOrder.findIndex(x => x.id === r.id);
+  }
   const prevRabbit = navOrder.length > 1 ? navOrder[(navIdx - 1 + navOrder.length) % navOrder.length] : null;
   const nextRabbit = navOrder.length > 1 ? navOrder[(navIdx + 1) % navOrder.length] : null;
   const navBarHTML = (prevRabbit || nextRabbit) ? `

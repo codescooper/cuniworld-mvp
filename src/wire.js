@@ -63,12 +63,52 @@ export function wireStatic(ctx) {
   });
 
   el.q.addEventListener("input", () => ctx.render());
-  el.sexFilter.addEventListener("change", () => ctx.render());
-  el.statusFilter.addEventListener("change", () => ctx.render());
-  el.weightMin?.addEventListener("input", () => ctx.render());
-  el.weightMax?.addEventListener("input", () => ctx.render());
-  el.sortBy?.addEventListener("change", () => ctx.render());
+  el.sexFilter.addEventListener("change", () => { ctx.render(); _updateActiveFiltersBadge(); });
+  el.statusFilter.addEventListener("change", () => { ctx.render(); _updateActiveFiltersBadge(); });
+  el.weightMin?.addEventListener("input", () => { ctx.render(); _updateActiveFiltersBadge(); });
+  el.weightMax?.addEventListener("input", () => { ctx.render(); _updateActiveFiltersBadge(); });
+  el.sortBy?.addEventListener("change", () => { ctx.render(); _updateActiveFiltersBadge(); });
   el.geneQ?.addEventListener("input", () => ctx.render());
+
+  // Toggle d'affichage des filtres avancés. Le champ recherche `#q` reste
+  // toujours visible — seuls les filtres complémentaires (sexe, statut,
+  // poids, tri) sont masqués par défaut pour libérer la vue.
+  const btnToggleFilters = document.getElementById("btnToggleFilters");
+  const advancedFilters  = document.getElementById("rlAdvancedFilters");
+  const btnCloseFilters  = document.getElementById("btnCloseFilters");
+  const btnResetFilters  = document.getElementById("btnResetFilters");
+  function _setFiltersOpen(open) {
+    if (!advancedFilters || !btnToggleFilters) return;
+    advancedFilters.hidden = !open;
+    btnToggleFilters.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  btnToggleFilters?.addEventListener("click", () => {
+    _setFiltersOpen(advancedFilters?.hidden ?? true);
+  });
+  btnCloseFilters?.addEventListener("click", () => _setFiltersOpen(false));
+  btnResetFilters?.addEventListener("click", () => {
+    el.sexFilter.value = "";
+    el.statusFilter.value = "";
+    if (el.weightMin) el.weightMin.value = "";
+    if (el.weightMax) el.weightMax.value = "";
+    if (el.sortBy) el.sortBy.value = "cage";
+    ctx.render();
+    _updateActiveFiltersBadge();
+  });
+
+  function _updateActiveFiltersBadge() {
+    const badge = document.getElementById("rlActiveFiltersBadge");
+    if (!badge) return;
+    let n = 0;
+    if (el.sexFilter?.value)     n++;
+    if (el.statusFilter?.value)  n++;
+    if (el.weightMin?.value)     n++;
+    if (el.weightMax?.value)     n++;
+    if (el.sortBy?.value && el.sortBy.value !== "cage") n++;
+    if (n > 0) { badge.textContent = String(n); badge.hidden = false; }
+    else       { badge.hidden = true; }
+  }
+  _updateActiveFiltersBadge();
 
   // modal
   el.modalClose.addEventListener("click", () => closeModal(el));
