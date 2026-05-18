@@ -75,7 +75,7 @@
       </button>
       <button class="nav-item" data-panel="genealogy" data-testid="nav-genealogy">
         <span class="nav-icon">🌳</span>
-        <span class="nav-label">Généalogie</span>
+        <span class="nav-label">Lignées</span>
         <span class="nav-badge" id="badge-genealogy"></span>
       </button>
       <button class="nav-item" data-panel="batiments" data-testid="nav-batiments">
@@ -226,20 +226,14 @@
         <div class="panel-header">
           <div class="panel-title-group">
             <span class="panel-icon">🌳</span>
-            <span class="panel-title">Généalogie 3D</span>
+            <span class="panel-title">Lignées</span>
           </div>
         </div>
         <div class="panel-body gene-panel-body">
-          <div class="gene-controls">
-            <input id="geneQ" class="input" placeholder="Rechercher un lapin (code, nom, cage…)" data-testid="gene-search" style="flex:1" />
-            <button id="geneResetView" class="btn secondary" data-testid="gene-reset-view">Réinitialiser la vue</button>
-          </div>
-          <div id="geneFocusBadge" class="gene-focus-badge" hidden></div>
-          <div class="gene-viewport">
-            <div id="geneGraph" class="gene-3d-stage" data-testid="gene-graph"></div>
-            <div id="geneSideCard" class="gene-sidecard" hidden></div>
-          </div>
-          <div id="geneList" class="list" data-testid="gene-list" style="display:none"></div>
+          <!-- Onglets et vues métier injectés par renderGenealogy.js.
+               L'onglet "Vue d'ensemble" injecte geneQ/geneGraph/etc. à la
+               volée pour réutiliser le moteur pan/zoom existant. -->
+          <div id="geneViews" data-testid="gene-views"></div>
         </div>
       </div>
 

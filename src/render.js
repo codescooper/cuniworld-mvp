@@ -598,11 +598,24 @@ export function renderAll(ctx) {
     try { renderLots(ctx); } catch(e) { console.error("[renderLots]", e); }
   }
 
-  // Panneaux lourds : rendus uniquement quand actifs
+  // Panneau Lignées : nouvelle UI à onglets (pedigree, descendance, comparer,
+  // suggestion d'accouplement). L'onglet "Vue d'ensemble" délègue à
+  // l'ancien moteur pan/zoom genealogy3d, mais le rendu de l'arbre n'est
+  // lancé qu'une fois l'onglet sélectionné (re-render du panneau).
   if (active === 'genealogy') {
-    import("./genealogy3d.js")
-      .then(m => { try { m.renderGenealogy3D(ctx); } catch (e) { console.error("[renderGenealogy3D]", e); } })
-      .catch(e => console.error("[lazy genealogy3d]", e));
+    import("./renderGenealogy.js")
+      .then(m => {
+        try { m.renderGenealogyPanel(ctx); }
+        catch (e) { console.error("[renderGenealogyPanel]", e); }
+        // Si l'onglet actif est "vue d'ensemble", on charge l'ancien moteur 3D
+        // après le rendu (les éléments geneGraph/geneQ ont alors été injectés).
+        if (m.getActiveTab() === 'overview') {
+          import("./genealogy3d.js")
+            .then(g => { try { g.renderGenealogy3D(ctx); } catch (e) { console.error("[renderGenealogy3D]", e); } })
+            .catch(e => console.error("[lazy genealogy3d]", e));
+        }
+      })
+      .catch(e => console.error("[lazy renderGenealogy]", e));
   }
   if (active === 'stats') {
     try { renderStats(ctx); } catch(e) { console.error("[renderStats]", e); }
