@@ -7,6 +7,7 @@ import { listFarmOrders, setOrderStatus, ORDER_STATUSES, getStatusLabel } from '
 import { showToast, showConfirm } from './notifications.js';
 import { can } from './permissions.js';
 import { addEvent } from './actions.js';
+import { spinnerHTML, trackFetch } from './loading.js';
 
 let _cache = { farmId: null, orders: null, at: 0 };
 const CACHE_TTL = 30000;
@@ -26,9 +27,9 @@ export async function renderOrders(ctx) {
   // Cache rapide pour éviter de rafraîchir à chaque switch de panneau
   const now = Date.now();
   if (_cache.farmId !== ctx.farmId || (now - _cache.at) > CACHE_TTL) {
-    host.innerHTML = `<div class="muted">Chargement des commandes…</div>`;
+    host.innerHTML = spinnerHTML('Chargement des commandes…');
     try {
-      _cache = { farmId: ctx.farmId, orders: await listFarmOrders(ctx.farmId), at: now };
+      _cache = { farmId: ctx.farmId, orders: await trackFetch(listFarmOrders(ctx.farmId)), at: now };
     } catch (err) {
       host.innerHTML = `<div class="section-card"><div class="muted" style="color:#c0392b">Erreur : ${escapeHTML(err?.message || '')}</div></div>`;
       return;

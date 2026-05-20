@@ -167,7 +167,7 @@ async function _selectFarm(ctx, onReady, joinFarmId = null) {
   const overlay = document.getElementById('authOverlay');
   overlay.style.display = '';
   overlay.classList.remove('hidden');
-  overlay.innerHTML = '<div class="auth-card"><p class="auth-loading">Chargement…</p></div>';
+  overlay.innerHTML = '<div class="auth-card" style="text-align:center"><span class="spinner spinner-lg" aria-hidden="true" style="color:var(--color-primary)"></span><p class="auth-loading">Chargement…</p></div>';
 
   // Auto-join via lien d'invitation
   if (joinFarmId) {
@@ -301,7 +301,7 @@ async function _loadFarm(farmId, farmName, ctx, onReady, isNew = false) {
   const overlay = document.getElementById('authOverlay');
   overlay.style.display = '';
   overlay.classList.remove('hidden');
-  overlay.innerHTML = `<div class="auth-card"><p class="auth-loading">Chargement de <strong>${escapeHTML(farmName)}</strong>…</p></div>`;
+  overlay.innerHTML = `<div class="auth-card" style="text-align:center"><span class="spinner spinner-lg" aria-hidden="true" style="color:var(--color-primary)"></span><p class="auth-loading">Chargement de <strong>${escapeHTML(farmName)}</strong>…</p></div>`;
 
   // Snapshot local-only data before Supabase load replaces ctx.state
   const preLoadLocal = ctx.state;

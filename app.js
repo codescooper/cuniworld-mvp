@@ -209,7 +209,9 @@ function updateSyncBadge(ctx) {
   const pending = getPendingMutationCount() + getPendingPhotoUploadCount();
   badge.className = `sync-badge ${status}`;
   const base = labels[status] || labels.local;
-  badge.textContent = pending > 0 ? `${base} · ${pending} en attente` : base;
+  const text = pending > 0 ? `${base} · ${pending} en attente` : base;
+  const icon = status === "syncing" ? `<span class="spinner spinner-sm" aria-hidden="true"></span> ` : "";
+  badge.innerHTML = `${icon}${escapeHTML(text)}`;
   const errTip = (status === "error" && ctx.lastSyncError?.message)
     ? ` — ${ctx.lastSyncError.message}`
     : "";

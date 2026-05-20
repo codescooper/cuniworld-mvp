@@ -5,6 +5,7 @@ import { getBreedingStatus, breedingStatusBadge, BREEDING_CONFIG } from "./breed
 import { getRabbitWeightHistory, getTotalHerdWeightEvolution, renderWeightSVG, getCurrentWeight, buildCurrentWeightIndex } from "./weightService.js";
 import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
 import { buildLots, LOT_STATUSES, deathCauseLabel } from "./lots.js";
+import { spinnerHTML, trackFetch } from "./loading.js";
 // genealogy3d.js : ~80 kB de logique 3D, chargé à la demande (panneau Généalogie)
 import { getReminders, reminderLabel } from "./health.js";
 import { getPhotoHistory, getProfilePhoto, rabbitThumbHTML } from "./photos.js";
@@ -633,7 +634,9 @@ export function renderAll(ctx) {
   // l'ancien moteur pan/zoom genealogy3d, mais le rendu de l'arbre n'est
   // lancé qu'une fois l'onglet sélectionné (re-render du panneau).
   if (active === 'genealogy') {
-    import("./renderGenealogy.js")
+    const gv = document.getElementById("geneViews");
+    if (gv && !gv.innerHTML.trim()) gv.innerHTML = spinnerHTML("Chargement de la généalogie…");
+    trackFetch(import("./renderGenealogy.js"))
       .then(m => {
         try { m.renderGenealogyPanel(ctx); }
         catch (e) { console.error("[renderGenealogyPanel]", e); }
