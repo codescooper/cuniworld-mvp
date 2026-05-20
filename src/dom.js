@@ -25,7 +25,6 @@ export function getEls() {
     modalClose: $("modalClose"),
 
     lotQ: $("lotQ"),
-    lotStatusFilter: $("lotStatusFilter"),
     lotList: $("lotList"),
     lotDetails: $("lotDetails"),
     geneQ: $("geneQ"),

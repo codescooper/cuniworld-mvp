@@ -811,6 +811,136 @@ textarea.input { min-height: 90px; resize: vertical }
 }
 .rl-check { accent-color: var(--color-primary, #4caf50); cursor: pointer; }
 
+/* ─── Module Lots / Jeunes : layout maître-détail ─── */
+#panel-lots .panel-body.lot-body { padding: 0; display: flex; align-items: stretch; }
+.lot-left {
+  width: 360px;
+  min-width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;
+  padding: var(--space-4);
+  background: var(--color-bg);
+}
+.lot-right { flex: 1; overflow-y: auto; padding: var(--space-4); }
+
+/* Bandeau résumé */
+.lot-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: var(--space-3);
+}
+.lot-sum-cell {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px 6px;
+  text-align: center;
+}
+.lot-sum-n { font-size: 1.25rem; font-weight: 800; line-height: 1.1; }
+.lot-sum-t { font-size: .7rem; color: var(--color-muted); margin-top: 2px; }
+.lot-sum-cell.ok    .lot-sum-n { color: var(--color-primary, #2e7d32); }
+.lot-sum-cell.warn  .lot-sum-n { color: #b4690e; }
+.lot-sum-cell.alert { border-color: #e0a800; background: rgba(224,168,0,.10); }
+.lot-sum-cell.alert .lot-sum-n { color: #b4690e; }
+
+/* Recherche + puces (sticky) */
+.lot-search {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--color-bg);
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
+.lot-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.lot-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px; font-size: .8rem;
+  border: 1px solid var(--color-border); border-radius: 999px;
+  background: var(--color-surface, #fff); color: var(--color-text, #222);
+  cursor: pointer; white-space: nowrap;
+}
+.lot-chip:hover { border-color: var(--color-primary, #4caf50); }
+.lot-chip.active {
+  background: var(--color-primary, #4caf50); color: #fff; border-color: var(--color-primary, #4caf50);
+}
+.lot-chip-n {
+  font-size: .72rem; font-weight: 700;
+  background: rgba(0,0,0,.08); border-radius: 999px; padding: 0 5px; min-width: 16px; text-align: center;
+}
+.lot-chip.active .lot-chip-n { background: rgba(255,255,255,.28); }
+
+/* Cartes de lot */
+.lot-card { display: block !important; padding: 10px 12px; }
+.lot-card-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.lot-card-cage { font-weight: 800; font-size: 1rem; }
+.lot-card-alert { margin-left: auto; }
+.lot-card-sub { color: var(--color-muted); margin-top: 2px; }
+.lot-card-stats { margin-top: 3px; }
+.lot-loss-txt { color: #b4690e; }
+
+/* En-tête du détail */
+.lot-detail-head { display: flex; align-items: flex-start; gap: 8px; }
+.lot-detail-titles { flex: 1; min-width: 0; }
+.lot-detail-title { font-size: 1.15rem; font-weight: 900; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lot-back { display: none; flex-shrink: 0; padding: 4px 10px; }
+
+/* Stepper de cycle de vie */
+.lot-stepper { display: flex; align-items: center; margin: 14px 0; }
+.lot-step { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
+.lot-step-dot {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--color-border); background: var(--color-surface, #fff);
+  font-size: .95rem; opacity: .55;
+}
+.lot-step-label { font-size: .68rem; color: var(--color-muted); text-align: center; }
+.lot-step-line { flex: 1; height: 2px; background: var(--color-border); margin: 0 2px; align-self: flex-start; margin-top: 17px; }
+.lot-step.done .lot-step-dot { opacity: 1; border-color: var(--color-primary, #4caf50); background: rgba(76,175,80,.12); }
+.lot-step.current .lot-step-dot { opacity: 1; border-color: var(--color-primary, #4caf50); background: var(--color-primary, #4caf50); box-shadow: 0 0 0 3px rgba(76,175,80,.18); }
+.lot-step.current .lot-step-label { color: var(--color-text, #222); font-weight: 700; }
+
+/* Bandeau action conseillée */
+.lot-hint {
+  background: rgba(76,175,80,.10); border: 1px solid rgba(76,175,80,.35);
+  border-radius: 8px; padding: 8px 10px; font-size: .85rem; margin-bottom: 12px;
+}
+.lot-hint.urgent { background: rgba(224,168,0,.12); border-color: #e0a800; }
+
+.lot-meta-line { display: flex; gap: 14px; flex-wrap: wrap; color: var(--color-muted-strong); margin: 8px 0 4px; }
+.lot-kpi { margin-top: 4px; }
+.lot-actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0; }
+.lot-section-title { font-weight: 700; margin: 14px 0 6px; }
+
+/* Tableau des lapereaux */
+.lot-kits { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.lot-kits th { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--color-border); color: var(--color-muted); font-weight: 600; }
+.lot-kits td { padding: 5px 6px; border-bottom: 1px solid var(--color-border); }
+.lot-kits tr.lot-kit-inactive { opacity: .55; }
+.lot-kits .btn.ghost { padding: 2px 8px; font-size: .8rem; }
+
+/* Pertes */
+.lot-losses { display: flex; flex-direction: column; gap: 3px; }
+.lot-loss-row { padding: 3px 0; border-bottom: 1px dashed var(--color-border); }
+.lot-loss-cause { color: #b4690e; font-weight: 600; }
+
+.lot-advanced { margin-top: 16px; border-top: 1px solid var(--color-border); padding-top: 10px; }
+.lot-advanced > summary { cursor: pointer; font-weight: 600; color: var(--color-muted-strong); }
+
+/* Responsive : stack + master/detail à ≤1100px */
+@media (max-width: 1100px) {
+  #panel-lots .panel-body.lot-body { flex-direction: column; }
+  .lot-left { width: 100%; border-right: none; border-bottom: 1px solid var(--color-border); }
+  .lot-back { display: inline-flex; }
+  #panel-lots.lot-selected .lot-left { display: none; }
+  #panel-lots:not(.lot-selected) .lot-right { display: none; }
+}
+@media (max-width: 480px) {
+  .lot-summary { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* Colonne droite : fiche scrollable */
 .rl-right {
   flex: 1;

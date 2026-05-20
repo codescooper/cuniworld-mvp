@@ -21,7 +21,6 @@ export function wireStatic(ctx) {
   const { el, Store } = ctx;
 
   ctx.el.lotQ?.addEventListener("input", () => ctx.render());
-  ctx.el.lotStatusFilter?.addEventListener("change", () => ctx.render());
 
   el.btnNewRabbit.addEventListener("click", () => {
     openModal(el, "Nouveau lapin", rabbitFormHTML(null, ctx.state));
@@ -366,6 +365,20 @@ export function wireDynamic(ctx) {
       ctx.selectedLotId = node.dataset.lot;
       ctx.render();
     });
+  });
+
+  // puces de filtre par statut
+  document.querySelectorAll("[data-lot-filter]").forEach(node => {
+    node.addEventListener("click", () => {
+      ctx.lotStatusFilter = node.dataset.lotFilter || "";
+      ctx.render();
+    });
+  });
+
+  // retour à la liste (mobile)
+  document.getElementById("btnLotBack")?.addEventListener("click", () => {
+    ctx.selectedLotId = null;
+    ctx.render();
   });
 
   // bouton "voir la mère" depuis détails lot

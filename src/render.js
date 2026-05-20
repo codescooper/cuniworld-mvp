@@ -1,10 +1,10 @@
 import { escapeHTML, escapeAttr, formatDate, rabbitStatusBadge, sexLabel, daysBetween, getRabbitStage, stageBadge } from "./utils.js";
 import { estimateRabbitValue, formatCurrency, getSettings } from "./settingsService.js";
 import { getReproInfo, getReproInfoFromIndex, buildLatestEventIndex } from "./repro.js";
-import { getBreedingStatus, breedingStatusBadge } from "./breeding.js";
+import { getBreedingStatus, breedingStatusBadge, BREEDING_CONFIG } from "./breeding.js";
 import { getRabbitWeightHistory, getTotalHerdWeightEvolution, renderWeightSVG, getCurrentWeight, buildCurrentWeightIndex } from "./weightService.js";
 import { getLitterStatsForDoe, formatEventDetails } from "./litters.js";
-import { buildLots, lotBadge, LOT_STATUSES } from "./lots.js";
+import { buildLots, LOT_STATUSES, deathCauseLabel } from "./lots.js";
 // genealogy3d.js : ~80 kB de logique 3D, chargé à la demande (panneau Généalogie)
 import { getReminders, reminderLabel } from "./health.js";
 import { getPhotoHistory, getProfilePhoto, rabbitThumbHTML } from "./photos.js";
@@ -939,7 +939,7 @@ function getFilteredRabbits(ctx) {
 
 function getFilteredLots(ctx, lots) {
   const q = (ctx.el.lotQ?.value || "").toLowerCase().trim();
-  const statusFilter = ctx.el.lotStatusFilter?.value || "";
+  const statusFilter = ctx.lotStatusFilter || "";
 
   return lots.filter(l => {
     if (statusFilter && l.status !== statusFilter) return false;
@@ -949,106 +949,244 @@ function getFilteredLots(ctx, lots) {
   });
 }
 
+// ── Bandeau résumé (vue d'ensemble du module) ───────────────────────────────
+function _lotSummaryHTML(lots) {
+  const activeLots  = lots.filter(l => l.status !== "termine" && l.status !== "vendu").length;
+  const youngAlive  = lots.reduce((s, l) => s + l.aliveCount, 0);
+  const toWean      = lots.filter(l => l.needsWeaning).length;
+  const losses      = lots.reduce((s, l) => s + l.deadCount, 0);
+  const cell = (n, label, cls = "") =>
+    `<div class="lot-sum-cell${cls ? " " + cls : ""}"><div class="lot-sum-n">${n}</div><div class="lot-sum-t">${label}</div></div>`;
+  return cell(activeLots, "Lots actifs")
+    + cell(youngAlive, "Jeunes vivants", "ok")
+    + cell(toWean, "À sevrer", toWean > 0 ? "alert" : "")
+    + cell(losses, "Pertes", losses > 0 ? "warn" : "");
+}
+
+// ── Puces de filtre par statut (avec compteurs) ─────────────────────────────
+function _lotChipsHTML(lots, current) {
+  const counts = { "": lots.length };
+  for (const l of lots) counts[l.status] = (counts[l.status] || 0) + 1;
+  const order = ["", "maternite", "sevre", "loges", "vendu", "termine"];
+  return order.map(val => {
+    const n = counts[val] || 0;
+    const act = (current || "") === val ? " active" : "";
+    const meta = LOT_STATUSES[val];
+    const label = val ? `${meta.icon} ${escapeHTML(meta.label)}` : "Tous";
+    const title = val ? escapeAttr(meta.label) : "Tous les lots";
+    return `<button class="lot-chip${act}" type="button" data-lot-filter="${escapeAttr(val)}" title="${title}">${label} <span class="lot-chip-n">${n}</span></button>`;
+  }).join("");
+}
+
+// ── Carte de lot (liste) ────────────────────────────────────────────────────
+function _lotCardHTML(ctx, lot) {
+  const active = ctx.selectedLotId === lot.id ? " active" : "";
+  const meta = LOT_STATUSES[lot.status] || LOT_STATUSES.maternite;
+  const primary = lot.cage && lot.cage !== "—" ? lot.cage : lot.doeName;
+  const age = lot.ageDays != null ? `J+${lot.ageDays}` : "";
+  const alert = lot.needsWeaning ? `<span class="lot-card-alert" title="Sevrage conseillé">⚠️</span>` : "";
+  const losses = lot.deadCount > 0 ? ` · <span class="lot-loss-txt">${lot.deadCount} perte${lot.deadCount > 1 ? "s" : ""}</span>` : "";
+  return `
+    <div class="item lot-card${active}" data-testid="lot-item" data-lot="${lot.id}">
+      <div class="lot-card-main">
+        <div class="lot-card-top">
+          <span class="lot-card-cage">${escapeHTML(primary)}</span>
+          <span class="${meta.cls}">${meta.icon} ${escapeHTML(meta.label)}</span>
+          ${alert}
+        </div>
+        <div class="lot-card-sub small">${escapeHTML(lot.doeName)}${lot.buckName ? ` × ${escapeHTML(lot.buckName)}` : ""}${age ? ` · ${age}` : ""}</div>
+        <div class="lot-card-stats small"><strong>${lot.aliveCount}</strong>/${lot.bornAlive} vivants${losses}</div>
+      </div>
+    </div>`;
+}
+
+// ── Stepper de cycle de vie ─────────────────────────────────────────────────
+function _lotStepperHTML(lot) {
+  const isTerminal = lot.status === "vendu" || lot.status === "termine";
+  const steps = [
+    { icon: "🐣", label: "Maternité" },
+    { icon: "🐇", label: "Sevré" },
+    { icon: "🏠", label: "En loges" },
+    { icon: isTerminal ? LOT_STATUSES[lot.status].icon : "🏁", label: isTerminal ? LOT_STATUSES[lot.status].label : "Fin" },
+  ];
+  const order = ["maternite", "sevre", "loges"];
+  const curIdx = isTerminal ? 3 : Math.max(0, order.indexOf(lot.status));
+  return `<div class="lot-stepper">${steps.map((s, i) => {
+    const st = i < curIdx ? "done" : i === curIdx ? "current" : "todo";
+    return `<div class="lot-step ${st}"><div class="lot-step-dot">${s.icon}</div><div class="lot-step-label">${escapeHTML(s.label)}</div></div>`;
+  }).join('<div class="lot-step-line"></div>')}</div>`;
+}
+
+function _sexIcon(sex) {
+  if (sex === "F") return '<span title="Femelle">♀</span>';
+  if (sex === "M") return '<span title="Mâle">♂</span>';
+  return '<span title="Inconnu" class="muted">?</span>';
+}
+
+function _renderLotDetails(ctx, selected) {
+  const { el, state } = ctx;
+  const today = new Date().toISOString().slice(0, 10);
+  const meta = LOT_STATUSES[selected.status] || LOT_STATUSES.maternite;
+  const primary = selected.cage && selected.cage !== "—" ? selected.cage : selected.doeName;
+
+  const kitIds = new Set(selected.rabbitIds || []);
+  const rabbits = (selected.rabbitIds || []).map(id => state.rabbits.find(r => r.id === id)).filter(Boolean);
+  const orderRank = (r) => r.status === "actif" ? 0 : r.status === "vendu" ? 1 : 2;
+  rabbits.sort((a, b) => orderRank(a) - orderRank(b) || (a.code || "").localeCompare(b.code || ""));
+
+  // KPI
+  const cell = (n, label, cls = "") =>
+    `<div class="stats-kpi${cls ? " stats-kpi--" + cls : ""}" style="padding:8px"><div class="stats-kpi-n">${escapeHTML(String(n))}</div><div class="stats-kpi-t">${escapeHTML(label)}</div></div>`;
+
+  // Bandeau action conseillée
+  let hint = "";
+  if (selected.aliveCount > 0) {
+    if (selected.status === "maternite") {
+      if (selected.needsWeaning) {
+        hint = `<div class="lot-hint urgent">⚠️ <strong>Sevrage conseillé</strong> — la portée a ${selected.ageDays} j (seuil ${BREEDING_CONFIG.WEAN_DAYS} j).</div>`;
+      } else if (selected.weanDueDate) {
+        hint = `<div class="lot-hint">🍼 Née il y a ${selected.ageDays ?? "?"} j · sevrage conseillé vers le <strong>${escapeHTML(formatDate(selected.weanDueDate))}</strong>.</div>`;
+      }
+    } else if (selected.status === "sevre") {
+      hint = `<div class="lot-hint">🏠 Sevré · répartis-les en loges individuelles dès qu'ils sont prêts.</div>`;
+    }
+  }
+
+  // Sex-ratio + poids moyen des vivants
+  const sc = selected.sexCounts || { M: 0, F: 0, U: 0 };
+  const weights = rabbits.filter(r => r.status === "actif").map(r => getCurrentWeight(state, r.id)).filter(w => w != null);
+  const avgW = weights.length ? (weights.reduce((a, b) => a + b, 0) / weights.length) : null;
+  const metaLine = `<div class="lot-meta-line small">
+    <span title="Sex-ratio des vivants">♀ ${sc.F} · ♂ ${sc.M}${sc.U ? ` · ? ${sc.U}` : ""}</span>
+    ${avgW != null ? `<span title="Poids moyen des vivants pesés">⚖️ ${avgW.toFixed(2)} kg</span>` : ""}
+    ${selected.ageDays != null ? `<span>🗓️ J+${selected.ageDays}</span>` : ""}
+  </div>`;
+
+  // Tableau des lapereaux
+  const kitsTable = rabbits.length > 0
+    ? `<table class="lot-kits">
+        <thead><tr><th>Code</th><th>Sexe</th><th>Âge</th><th>Poids</th><th>Loge</th><th>Statut</th><th></th></tr></thead>
+        <tbody>${rabbits.map(r => {
+          const w = getCurrentWeight(state, r.id);
+          const ageK = r.birthDate ? `J+${Math.max(0, daysBetween(r.birthDate, today))}` : "—";
+          return `<tr class="${r.status !== "actif" ? "lot-kit-inactive" : ""}">
+            <td><strong>${escapeHTML(r.code)}</strong></td>
+            <td>${_sexIcon(r.sex)}</td>
+            <td>${ageK}</td>
+            <td>${w != null ? w.toFixed(2) + " kg" : "—"}</td>
+            <td>${escapeHTML(r.cage || "—")}</td>
+            <td>${rabbitStatusBadge(r.status)}</td>
+            <td><button class="btn ghost" data-open-rabbit="${r.id}">Voir</button></td>
+          </tr>`;
+        }).join("")}</tbody>
+      </table>`
+    : `<div class="small muted">Aucun lapereau enregistré${selected.stillborn > 0 ? ` (${selected.stillborn} mort-né${selected.stillborn > 1 ? "s" : ""})` : ""}.</div>`;
+
+  // Historique des pertes (décès des lapereaux)
+  const lossEvents = (state.events || [])
+    .filter(e => (e.type === "décès" || e.type === "deces") && kitIds.has(e.rabbitId))
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const lossesHTML = lossEvents.length
+    ? `<div class="lot-section-title">Pertes (${lossEvents.length})</div>
+       <div class="lot-losses">${lossEvents.map(e => {
+          const r = state.rabbits.find(x => x.id === e.rabbitId);
+          const cond = (e.data?.condition || "").trim();
+          return `<div class="lot-loss-row small">
+            <span class="muted">${escapeHTML(formatDate(e.date))}</span> ·
+            <strong>${escapeHTML(r?.code || "?")}</strong> ·
+            <span class="lot-loss-cause">${escapeHTML(deathCauseLabel(e.data?.cause))}</span>${cond ? ` — ${escapeHTML(cond)}` : ""}
+          </div>`;
+        }).join("")}</div>`
+    : "";
+
+  // Actions : l'action de cycle de vie suivante est mise en avant.
+  const canWean  = selected.aliveCount > 0 && selected.status === "maternite";
+  const canLodge = selected.aliveCount > 0 && (selected.status === "sevre" || selected.status === "loges");
+  const weanCls  = canWean ? "btn" : "btn secondary";
+  const lodgeCls = canLodge ? "btn" : "btn secondary";
+  const actions = [
+    canWean  ? `<button class="${weanCls}" id="btnLotWean" data-testid="lot-wean">🐇 Sevrer le lot</button>` : "",
+    canLodge ? `<button class="${lodgeCls}" id="btnLotLodges" data-testid="lot-lodges">🏠 Répartir en loges</button>` : "",
+    selected.aliveCount > 0 ? `<button class="btn secondary" id="btnLotLoss" data-testid="lot-loss">☠️ Déclarer une perte</button>` : "",
+    `<button class="btn secondary" id="btnLotAddKits" data-testid="lot-add-kits">➕ Ajouter des lapereaux</button>`,
+  ].filter(Boolean).join("");
+
+  const statusOptions = Object.entries(LOT_STATUSES)
+    .map(([k, v]) => `<option value="${k}"${k === selected.status ? " selected" : ""}>${escapeHTML(v.label)}</option>`)
+    .join("");
+
+  el.lotDetails.innerHTML = `
+    <div class="lot-detail-head">
+      <button class="btn ghost lot-back" id="btnLotBack" title="Retour à la liste" aria-label="Retour">←</button>
+      <div class="lot-detail-titles">
+        <div class="lot-detail-title">${meta.icon} ${escapeHTML(primary)} <span class="${meta.cls}">${escapeHTML(meta.label)}</span></div>
+        <div class="small muted">Mise-bas du ${escapeHTML(formatDate(selected.date))} · ${escapeHTML(selected.doeName)} (${escapeHTML(selected.doeCode)})${selected.buckName ? ` × ${escapeHTML(selected.buckName)}` : ""}</div>
+      </div>
+    </div>
+
+    ${_lotStepperHTML(selected)}
+    ${hint}
+
+    <div class="stats-kpi-row lot-kpi" style="grid-template-columns:repeat(5,1fr);gap:6px">
+      ${cell(selected.born, "Nés")}
+      ${cell(selected.bornAlive, "Nés vivants")}
+      ${cell(selected.aliveCount, "Vivants", "ok")}
+      ${cell(selected.deadCount, "Pertes", selected.deadCount > 0 ? "warn" : "")}
+      ${cell(selected.soldCount, "Vendus")}
+    </div>
+    ${metaLine}
+
+    <div class="lot-actions">${actions}</div>
+
+    <div class="lot-section-title">${selected.aliveCount} vivant${selected.aliveCount > 1 ? "s" : ""} sur ${rabbits.length} lapereau${rabbits.length > 1 ? "x" : ""}</div>
+    ${kitsTable}
+
+    ${lossesHTML}
+
+    <details class="lot-advanced">
+      <summary>⚙️ Options du lot</summary>
+      <div class="kv" style="margin-top:8px">
+        <div>Statut manuel</div><div><select id="lotStatusSelect" class="input" style="padding:2px 6px;height:auto" data-testid="lot-status-select" title="${escapeAttr(meta.hint || "")}">${statusOptions}</select></div>
+        <div>Notes</div><div>${escapeHTML(selected.notes || "—")}</div>
+      </div>
+      <div class="row" style="margin-top:8px"><button class="btn secondary" id="btnOpenDoe">Voir la mère</button></div>
+    </details>
+  `;
+}
+
 export function renderLots(ctx) {
   const { el, state } = ctx;
 
   // si l'UI n'existe pas (au cas où), on skip
   if (!el.lotList || !el.lotDetails) return;
 
-  const lots = buildLots(state);
+  const today = new Date().toISOString().slice(0, 10);
+  const lots = buildLots(state, today);
   const filtered = getFilteredLots(ctx, lots);
 
-  if (!filtered.length) {
-    el.lotList.innerHTML = `<div class="muted">Aucun lot trouvé. Un lot est créé automatiquement à chaque mise-bas.</div>`;
-  } else {
-    el.lotList.innerHTML = filtered.map(l => {
-      const active = (ctx.selectedLotId === l.id) ? "active" : "";
-      // Si pas de cage de destination, on affiche le nom de la mère comme
-      // libellé principal plutôt qu'un "—" peu lisible.
-      const primary = l.cage && l.cage !== "—" ? l.cage : l.doeName;
-      const parents = l.buckName
-        ? `${escapeHTML(l.doeName)} × ${escapeHTML(l.buckName)}`
-        : `${escapeHTML(l.doeName)} (${escapeHTML(l.doeCode)})`;
-      return `
-        <div class="item ${active}" data-testid="lot-item" data-lot="${l.id}">
-          <div>
-            <div><strong>${escapeHTML(primary)}</strong> — ${escapeHTML(formatDate(l.date))}</div>
-            <div class="small">${parents}</div>
-          </div>
-          <div>${lotBadge(l)}</div>
-        </div>
-      `;
-    }).join("");
-  }
+  // Bandeau résumé + puces de filtre
+  const summary = document.getElementById("lotSummary");
+  if (summary) summary.innerHTML = _lotSummaryHTML(lots);
+  const chips = document.getElementById("lotFilterChips");
+  if (chips) chips.innerHTML = _lotChipsHTML(lots, ctx.lotStatusFilter);
 
-  // détails lot
+  // Liste
+  el.lotList.innerHTML = filtered.length
+    ? filtered.map(l => _lotCardHTML(ctx, l)).join("")
+    : `<div class="muted" style="padding:16px">Aucun lot${ctx.lotStatusFilter || (ctx.el.lotQ?.value || "").trim() ? " pour ce filtre" : ""}. Un lot est créé automatiquement à chaque mise-bas.</div>`;
+
+  // Détail
   const selected = lots.find(x => x.id === ctx.selectedLotId);
+  document.getElementById("panel-lots")?.classList.toggle("lot-selected", !!selected);
   if (!selected) {
-    el.lotDetails.innerHTML = `<div class="muted">Sélectionne un lot.</div>`;
-  } else {
-    const rabbits = selected.rabbitIds?.map(id => state.rabbits.find(r => r.id === id)).filter(Boolean) || [];
-    // Vivants d'abord, puis morts/vendus.
-    const orderRank = (r) => r.status === "actif" ? 0 : r.status === "vendu" ? 1 : 2;
-    rabbits.sort((a, b) => orderRank(a) - orderRank(b) || (a.code || "").localeCompare(b.code || ""));
-
-    const rabbitsList = rabbits.length > 0
-      ? `<div class="list" style="margin-top: 12px;">
-          ${rabbits.map(r => `
-            <div class="item">
-              <div>
-                <div><strong>${escapeHTML(r.code)}</strong> — ${escapeHTML(r.name)} ${rabbitStatusBadge(r.status)}</div>
-                <div class="small">Sexe: ${sexLabel(r.sex)} · ${stageBadge(getRabbitStage(r))}${r.cage ? ` · Loge: ${escapeHTML(r.cage)}` : ""}</div>
-              </div>
-              <div>
-                <button class="btn ghost" data-open-rabbit="${r.id}">Voir</button>
-              </div>
-            </div>
-          `).join("")}
-        </div>`
-      : `<div class="small muted">Aucun lapereau enregistré pour cette portée${selected.stillborn > 0 ? ` (${selected.stillborn} mort-né${selected.stillborn > 1 ? "s" : ""})` : ""}.</div>`;
-
-    const statusOptions = Object.entries(LOT_STATUSES)
-      .map(([k, v]) => `<option value="${k}"${k === selected.status ? " selected" : ""}>${escapeHTML(v.label)}</option>`)
-      .join("");
-    const statusMeta = LOT_STATUSES[selected.status] || LOT_STATUSES.maternite;
-
-    const cell = (n, label, cls = "") =>
-      `<div class="stats-kpi${cls ? " stats-kpi--" + cls : ""}" style="padding:8px"><div class="stats-kpi-n">${escapeHTML(String(n))}</div><div class="stats-kpi-t">${escapeHTML(label)}</div></div>`;
-
-    const canWean   = selected.aliveCount > 0 && selected.status === "maternite";
-    const canLodge  = selected.aliveCount > 0 && (selected.status === "sevre" || selected.status === "loges");
-
     el.lotDetails.innerHTML = `
-      <div style="font-size:18px;font-weight:900">${escapeHTML(selected.cage)} <span class="${statusMeta.cls}">${escapeHTML(statusMeta.label)}</span></div>
-      <div class="small muted">Mise-bas du ${escapeHTML(formatDate(selected.date))} · ${escapeHTML(selected.doeName)} (${escapeHTML(selected.doeCode)})${selected.buckName ? ` × ${escapeHTML(selected.buckName)}` : ""}</div>
-      <div class="sep"></div>
-      <div class="stats-kpi-row" style="grid-template-columns:repeat(5,1fr);gap:6px">
-        ${cell(selected.born, "Nés")}
-        ${cell(selected.bornAlive, "Nés vivants")}
-        ${cell(selected.aliveCount, "Vivants", "ok")}
-        ${cell(selected.deadCount, "Pertes", selected.deadCount > 0 ? "warn" : "")}
-        ${cell(selected.soldCount, "Vendus")}
-      </div>
-      <div class="kv" style="margin-top:10px">
-        <div>Statut: </div><div><select id="lotStatusSelect" class="input" style="padding:2px 6px;height:auto" data-testid="lot-status-select" title="${escapeAttr(statusMeta.hint || "")}">${statusOptions}</select></div>
-        <div>Notes: </div><div>${escapeHTML(selected.notes || "—")}</div>
-      </div>
-      <div class="sep"></div>
-      <div class="row" style="gap:6px;flex-wrap:wrap">
-        ${canWean  ? `<button class="btn secondary" id="btnLotWean" data-testid="lot-wean">🐇 Sevrer le lot</button>` : ""}
-        ${canLodge ? `<button class="btn secondary" id="btnLotLodges" data-testid="lot-lodges">🏠 Répartir en loges</button>` : ""}
-        ${selected.aliveCount > 0 ? `<button class="btn secondary" id="btnLotLoss" data-testid="lot-loss">☠️ Déclarer une perte</button>` : ""}
-        <button class="btn secondary" id="btnLotAddKits" data-testid="lot-add-kits">➕ Ajouter des lapereaux</button>
-      </div>
-      <div class="sep"></div>
-      <div style="font-weight:700;margin-bottom:6px">${selected.aliveCount} vivant${selected.aliveCount > 1 ? "s" : ""} sur ${rabbits.length} lapereau${rabbits.length > 1 ? "x" : ""}</div>
-      ${rabbitsList}
-      <div class="sep"></div>
-      <div class="row">
-        <button class="btn secondary" id="btnOpenDoe">Voir la mère</button>
-      </div>
-    `;
+      <div class="rl-empty-state">
+        <div class="rl-empty-icon">📦</div>
+        <div class="rl-empty-text">Sélectionne un lot pour voir son suivi détaillé.</div>
+      </div>`;
+    return;
   }
+  _renderLotDetails(ctx, selected);
 }
 
 export function renderGenealogy(ctx) {

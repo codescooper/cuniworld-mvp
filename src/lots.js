@@ -1,5 +1,6 @@
-import { escapeHTML, num } from "./utils.js";
+import { escapeHTML, num, daysBetween, addDays } from "./utils.js";
 import { latestEventOf } from "./repro.js";
+import { BREEDING_CONFIG } from "./breeding.js";
 
 /**
  * Un LOT = une PORTÉE (événement `mise_bas`), suivi depuis la naissance.
@@ -11,12 +12,16 @@ import { latestEventOf } from "./repro.js";
  * statut dérivé du cycle réel (présence d'un sevrage).
  */
 export const LOT_STATUSES = {
-  maternite: { label: "Maternité", cls: "badge accent",  hint: "Lapereaux sous la mère" },
-  sevre:     { label: "Sevré",     cls: "badge warn",    hint: "Sevré, en bâtiment collectif" },
-  loges:     { label: "En loges",  cls: "badge ok",      hint: "Répartis en loges individuelles" },
-  vendu:     { label: "Vendu",     cls: "badge warning", hint: "Lot vendu" },
-  termine:   { label: "Terminé",   cls: "badge muted",   hint: "Lot clôturé" },
+  maternite: { label: "Maternité", cls: "badge accent",  icon: "🐣", hint: "Lapereaux sous la mère" },
+  sevre:     { label: "Sevré",     cls: "badge warn",    icon: "🐇", hint: "Sevré, en bâtiment collectif" },
+  loges:     { label: "En loges",  cls: "badge ok",      icon: "🏠", hint: "Répartis en loges individuelles" },
+  vendu:     { label: "Vendu",     cls: "badge warning", icon: "💰", hint: "Lot vendu" },
+  termine:   { label: "Terminé",   cls: "badge muted",   icon: "✅", hint: "Lot clôturé" },
 };
+
+// Étapes du cycle de vie affichées dans le stepper (les statuts terminaux
+// vendu/termine partagent la dernière case).
+export const LOT_LIFECYCLE = ["maternite", "sevre", "loges"];
 
 /** Causes de perte (mortalité) — alimentent les stats de mortalité par cause. */
 export const DEATH_CAUSES = {
@@ -66,7 +71,7 @@ function _dominantCage(rabbits) {
   return best;
 }
 
-export function buildLots(state) {
+export function buildLots(state, todayISO = new Date().toISOString().slice(0, 10)) {
   const rabbitsById = new Map((state.rabbits || []).map(r => [r.id, r]));
   const statuses = state.lotStatuses || {};
 
@@ -105,6 +110,16 @@ export function buildLots(state) {
 
       const status = statuses[id] || derivedLotStatus(state, e);
 
+      // Âge de la portée + repères de cycle de vie (timing du sevrage).
+      const ageDays = e.date ? Math.max(0, daysBetween(e.date, todayISO)) : null;
+      const weanDueDate = e.date ? addDays(e.date, BREEDING_CONFIG.WEAN_DAYS) : null;
+      const needsWeaning = status === "maternite" && alive.length > 0 &&
+        ageDays != null && ageDays >= BREEDING_CONFIG.WEAN_DAYS;
+
+      // Sex-ratio des vivants.
+      const sexCounts = { M: 0, F: 0, U: 0 };
+      for (const k of alive) sexCounts[k.sex === "M" ? "M" : k.sex === "F" ? "F" : "U"]++;
+
       return {
         id,
         eventId: e.id,
@@ -128,6 +143,10 @@ export function buildLots(state) {
         notes: e.notes || "",
         status,
         autoStatus: derivedLotStatus(state, e),
+        ageDays,
+        weanDueDate,
+        needsWeaning,
+        sexCounts,
       };
     })
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));

@@ -93,6 +93,7 @@
 | 2026-05-20 | _ce commit_ | Hors roadmap — refonte gestion des lots/portées : lot créé dès la mise-bas, cycle Maternité→Sevré→Loges, déclaration des pertes (cause + condition), ajout de lapereaux, répartition en loges + fix stats mortalité (mort-nés dans KPI Morts, survie reproductrice en direct) | 100 % |
 | 2026-05-20 | _ce commit_ | Hors roadmap — traitement par lot : mode sélection multiple dans la liste lapins + actions groupées (événement groupé vaccin/traitement/pesée/vente/décès, modification groupée cage/race/dispo repro/boutique) | 100 % |
 | 2026-05-20 | _ce commit_ | Hors roadmap — intégrité des données : tout passage à Mort/Vendu (fiche lapin incluse) crée l'événement avec précisions (cause / prix) → stats toujours justes quel que soit le chemin ; cause ajoutée au formulaire événement décès ; réactivation supprime l'événement terminal erroné ; boutons liste en icône seule | 100 % |
+| 2026-05-20 | _ce commit_ | Hors roadmap — refonte UX module Lots/Jeunes : layout maître-détail, bandeau résumé, filtres en puces avec compteurs, cartes avec âge/alerte, fiche avec stepper de cycle de vie, conseil de sevrage, sex-ratio, tableau des lapereaux et historique des pertes | 100 % |
 
 ---
 
