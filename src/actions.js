@@ -327,48 +327,122 @@ export function addKitsToLitter(ctx, litterEventId, count, { reason = "", date =
 }
 
 /**
- * Déclare une perte (décès) pour un ou plusieurs lapereaux d'un lot, avec
- * cause et condition détaillée. Crée de vrais événements `décès` → met le
- * statut à "mort" (via applyEventSideEffects) et se répercute sur TOUTES les
- * stats (compteur global, survie portée, classement reproductrice).
+ * Applique un même événement à plusieurs lapins (traitement par lot).
+ * Chaque lapin est validé individuellement ; les échecs sont collectés sans
+ * bloquer les autres. Persiste et synchronise une seule fois.
+ *
+ * @returns {{ ok: number, failed: Array<{id, code?, error}> }}
  */
-export function declareLotLoss(ctx, rabbitIds, { cause = "inconnu", condition = "", date = null } = {}) {
+export function applyBulkEvent(ctx, rabbitIds, { type, date = null, notes = "", data = {} } = {}) {
   const { uid, nowISO } = ctx.Store.helpers;
-  const day = date || nowISO().slice(0, 10);
-  const detail = (condition || "").trim();
+  const day = date || new Date().toISOString().slice(0, 10);
+  const actor = defaultActor(ctx);
+  const cleanNotes = (notes || "").trim();
   const created = [];
+  const failed = [];
+  const touched = new Set();
 
   for (const rid of (rabbitIds || [])) {
     const r = ctx.state.rabbits.find(x => x.id === rid);
-    if (!r || r.status !== "actif") continue;
+    if (!r) { failed.push({ id: rid, error: "Lapin introuvable." }); continue; }
+
+    const evData = { ...(data || {}) };
+    if (type === "mise_bas") {
+      const born  = numOrNull(evData.born);
+      const alive = num(evData.alive);
+      const dead  = num(evData.dead);
+      if (born === null) evData.born = alive + dead;
+      else evData.dead = Math.max(born - alive, 0);
+    }
+
     const ev = {
       id: uid("ev"),
       rabbitId: rid,
-      type: "décès",
+      type: type || "autre",
       date: day,
-      notes: detail,
-      data: { cause, condition: detail },
-      performedBy: defaultActor(ctx),
+      notes: cleanNotes,
+      data: evData,
+      performedBy: actor,
       createdAt: nowISO(),
     };
+
     const check = validateEvent(ctx.state, rid, ev);
-    if (!check.ok) continue;
+    if (!check.ok) { failed.push({ id: rid, code: r.code, error: check.error }); continue; }
+
     ctx.state.events.unshift(ev);
-    applyEventSideEffects(ctx, ev); // → status "mort" + libère le nom du pool
-    created.push({ ev, rabbit: r });
+    applyEventSideEffects(ctx, ev);
+    created.push(ev);
+    touched.add(rid);
+    // Lapereaux créés/modifiés par effet de bord (mise_bas/sevrage).
+    if (type === "mise_bas") for (const k of ctx.state.rabbits) if (k.litterId === ev.id) touched.add(k.id);
+    if (type === "sevrage" && ev.data?.litterId) for (const k of ctx.state.rabbits) if (k.litterId === ev.data.litterId) touched.add(k.id);
   }
 
-  if (!created.length) return 0;
-  persist(ctx);
-  const farmId = fid(ctx);
-  if (farmId) {
-    for (const { ev, rabbit } of created) {
-      trackCloudWrite(ctx, DB.upsertEvent(farmId, ev), { type: "upsertEvent", payload: { farmId, event: ev } });
-      trackCloudWrite(ctx, DB.upsertRabbit(farmId, rabbit), { type: "upsertRabbit", payload: { farmId, rabbit } });
+  if (created.length) {
+    persist(ctx);
+    const farmId = fid(ctx);
+    if (farmId) {
+      for (const ev of created) {
+        trackCloudWrite(ctx, DB.upsertEvent(farmId, ev), { type: "upsertEvent", payload: { farmId, event: ev } });
+      }
+      for (const rid of touched) {
+        const rb = ctx.state.rabbits.find(r => r.id === rid);
+        if (rb) trackCloudWrite(ctx, DB.upsertRabbit(farmId, rb), { type: "upsertRabbit", payload: { farmId, rabbit: rb } });
+      }
     }
+    ctx.render();
   }
-  ctx.render();
-  return created.length;
+  return { ok: created.length, failed };
+}
+
+/**
+ * Applique une même modification de champs (cage, race, dispo repro, boutique…)
+ * à plusieurs lapins. Seuls les champs présents dans `patch` sont modifiés.
+ * @returns {number} nombre de lapins modifiés
+ */
+export function applyBulkEdit(ctx, rabbitIds, patch = {}) {
+  const { nowISO } = ctx.Store.helpers;
+  const keys = Object.keys(patch);
+  if (!keys.length) return 0;
+
+  const touched = [];
+  for (const rid of (rabbitIds || [])) {
+    const r = ctx.state.rabbits.find(x => x.id === rid);
+    if (!r) continue;
+    Object.assign(r, patch);
+    // Cohérence boutique : retirer de la vente nettoie prix + description.
+    if (patch.forSale === false) { r.salePrice = null; r.shopDescription = ""; }
+    r.updatedAt = nowISO();
+    touched.push(r);
+  }
+
+  if (touched.length) {
+    persist(ctx);
+    const farmId = fid(ctx);
+    if (farmId) {
+      for (const r of touched) {
+        trackCloudWrite(ctx, DB.upsertRabbit(farmId, r), { type: "upsertRabbit", payload: { farmId, rabbit: r } });
+      }
+    }
+    ctx.render();
+  }
+  return touched.length;
+}
+
+/**
+ * Déclare une perte (décès) pour un ou plusieurs lapereaux d'un lot, avec
+ * cause et condition détaillée. S'appuie sur applyBulkEvent → met le statut à
+ * "mort" et se répercute sur TOUTES les stats (compteur global, survie portée,
+ * classement reproductrice).
+ */
+export function declareLotLoss(ctx, rabbitIds, { cause = "inconnu", condition = "", date = null } = {}) {
+  const detail = (condition || "").trim();
+  const ids = (rabbitIds || []).filter(rid => {
+    const r = ctx.state.rabbits.find(x => x.id === rid);
+    return r && r.status === "actif";
+  });
+  const res = applyBulkEvent(ctx, ids, { type: "décès", date, notes: detail, data: { cause, condition: detail } });
+  return res.ok;
 }
 
 /**

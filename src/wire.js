@@ -1,6 +1,6 @@
 import { openModal, closeModal } from "./modal.js";
 import { escapeHTML, escapeAttr, generateRabbitCode, num, numOrNull } from "./utils.js";
-import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent, addPhoto, deletePhoto, trackCloudWrite, addKitsToLitter, declareLotLoss, assignLotLodges } from "./actions.js";
+import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent, addPhoto, deletePhoto, trackCloudWrite, addKitsToLitter, declareLotLoss, assignLotLodges, applyBulkEvent, applyBulkEdit } from "./actions.js";
 import { buildLots, DEATH_CAUSES } from "./lots.js";
 import { DB } from "./db.js";
 import { compressImage } from "./photos.js";
@@ -87,6 +87,16 @@ export function wireStatic(ctx) {
     _setFiltersOpen(advancedFilters?.hidden ?? true);
   });
   btnCloseFilters?.addEventListener("click", () => _setFiltersOpen(false));
+
+  // Mode sélection multiple (traitement par lot)
+  const btnSelectMode = document.getElementById("btnSelectMode");
+  btnSelectMode?.addEventListener("click", () => {
+    ctx.selectionMode = !ctx.selectionMode;
+    if (!(ctx.selectedIds instanceof Set)) ctx.selectedIds = new Set();
+    if (!ctx.selectionMode) ctx.selectedIds.clear();
+    btnSelectMode.setAttribute("aria-pressed", ctx.selectionMode ? "true" : "false");
+    ctx.render();
+  });
   btnResetFilters?.addEventListener("click", () => {
     el.sexFilter.value = "";
     el.statusFilter.value = "";
@@ -129,13 +139,55 @@ export function wireStatic(ctx) {
 export function wireDynamic(ctx) {
   const { el } = ctx;
 
+  if (!(ctx.selectedIds instanceof Set)) ctx.selectedIds = new Set();
+  const _setSel = (id, on) => { if (on) ctx.selectedIds.add(id); else ctx.selectedIds.delete(id); };
+
   el.rabbitList.querySelectorAll("[data-rabbit]").forEach(node => {
     node.addEventListener("click", () => {
-      ctx.selectedRabbitId = node.dataset.rabbit;
-      ctx.selectedGeneRabbitId = node.dataset.rabbit;
+      const id = node.dataset.rabbit;
+      if (ctx.selectionMode) {
+        _setSel(id, !ctx.selectedIds.has(id));
+        ctx.render();
+        return;
+      }
+      ctx.selectedRabbitId = id;
+      ctx.selectedGeneRabbitId = id;
       ctx.render();
     });
   });
+
+  // Cases à cocher (mode sélection) — stoppe la propagation pour gérer l'état soi-même.
+  el.rabbitList.querySelectorAll(".rl-check").forEach(cb => {
+    cb.addEventListener("click", (e) => {
+      e.stopPropagation();
+      _setSel(cb.dataset.check, cb.checked);
+      ctx.render();
+    });
+  });
+
+  // Barre d'actions groupées (traitement par lot)
+  if (ctx.selectionMode) {
+    document.getElementById("rlSelectAll")?.addEventListener("click", () => {
+      el.rabbitList.querySelectorAll("[data-rabbit]").forEach(n => ctx.selectedIds.add(n.dataset.rabbit));
+      ctx.render();
+    });
+    document.getElementById("rlSelectNone")?.addEventListener("click", () => {
+      ctx.selectedIds.clear();
+      ctx.render();
+    });
+    document.getElementById("rlBulkExit")?.addEventListener("click", () => {
+      ctx.selectionMode = false;
+      ctx.selectedIds.clear();
+      document.getElementById("btnSelectMode")?.setAttribute("aria-pressed", "false");
+      ctx.render();
+    });
+    document.getElementById("rlBulkEvent")?.addEventListener("click", () => {
+      if (ctx.selectedIds.size) openBulkEventModal(ctx, [...ctx.selectedIds]);
+    });
+    document.getElementById("rlBulkEdit")?.addEventListener("click", () => {
+      if (ctx.selectedIds.size) openBulkEditModal(ctx, [...ctx.selectedIds]);
+    });
+  }
 
   document.querySelectorAll("[data-open-rabbit]").forEach(node => {
     node.addEventListener("click", (e) => {
@@ -1311,6 +1363,193 @@ function bindExtraHandlers(type) {
 
 function refreshAllowedTypes() {
   // Placeholder: ancienne logique supprimée, on garde le hook pour éviter les erreurs.
+}
+
+/* -------- Traitement par lot (sélection multiple de lapins) -------- */
+
+function _bulkEventExtra(ctx, type) {
+  if (type === "vaccin" || type === "traitement") {
+    return `
+      <div class="row2">
+        <div class="field"><div class="label">Produit (optionnel)</div><input class="input" name="product" placeholder="ex: Myxomatose / Vermifuge…"></div>
+        <div class="field"><div class="label">Dose (optionnel)</div><input class="input" name="dose" placeholder="ex: 1ml"></div>
+      </div>
+      <div class="field"><div class="label">Prochain rappel (optionnel)</div><input class="input" name="nextDate" type="date"></div>`;
+  }
+  if (type === "pesée") {
+    return `<div class="field"><div class="label">Poids appliqué à chaque lapin (kg)</div><input class="input" name="weight" type="number" min="0" step="0.01" placeholder="ex: 2.35" required></div>`;
+  }
+  if (type === "vente") {
+    const cur = getSettings(ctx).currencySymbol || "FCFA";
+    return `
+      <div class="row2">
+        <div class="field"><div class="label">Prix unitaire (${escapeHTML(cur)})</div><input class="input" name="price" type="number" min="0.01" step="0.01" placeholder="ex: 2500" required></div>
+        <div class="field"><div class="label">Client (optionnel)</div><input class="input" name="client" placeholder="ex: Jean Dupont"></div>
+      </div>`;
+  }
+  if (type === "décès") {
+    const causeOptions = Object.entries(DEATH_CAUSES)
+      .map(([k, v], i) => `<option value="${escapeAttr(k)}"${i === 0 ? " selected" : ""}>${escapeHTML(v)}</option>`)
+      .join("");
+    return `
+      <div class="field"><div class="label">Cause</div><select class="input" name="cause">${causeOptions}</select></div>
+      <div class="field"><div class="label">Conditions / détails (recommandé)</div><textarea class="input" name="condition" rows="2" placeholder="Symptômes, circonstances…"></textarea></div>`;
+  }
+  return "";
+}
+
+function openBulkEventModal(ctx, ids) {
+  const today = new Date().toISOString().slice(0, 10);
+  const types = ["vaccin", "traitement", "pesée", "vente", "décès", "autre"];
+  const labels = { vaccin: "💉 Vaccin", traitement: "💊 Traitement", "pesée": "⚖️ Pesée", vente: "💰 Vente", "décès": "☠️ Décès", autre: "📝 Note / Autre" };
+  const options = types.map(t => `<option value="${t}">${labels[t]}</option>`).join("");
+
+  openModal(ctx.el, `📅 Événement groupé — ${ids.length} lapin${ids.length > 1 ? "s" : ""}`, `
+    <form id="bulkEventForm" class="form">
+      <div class="row2">
+        <div class="field"><div class="label">Type d'événement</div><select class="input" name="type" id="bulkEvType">${options}</select></div>
+        <div class="field"><div class="label">Date</div><input class="input" type="date" name="date" value="${today}"></div>
+      </div>
+      <div id="bulkEvExtra"></div>
+      <div class="field"><div class="label">Notes (optionnel)</div><textarea class="input" name="notes" rows="2" placeholder="Appliqué à tous les lapins sélectionnés"></textarea></div>
+      <div id="bulkEvError" class="error" hidden></div>
+      <div class="row" style="justify-content:flex-end">
+        <button type="button" class="btn secondary" id="bulkEvCancel">Annuler</button>
+        <button type="submit" class="btn" data-testid="bulk-event-submit">Appliquer à ${ids.length}</button>
+      </div>
+    </form>
+  `);
+
+  const form = document.getElementById("bulkEventForm");
+  const typeSel = document.getElementById("bulkEvType");
+  const extra = document.getElementById("bulkEvExtra");
+  const errBox = document.getElementById("bulkEvError");
+  const renderExtra = () => { extra.innerHTML = _bulkEventExtra(ctx, typeSel.value); };
+  renderExtra();
+  typeSel.addEventListener("change", () => { renderExtra(); if (errBox) errBox.hidden = true; });
+  document.getElementById("bulkEvCancel")?.addEventListener("click", () => closeModal(ctx.el));
+
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const type = (fd.get("type") || "autre").toString();
+    const date = (fd.get("date") || today).toString();
+    const notes = (fd.get("notes") || "").toString();
+
+    const data = {};
+    if (type === "vaccin" || type === "traitement") {
+      data.product = (fd.get("product") || "").toString().trim();
+      data.dose = (fd.get("dose") || "").toString().trim();
+      data.nextDate = (fd.get("nextDate") || "").toString();
+    } else if (type === "pesée") {
+      data.weight = num(fd.get("weight"));
+    } else if (type === "vente") {
+      data.price = num(fd.get("price"));
+      data.client = (fd.get("client") || "").toString().trim();
+    } else if (type === "décès") {
+      data.cause = (fd.get("cause") || "inconnu").toString();
+      data.condition = (fd.get("condition") || "").toString().trim();
+    }
+
+    const res = applyBulkEvent(ctx, ids, { type, date, notes, data });
+    if (res.ok === 0 && res.failed.length) {
+      if (errBox) {
+        const first = res.failed[0];
+        errBox.textContent = `Aucun appliqué. Ex. : ${first.code || ""} — ${first.error}`;
+        errBox.hidden = false;
+      }
+      return;
+    }
+    closeModal(ctx.el);
+    const msg = res.failed.length
+      ? `${res.ok} événement(s) appliqué(s), ${res.failed.length} ignoré(s) (statut incompatible).`
+      : `${res.ok} événement(s) appliqué(s).`;
+    showToast(msg, res.failed.length ? "warn" : "success");
+  });
+}
+
+function _bulkCageField(state) {
+  const buildings = (state?.buildings || []).slice().sort((a, b) => a.letter.localeCompare(b.letter));
+  const lodges = state?.lodges || [];
+  if (!buildings.length) {
+    return `<input class="input" name="cage" placeholder="ex: A1 (vide = ne pas changer)">`;
+  }
+  const groups = buildings.map(b => {
+    const opts = lodges.filter(l => l.buildingId === b.id).sort((x, y) => x.number - y.number)
+      .map(l => `<option value="${escapeAttr(l.code)}">${escapeHTML(l.code)}</option>`).join("");
+    return `<optgroup label="Bâtiment ${escapeHTML(b.letter)}">${opts}</optgroup>`;
+  }).join("");
+  return `<select class="input" name="cage"><option value="__keep__" selected>— Ne pas changer —</option>${groups}</select>`;
+}
+
+function openBulkEditModal(ctx, ids) {
+  openModal(ctx.el, `✏️ Modifier en lot — ${ids.length} lapin${ids.length > 1 ? "s" : ""}`, `
+    <form id="bulkEditForm" class="form">
+      <p class="small muted">Seuls les champs renseignés seront modifiés sur les ${ids.length} lapins sélectionnés.</p>
+      <div class="field"><div class="label">Loge / cage</div>${_bulkCageField(ctx.state)}</div>
+      <div class="field"><div class="label">Race</div><input class="input" name="breed" placeholder="vide = ne pas changer"></div>
+      <div class="field"><div class="label">Disponibilité reproduction</div>
+        <select class="input" name="breedingOverride">
+          <option value="__keep__" selected>— Ne pas changer —</option>
+          <option value="auto">Automatique</option>
+          <option value="disponible">Forcer disponible</option>
+          <option value="indisponible">Forcer indisponible</option>
+        </select>
+      </div>
+      <div class="field"><div class="label">Boutique</div>
+        <select class="input" name="forSale" id="bulkForSale">
+          <option value="__keep__" selected>— Ne pas changer —</option>
+          <option value="true">Mettre en vente</option>
+          <option value="false">Retirer de la vente</option>
+        </select>
+      </div>
+      <div class="field" id="bulkPriceField" style="display:none"><div class="label">Prix demandé (optionnel)</div><input class="input" name="salePrice" type="number" min="0" step="any" placeholder="vide = calcul auto (poids × prix vif)"></div>
+      <div id="bulkEditError" class="error" hidden></div>
+      <div class="row" style="justify-content:flex-end">
+        <button type="button" class="btn secondary" id="bulkEditCancel">Annuler</button>
+        <button type="submit" class="btn" data-testid="bulk-edit-submit">Appliquer à ${ids.length}</button>
+      </div>
+    </form>
+  `);
+
+  const form = document.getElementById("bulkEditForm");
+  const forSaleSel = document.getElementById("bulkForSale");
+  const priceField = document.getElementById("bulkPriceField");
+  forSaleSel?.addEventListener("change", () => { priceField.style.display = forSaleSel.value === "true" ? "block" : "none"; });
+  document.getElementById("bulkEditCancel")?.addEventListener("click", () => closeModal(ctx.el));
+
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const patch = {};
+
+    const cageVal = (fd.get("cage") || "").toString().trim();
+    if (cageVal && cageVal !== "__keep__") patch.cage = cageVal;
+
+    const breed = (fd.get("breed") || "").toString().trim();
+    if (breed) patch.breed = breed;
+
+    const bo = (fd.get("breedingOverride") || "__keep__").toString();
+    if (bo !== "__keep__") patch.breedingOverride = bo;
+
+    const shop = (fd.get("forSale") || "__keep__").toString();
+    if (shop === "true") {
+      patch.forSale = true;
+      const p = parseFloat(fd.get("salePrice"));
+      if (Number.isFinite(p) && p > 0) patch.salePrice = p;
+    } else if (shop === "false") {
+      patch.forSale = false;
+    }
+
+    if (!Object.keys(patch).length) {
+      const errBox = document.getElementById("bulkEditError");
+      if (errBox) { errBox.textContent = "Renseigne au moins un champ à modifier."; errBox.hidden = false; }
+      return;
+    }
+    const n = applyBulkEdit(ctx, ids, patch);
+    closeModal(ctx.el);
+    showToast(`${n} lapin${n > 1 ? "s" : ""} modifié${n > 1 ? "s" : ""}.`, "success");
+  });
 }
 
 /* -------- Modales de gestion de lot (portée) -------- */

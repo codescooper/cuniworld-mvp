@@ -10,6 +10,7 @@ export function getEls() {
     weightMax: $("weightMax"),
     sortBy: $("sortBy"),
     rabbitList: $("rabbitList"),
+    rlBulkBar: $("rlBulkBar"),
     rabbitDetails: $("rabbitDetails"),
     eventsPanel: $("eventsPanel"),
 

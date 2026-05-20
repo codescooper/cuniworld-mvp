@@ -152,6 +152,12 @@
                   <span class="rl-filters-toggle-label">Filtres</span>
                   <span id="rlActiveFiltersBadge" class="rl-filters-badge" hidden>0</span>
                 </button>
+                <button id="btnSelectMode" class="btn secondary rl-filters-toggle"
+                        type="button" aria-pressed="false" data-testid="btn-select-mode"
+                        title="Sélection multiple (traitement par lot)">
+                  <span>☑️</span>
+                  <span class="rl-filters-toggle-label">Sélection</span>
+                </button>
               </div>
               <div id="rlAdvancedFilters" class="rl-advanced-filters" hidden>
                 <div class="row" style="gap:var(--space-2)">
@@ -185,6 +191,7 @@
                 </div>
               </div>
             </div>
+            <div id="rlBulkBar" class="rl-bulk-bar" data-testid="rl-bulk-bar" hidden></div>
             <div id="rabbitList" class="list" data-testid="rabbit-list"></div>
           </div>
 

@@ -91,6 +91,7 @@
 | 2026-05-17 | 0edc315 | Phase 5 complète (5.1 → 5.5) — onboarding 3 étapes, 5 pages manuel, mode démo `?demo=1`, hovers d'aide | 98 % |
 | 2026-05-17 | _ce commit_ | Phase 6 complète (6.1 → 6.4) + fix bug carnet sanitaire (popup bloqué par await avant window.open) — i18n FR/EN, multi-devises, sélecteur fermes filtrable, procédure emails Resend | 100 % |
 | 2026-05-20 | _ce commit_ | Hors roadmap — refonte gestion des lots/portées : lot créé dès la mise-bas, cycle Maternité→Sevré→Loges, déclaration des pertes (cause + condition), ajout de lapereaux, répartition en loges + fix stats mortalité (mort-nés dans KPI Morts, survie reproductrice en direct) | 100 % |
+| 2026-05-20 | _ce commit_ | Hors roadmap — traitement par lot : mode sélection multiple dans la liste lapins + actions groupées (événement groupé vaccin/traitement/pesée/vente/décès, modification groupée cage/race/dispo repro/boutique) | 100 % |
 
 ---
 

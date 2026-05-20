@@ -204,9 +204,30 @@ function _renderWeightExtremesCards(ctx) {
 }
 
 
+function renderBulkBar(ctx, rabbits) {
+  const bar = ctx.el.rlBulkBar;
+  if (!bar) return;
+  if (!ctx.selectionMode) { bar.hidden = true; bar.innerHTML = ""; return; }
+  const n = ctx.selectedIds.size;
+  bar.hidden = false;
+  bar.innerHTML = `
+    <div class="rl-bulk-count"><strong>${n}</strong> sélectionné${n > 1 ? "s" : ""}</div>
+    <div class="rl-bulk-actions">
+      <button class="btn ghost" id="rlSelectAll" type="button">Tout (${rabbits.length})</button>
+      <button class="btn ghost" id="rlSelectNone" type="button"${n ? "" : " disabled"}>Aucun</button>
+      <button class="btn secondary" id="rlBulkEvent" type="button" data-testid="bulk-event"${n ? "" : " disabled"}>📅 Événement</button>
+      <button class="btn secondary" id="rlBulkEdit" type="button" data-testid="bulk-edit"${n ? "" : " disabled"}>✏️ Modifier</button>
+      <button class="btn ghost" id="rlBulkExit" type="button" title="Quitter la sélection multiple">✖</button>
+    </div>`;
+}
+
 export function renderRabbitList(ctx) {
   const { el } = ctx;
+  if (!(ctx.selectedIds instanceof Set)) ctx.selectedIds = new Set();
+  const selectionMode = !!ctx.selectionMode;
   const rabbits = getFilteredRabbits(ctx);
+
+  renderBulkBar(ctx, rabbits);
 
   if (rabbits.length === 0) {
     el.rabbitList.innerHTML = `<div class="muted">Aucun lapin trouvé.</div>`;
@@ -221,6 +242,8 @@ export function renderRabbitList(ctx) {
 
   el.rabbitList.innerHTML = rabbits.map(r => {
     const active = r.id === ctx.selectedRabbitId ? "active" : "";
+    const checked = selectionMode && ctx.selectedIds.has(r.id);
+    const selClass = checked ? " rl-selected" : "";
     const stage  = getRabbitStage(r);
     const repro  = getReproInfoFromIndex(r, matingIdx, birthIdx);
     const pregnantBadge = repro?.isPregnant ? `<span class="badge accent">🤰</span>` : "";
@@ -228,8 +251,15 @@ export function renderRabbitList(ctx) {
     const thumb = rabbitThumbHTML(ctx.state, r, { size: 40 });
     const w = weightIndex.get(r.id) ?? null;
     const wTxt = w != null ? `⚖️ ${w.toFixed(2)} kg` : "⚖️ —";
+    const checkbox = selectionMode
+      ? `<input type="checkbox" class="rl-check" data-check="${escapeAttr(r.id)}"${checked ? " checked" : ""} aria-label="Sélectionner ${escapeAttr(r.code)}" style="flex-shrink:0;width:18px;height:18px">`
+      : "";
+    const trailing = selectionMode
+      ? ""
+      : `<button class="btn ghost rl-event-btn" type="button" data-add-event="${r.id}" title="Nouvel événement" style="flex-shrink:0;padding:4px 8px;font-size:1rem">＋</button>`;
     return `
-      <div class="item rl-item ${active}" data-testid="rabbit-item" data-rabbit="${r.id}" style="cursor:pointer;display:flex;align-items:center;gap:10px">
+      <div class="item rl-item ${active}${selClass}" data-testid="rabbit-item" data-rabbit="${r.id}" style="cursor:pointer;display:flex;align-items:center;gap:10px">
+        ${checkbox}
         ${thumb}
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -245,7 +275,7 @@ export function renderRabbitList(ctx) {
             ${escapeHTML(r.breed || "—")} · ${escapeHTML(r.cage || "—")} · ${escapeHTML(formatDate(r.birthDate))} · ${wTxt}
           </div>
         </div>
-        <button class="btn ghost rl-event-btn" type="button" data-add-event="${r.id}" title="Nouvel événement" style="flex-shrink:0;padding:4px 8px;font-size:1rem">＋</button>
+        ${trailing}
       </div>
     `;
   }).join("");
