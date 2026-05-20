@@ -67,13 +67,13 @@ test("flux complet de reproduction: femelle -> saillie -> mise-bas -> sevrage ->
   // Naviguer vers le panneau Lots pour vérifier le lot créé
   await navigateTo(page, "lots");
 
-  // Vérifier que le lot a été créé
+  // Vérifier que le lot a été créé (compteurs en direct : 7 vivants)
   await expect(page.locator("#lotList")).toContainText("C-04");
-  await expect(page.locator("#lotList")).toContainText("7 sevrés");
+  await expect(page.locator("#lotList")).toContainText("7 vivants");
 
   // Ouvrir le lot et vérifier les détails
   await page.locator("#lotList").getByText("C-04").first().click();
-  await expect(page.locator("#lotDetails")).toContainText("Mère: Naya (CW-F001)");
+  await expect(page.locator("#lotDetails")).toContainText("Naya (CW-F001)");
   await expect(page.locator("#lotDetails")).toContainText("7 lapereaux");
 
   // Vérifier que les lapereaux ont changé de cage

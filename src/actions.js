@@ -1,4 +1,5 @@
 import { validateEvent, applyEventSideEffects } from "./rules.js";
+import { getReproInfo } from "./repro.js";
 import { generateRabbitCode, num, numOrNull } from "./utils.js";
 import { isNameFromPool, lockRabbitName, releaseRabbitName } from "./rabbitNameService.js";
 import { DB } from "./db.js";
@@ -238,6 +239,166 @@ export function deleteEvent(ctx, eventId) {
   persist(ctx);
   if (fid(ctx)) trackCloudWrite(ctx, DB.deleteEvent(fid(ctx), eventId), { type: "deleteEvent", payload: { farmId: fid(ctx), eventId } });
   ctx.render();
+}
+
+/**
+ * Prochain index de code lapereau pour une mère (suite de `${code}-K01`).
+ */
+function nextKitIndex(state, mother) {
+  const prefix = `${(mother.code || "CW").trim()}-K`;
+  const max = (state.rabbits || [])
+    .map(r => r.code || "")
+    .filter(code => code.startsWith(prefix))
+    .map(code => Number(code.slice(prefix.length)))
+    .filter(n => Number.isFinite(n))
+    .reduce((acc, n) => Math.max(acc, n), 0);
+  return max + 1;
+}
+
+/**
+ * Ajoute `count` lapereaux à une portée existante (cas : la mère a mis bas
+ * plus de lapereaux qu'initialement comptés, constaté après coup).
+ * Met à jour les compteurs de la mise-bas pour garder les stats cohérentes.
+ */
+export function addKitsToLitter(ctx, litterEventId, count, { reason = "", date = null } = {}) {
+  const { uid, nowISO } = ctx.Store.helpers;
+  const n = Math.max(0, parseInt(count, 10) || 0);
+  if (!n) return [];
+
+  const ev = ctx.state.events.find(e => e.id === litterEventId && e.type === "mise_bas");
+  if (!ev) throw new Error("Portée introuvable.");
+  const mother = ctx.state.rabbits.find(r => r.id === ev.rabbitId);
+  if (!mother) throw new Error("Mère introuvable.");
+
+  const repro = getReproInfo(ctx.state, mother);
+  const sibling = ctx.state.rabbits.find(k => k.litterId === ev.id);
+  const fatherId = repro?.lastMating?.data?.maleId
+    || sibling?.buckId || sibling?.fatherId || null;
+
+  // Alignement sur la fratrie : même stade et même cage que les lapereaux du lot.
+  const stage = sibling?.stage || "kit";
+  const cage  = sibling?.cage  || mother.cage || "";
+  const birthDate = date || ev.date || nowISO().slice(0, 10);
+
+  const created = [];
+  let idx = nextKitIndex(ctx.state, mother);
+  for (let i = 0; i < n; i++) {
+    const code = `${mother.code}-K${String(idx).padStart(2, "0")}`;
+    const label = String(idx).padStart(2, "0");
+    idx++;
+    const kit = {
+      id: uid("rb"),
+      code,
+      name: `Lapereau ${label}`,
+      sex: "U",
+      breed: mother.breed || "",
+      birthDate,
+      cage,
+      status: "actif",
+      stage,
+      notes: `Ajouté à la portée du ${ev.date}${reason ? " — " + reason : ""}`,
+      doeId: mother.id,
+      buckId: fatherId,
+      litterId: ev.id,
+      createdAt: nowISO(),
+      updatedAt: nowISO(),
+    };
+    ctx.state.rabbits.unshift(kit);
+    created.push(kit);
+  }
+
+  // Mise à jour des compteurs de la mise-bas (nés + nés vivants).
+  ev.data = ev.data || {};
+  ev.data.born  = num(ev.data.born)  + n;
+  ev.data.alive = num(ev.data.alive) + n;
+  ev.data.kitsCount = num(ev.data.kitsCount) + n;
+  ev.data.additions = [ ...(ev.data.additions || []), { date: birthDate, count: n, reason: (reason || "").trim() } ];
+
+  persist(ctx);
+  const farmId = fid(ctx);
+  if (farmId) {
+    trackCloudWrite(ctx, DB.upsertEvent(farmId, ev), { type: "upsertEvent", payload: { farmId, event: ev } });
+    for (const kit of created) {
+      trackCloudWrite(ctx, DB.upsertRabbit(farmId, kit), { type: "upsertRabbit", payload: { farmId, rabbit: kit } });
+    }
+  }
+  ctx.render();
+  return created;
+}
+
+/**
+ * Déclare une perte (décès) pour un ou plusieurs lapereaux d'un lot, avec
+ * cause et condition détaillée. Crée de vrais événements `décès` → met le
+ * statut à "mort" (via applyEventSideEffects) et se répercute sur TOUTES les
+ * stats (compteur global, survie portée, classement reproductrice).
+ */
+export function declareLotLoss(ctx, rabbitIds, { cause = "inconnu", condition = "", date = null } = {}) {
+  const { uid, nowISO } = ctx.Store.helpers;
+  const day = date || nowISO().slice(0, 10);
+  const detail = (condition || "").trim();
+  const created = [];
+
+  for (const rid of (rabbitIds || [])) {
+    const r = ctx.state.rabbits.find(x => x.id === rid);
+    if (!r || r.status !== "actif") continue;
+    const ev = {
+      id: uid("ev"),
+      rabbitId: rid,
+      type: "décès",
+      date: day,
+      notes: detail,
+      data: { cause, condition: detail },
+      performedBy: defaultActor(ctx),
+      createdAt: nowISO(),
+    };
+    const check = validateEvent(ctx.state, rid, ev);
+    if (!check.ok) continue;
+    ctx.state.events.unshift(ev);
+    applyEventSideEffects(ctx, ev); // → status "mort" + libère le nom du pool
+    created.push({ ev, rabbit: r });
+  }
+
+  if (!created.length) return 0;
+  persist(ctx);
+  const farmId = fid(ctx);
+  if (farmId) {
+    for (const { ev, rabbit } of created) {
+      trackCloudWrite(ctx, DB.upsertEvent(farmId, ev), { type: "upsertEvent", payload: { farmId, event: ev } });
+      trackCloudWrite(ctx, DB.upsertRabbit(farmId, rabbit), { type: "upsertRabbit", payload: { farmId, rabbit } });
+    }
+  }
+  ctx.render();
+  return created.length;
+}
+
+/**
+ * Affecte des loges individuelles aux lapereaux d'un lot et passe le lot au
+ * statut "loges". `assignments` : [{ id, cage }].
+ */
+export function assignLotLodges(ctx, lotId, assignments) {
+  const { nowISO } = ctx.Store.helpers;
+  const farmId = fid(ctx);
+  const touched = [];
+  for (const { id, cage } of (assignments || [])) {
+    const r = ctx.state.rabbits.find(x => x.id === id);
+    if (!r) continue;
+    const c = (cage || "").trim();
+    if (!c || r.cage === c) continue;
+    r.cage = c;
+    r.updatedAt = nowISO();
+    touched.push(r);
+  }
+
+  ctx.state.lotStatuses = { ...(ctx.state.lotStatuses || {}), [lotId]: "loges" };
+  persist(ctx);
+  if (farmId) {
+    for (const r of touched) {
+      trackCloudWrite(ctx, DB.upsertRabbit(farmId, r), { type: "upsertRabbit", payload: { farmId, rabbit: r } });
+    }
+    trackCloudWrite(ctx, DB.setLotStatus(farmId, lotId, "loges"), { type: "setLotStatus", payload: { farmId, lotId, status: "loges" } });
+  }
+  ctx.render();
+  return touched.length;
 }
 
 export async function addPhoto(ctx, rabbitId, { dataUrl, date, source = "profile", eventId = null, note = "" }) {

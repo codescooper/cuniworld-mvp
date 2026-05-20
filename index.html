@@ -211,7 +211,9 @@
             <input id="lotQ" class="input" placeholder="Rechercher (cage, mère, date…)" data-testid="lot-search" style="flex:2" />
             <select id="lotStatusFilter" class="input" data-testid="lot-status-filter" style="flex:1">
               <option value="">Statut: Tous</option>
-              <option value="en_cours">En cours</option>
+              <option value="maternite">Maternité</option>
+              <option value="sevre">Sevré</option>
+              <option value="loges">En loges</option>
               <option value="vendu">Vendu</option>
               <option value="termine">Terminé</option>
             </select>
@@ -642,24 +644,25 @@
               <!-- LOTS -->
               <section class="doc-section" id="doc-lots">
                 <h2 class="doc-h2">📦 Lots &amp; Jeunes</h2>
-                <p class="doc-p">Un lot regroupe les lapereaux d'une même portée après le sevrage. Il permet de suivre la destinée d'un groupe (engraissement, vente, sélection).</p>
+                <p class="doc-p">Un lot regroupe les lapereaux d'une même portée. Il est créé <strong>automatiquement dès la mise-bas</strong> et permet de suivre le groupe de la naissance jusqu'à la vente ou l'intégration au cheptel.</p>
 
                 <h3 class="doc-h3">Création automatique</h3>
-                <p class="doc-p">Quand vous enregistrez un <strong>sevrage</strong> avec une cage de destination, un lot est créé automatiquement avec tous les lapereaux de la portée.</p>
+                <p class="doc-p">Chaque <strong>mise-bas</strong> crée un lot avec tous les lapereaux nés vivants. Les compteurs (vivants, pertes, vendus) sont calculés en direct à partir des fiches individuelles.</p>
 
-                <h3 class="doc-h3">Informations d'un lot</h3>
+                <h3 class="doc-h3">Actions sur un lot</h3>
                 <ul class="doc-list">
-                  <li>Mère, père, date de sevrage</li>
-                  <li>Nombre de lapereaux, poids moyen</li>
-                  <li>Cage de destination</li>
-                  <li>Liste des individus avec liens vers leur fiche</li>
+                  <li><strong>Sevrer le lot</strong> : déplace les lapereaux vivants vers leur bâtiment (passe en « Sevré »).</li>
+                  <li><strong>Répartir en loges</strong> : affecte une loge individuelle à chaque lapereau prêt (passe en « En loges »).</li>
+                  <li><strong>Déclarer une perte</strong> : enregistre un décès avec sa cause (maladie, écrasement, froid…) et les conditions observées.</li>
+                  <li><strong>Ajouter des lapereaux</strong> : si la mère a mis bas plus de petits que comptés au départ.</li>
                 </ul>
 
-                <h3 class="doc-h3">Statuts d'un lot</h3>
+                <h3 class="doc-h3">Cycle de vie d'un lot</h3>
                 <div class="doc-grid">
-                  <div class="doc-card"><div class="doc-card-title">🟡 En cours</div><p>Lapereaux en élevage.</p></div>
-                  <div class="doc-card"><div class="doc-card-title">✅ Vendu</div><p>Lot cédé.</p></div>
-                  <div class="doc-card"><div class="doc-card-title">⬜ Terminé</div><p>Cycle terminé (intégration cheptel, etc.).</p></div>
+                  <div class="doc-card"><div class="doc-card-title">🐣 Maternité</div><p>Lapereaux sous la mère (allaitement).</p></div>
+                  <div class="doc-card"><div class="doc-card-title">🐇 Sevré</div><p>Sevrés, déplacés en bâtiment collectif.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">🏠 En loges</div><p>Répartis en loges individuelles.</p></div>
+                  <div class="doc-card"><div class="doc-card-title">✅ Vendu / ⬜ Terminé</div><p>Lot cédé ou cycle clôturé.</p></div>
                 </div>
               </section>
 

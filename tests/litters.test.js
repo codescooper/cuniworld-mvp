@@ -33,12 +33,12 @@ describe("litters", () => {
     expect(st.dead).toBe(2);
   });
 
-  it("counts kits created automatically", () => {
+  it("compte la survie réelle (mort-nés + décès post-naissance)", () => {
     const state = {
       rabbits: [
         { id: "k1", doeId: "F1", status: "actif" },
         { id: "k2", doeId: "F1", status: "actif" },
-        { id: "k3", doeId: "F1", status: "mort" }
+        { id: "k3", doeId: "F1", status: "mort" } // décès après naissance
       ],
       events: [
         {
@@ -53,8 +53,12 @@ describe("litters", () => {
     const st = getLitterStatsForDoe(state, "F1");
     expect(st.count).toBe(1);
     expect(st.born).toBe(8);
-    expect(st.alive).toBe(7);
-    expect(st.dead).toBe(1);
-    expect(st.activeKits).toBe(2); // 2 kits encore actifs
+    expect(st.alive).toBe(7);          // nés vivants (figé mise-bas)
+    expect(st.stillborn).toBe(1);      // 8 - 7
+    expect(st.deadPostBirth).toBe(1);  // k3
+    expect(st.dead).toBe(2);           // mort-né + décès
+    expect(st.currentAlive).toBe(2);   // k1, k2
+    expect(st.activeKits).toBe(2);
+    expect(st.survival).toBe(Math.round((8 - 2) / 8 * 100)); // 75
   });
 });

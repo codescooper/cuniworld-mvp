@@ -1,6 +1,7 @@
 import { openModal, closeModal } from "./modal.js";
 import { escapeHTML, escapeAttr, generateRabbitCode, num, numOrNull } from "./utils.js";
-import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent, addPhoto, deletePhoto, trackCloudWrite } from "./actions.js";
+import { addRabbit, updateRabbit, deleteRabbit, addEvent, deleteEvent, addPhoto, deletePhoto, trackCloudWrite, addKitsToLitter, declareLotLoss, assignLotLodges } from "./actions.js";
+import { buildLots, DEATH_CAUSES } from "./lots.js";
 import { DB } from "./db.js";
 import { compressImage } from "./photos.js";
 import { isNameFromPool, isNameAvailable, isNameUsedByLivingRabbit, suggestAvailableRabbitName } from "./rabbitNameService.js";
@@ -341,6 +342,21 @@ export function wireDynamic(ctx) {
       ctx.render();
     });
   }
+
+  // Actions du lot (boutons rendus dynamiquement dans le détail du lot).
+  const _selectedLot = () => buildLots(ctx.state).find(l => l.id === ctx.selectedLotId) || null;
+  document.getElementById("btnLotLoss")?.addEventListener("click", () => {
+    const lot = _selectedLot(); if (lot) openLotLossModal(ctx, lot);
+  });
+  document.getElementById("btnLotAddKits")?.addEventListener("click", () => {
+    const lot = _selectedLot(); if (lot) openLotAddKitsModal(ctx, lot);
+  });
+  document.getElementById("btnLotWean")?.addEventListener("click", () => {
+    const lot = _selectedLot(); if (lot) openLotWeanModal(ctx, lot);
+  });
+  document.getElementById("btnLotLodges")?.addEventListener("click", () => {
+    const lot = _selectedLot(); if (lot) openLotLodgesModal(ctx, lot);
+  });
 
   // Photo de profil depuis la fiche lapin
   const inputProfilePhoto = document.getElementById("inputProfilePhoto");
@@ -1295,6 +1311,196 @@ function bindExtraHandlers(type) {
 
 function refreshAllowedTypes() {
   // Placeholder: ancienne logique supprimée, on garde le hook pour éviter les erreurs.
+}
+
+/* -------- Modales de gestion de lot (portée) -------- */
+
+function _livingKitsOfLot(ctx, lot) {
+  const ids = new Set(lot.aliveRabbitIds || []);
+  return (ctx.state.rabbits || [])
+    .filter(r => ids.has(r.id))
+    .sort((a, b) => (a.code || "").localeCompare(b.code || ""));
+}
+
+function openLotLossModal(ctx, lot) {
+  const kits = _livingKitsOfLot(ctx, lot);
+  const today = new Date().toISOString().slice(0, 10);
+  if (!kits.length) { showToast("Aucun lapereau vivant dans ce lot.", "warn"); return; }
+
+  const causeOptions = Object.entries(DEATH_CAUSES)
+    .map(([k, v], i) => `<option value="${escapeAttr(k)}"${i === 0 ? " selected" : ""}>${escapeHTML(v)}</option>`)
+    .join("");
+  const kitRows = kits.map(r => `
+    <label class="item" style="cursor:pointer">
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" name="kit" value="${escapeAttr(r.id)}">
+        <span><strong>${escapeHTML(r.code)}</strong> — ${escapeHTML(r.name)}</span>
+      </div>
+    </label>`).join("");
+
+  openModal(ctx.el, "☠️ Déclarer une perte", `
+    <form id="lotLossForm" class="form">
+      <div class="field">
+        <div class="label">Lapereaux concernés
+          <label style="float:right;font-weight:400;cursor:pointer"><input type="checkbox" id="lotLossAll"> Tout sélectionner</label>
+        </div>
+        <div class="list" style="max-height:220px;overflow:auto">${kitRows}</div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <div class="label">Cause</div>
+          <select class="input" name="cause">${causeOptions}</select>
+        </div>
+        <div class="field">
+          <div class="label">Date</div>
+          <input class="input" type="date" name="date" value="${today}">
+        </div>
+      </div>
+      <div class="field">
+        <div class="label">Conditions / détails (recommandé)</div>
+        <textarea class="input" name="condition" rows="2" placeholder="Symptômes, circonstances observées…"></textarea>
+      </div>
+      <div id="lotLossError" class="error" hidden></div>
+      <div class="row" style="justify-content:flex-end">
+        <button type="button" class="btn secondary" id="lotLossCancel">Annuler</button>
+        <button type="submit" class="btn" data-testid="lot-loss-submit">Enregistrer la perte</button>
+      </div>
+    </form>
+  `);
+
+  const form = document.getElementById("lotLossForm");
+  document.getElementById("lotLossCancel")?.addEventListener("click", () => closeModal(ctx.el));
+  document.getElementById("lotLossAll")?.addEventListener("change", (e) => {
+    form.querySelectorAll('input[name="kit"]').forEach(cb => { cb.checked = e.target.checked; });
+  });
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const ids = fd.getAll("kit");
+    const errBox = document.getElementById("lotLossError");
+    if (!ids.length) { if (errBox) { errBox.textContent = "Sélectionne au moins un lapereau."; errBox.hidden = false; } return; }
+    const cause = (fd.get("cause") || "inconnu").toString();
+    const condition = (fd.get("condition") || "").toString();
+    const date = (fd.get("date") || today).toString();
+    const n = declareLotLoss(ctx, ids, { cause, condition, date });
+    closeModal(ctx.el);
+    showToast(`${n} perte${n > 1 ? "s" : ""} enregistrée${n > 1 ? "s" : ""}.`, "success");
+  });
+}
+
+function openLotAddKitsModal(ctx, lot) {
+  openModal(ctx.el, "➕ Ajouter des lapereaux", `
+    <form id="lotAddForm" class="form">
+      <p class="small muted">Utilise ceci quand la mère a mis bas plus de lapereaux que comptés à la mise-bas. Ils rejoignent la portée de <strong>${escapeHTML(lot.doeName)}</strong> du ${escapeHTML(lot.date)}.</p>
+      <div class="row2">
+        <div class="field">
+          <div class="label">Nombre à ajouter</div>
+          <input class="input" type="number" name="count" min="1" value="1" required>
+        </div>
+        <div class="field">
+          <div class="label">Date de naissance</div>
+          <input class="input" type="date" name="date" value="${escapeAttr(lot.date)}">
+        </div>
+      </div>
+      <div class="field">
+        <div class="label">Motif (optionnel)</div>
+        <input class="input" name="reason" placeholder="ex: lapereaux découverts dans le nid">
+      </div>
+      <div class="row" style="justify-content:flex-end">
+        <button type="button" class="btn secondary" id="lotAddCancel">Annuler</button>
+        <button type="submit" class="btn" data-testid="lot-add-submit">Ajouter</button>
+      </div>
+    </form>
+  `);
+  const form = document.getElementById("lotAddForm");
+  document.getElementById("lotAddCancel")?.addEventListener("click", () => closeModal(ctx.el));
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const count = num(fd.get("count"));
+    if (count < 1) { showToast("Indique un nombre valide.", "warn"); return; }
+    const reason = (fd.get("reason") || "").toString();
+    const date = (fd.get("date") || lot.date).toString();
+    try {
+      const created = addKitsToLitter(ctx, lot.eventId, count, { reason, date });
+      closeModal(ctx.el);
+      showToast(`${created.length} lapereau${created.length > 1 ? "x" : ""} ajouté${created.length > 1 ? "s" : ""} au lot.`, "success");
+    } catch (err) {
+      showToast(err?.message || String(err), "error");
+    }
+  });
+}
+
+function openLotWeanModal(ctx, lot) {
+  const today = new Date().toISOString().slice(0, 10);
+  openModal(ctx.el, "🐇 Sevrer le lot", `
+    <form id="lotWeanForm" class="form">
+      <p class="small muted">Sèvre les <strong>${escapeHTML(String(lot.aliveCount))}</strong> lapereau(x) vivant(s) et les déplace vers leur bâtiment. Le lot passe au statut « Sevré ».</p>
+      <div class="row2">
+        <div class="field">
+          <div class="label">Date de sevrage</div>
+          <input class="input" type="date" name="date" value="${today}">
+        </div>
+        <div class="field">
+          <div class="label">Cage / bâtiment destination</div>
+          ${cageSelectHTML(ctx.state, lot.cage && lot.cage !== "—" ? lot.cage : "", "destCage", { optional: true })}
+        </div>
+      </div>
+      <div id="lotWeanError" class="error" hidden></div>
+      <div class="row" style="justify-content:flex-end">
+        <button type="button" class="btn secondary" id="lotWeanCancel">Annuler</button>
+        <button type="submit" class="btn" data-testid="lot-wean-submit">Sevrer</button>
+      </div>
+    </form>
+  `);
+  const form = document.getElementById("lotWeanForm");
+  document.getElementById("lotWeanCancel")?.addEventListener("click", () => closeModal(ctx.el));
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const date = (fd.get("date") || today).toString();
+    const destCage = (fd.get("destCage") || "").toString().trim();
+    const errBox = document.getElementById("lotWeanError");
+    try {
+      addEvent(ctx, lot.doeId, { type: "sevrage", date, data: { weaned: lot.aliveCount, destCage } });
+      closeModal(ctx.el);
+      showToast("Lot sevré.", "success");
+    } catch (err) {
+      if (errBox) { errBox.textContent = err?.message || String(err); errBox.hidden = false; }
+      else showToast(err?.message || String(err), "error");
+    }
+  });
+}
+
+function openLotLodgesModal(ctx, lot) {
+  const kits = _livingKitsOfLot(ctx, lot);
+  if (!kits.length) { showToast("Aucun lapereau vivant à répartir.", "warn"); return; }
+  const rows = kits.map(r => `
+    <div class="field">
+      <div class="label">${escapeHTML(r.code)} — ${escapeHTML(r.name)}</div>
+      ${cageSelectHTML(ctx.state, r.cage || "", `cage_${r.id}`, { optional: true })}
+    </div>`).join("");
+
+  openModal(ctx.el, "🏠 Répartir en loges", `
+    <form id="lotLodgesForm" class="form">
+      <p class="small muted">Affecte une loge individuelle à chaque lapereau. Le lot passe au statut « En loges ».</p>
+      ${rows}
+      <div class="row" style="justify-content:flex-end">
+        <button type="button" class="btn secondary" id="lotLodgesCancel">Annuler</button>
+        <button type="submit" class="btn" data-testid="lot-lodges-submit">Enregistrer</button>
+      </div>
+    </form>
+  `);
+  const form = document.getElementById("lotLodgesForm");
+  document.getElementById("lotLodgesCancel")?.addEventListener("click", () => closeModal(ctx.el));
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const assignments = kits.map(r => ({ id: r.id, cage: (fd.get(`cage_${r.id}`) || "").toString().trim() }));
+    const n = assignLotLodges(ctx, lot.id, assignments);
+    closeModal(ctx.el);
+    showToast(n > 0 ? `${n} lapereau(x) affecté(s) en loge.` : "Lot marqué « En loges ».", "success");
+  });
 }
 
 /* -------- Modal "🎯 Trouver un lapin par budget client" -------- */

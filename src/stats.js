@@ -21,7 +21,7 @@ export function renderStats(ctx) {
   const total   = rabbits.length;
   const actifs  = rabbits.filter(r => r.status === 'actif').length;
   const vendus  = rabbits.filter(r => r.status === 'vendu').length;
-  const morts   = rabbits.filter(r => r.status === 'mort').length;
+  const mortsRecords = rabbits.filter(r => r.status === 'mort').length;
   const survivalRate = total > 0 ? Math.round((actifs / total) * 100) : 0;
 
   // ── Reproduction ──────────────────────────────────────────────────────────────
@@ -29,6 +29,10 @@ export function renderStats(ctx) {
   const totalBirths  = birthEvents.length;
   const totalAlive   = birthEvents.reduce((s, e) => s + (Number(e.data?.alive) || 0), 0);
   const totalBorn    = birthEvents.reduce((s, e) => s + (Number(e.data?.born)  || 0), 0);
+  // Mort-nés : nés - nés vivants, agrégés sur toutes les portées.
+  const stillborn = birthEvents.reduce((s, e) => s + Math.max(0, (Number(e.data?.born) || 0) - (Number(e.data?.alive) || 0)), 0);
+  // Mortalité totale = décès enregistrés (records) + mort-nés (jamais créés).
+  const morts = mortsRecords + stillborn;
   const avgAlive     = totalBirths > 0 ? (totalAlive / totalBirths).toFixed(1) : '—';
   const birthSurvival = totalBorn > 0 ? Math.round((totalAlive / totalBorn) * 100) : 0;
 
@@ -117,7 +121,7 @@ export function renderStats(ctx) {
         ${kpi(successRate !== null ? successRate + '%' : '—', 'Taux mise-bas')}
         ${kpi(avgGDQ !== null ? '+' + avgGDQ + 'g/j' : '—', 'Gain poids/j')}
         ${kpi(vendus, 'Vendus')}
-        ${kpi(morts, 'Morts', morts > 0 ? 'warn' : '')}
+        ${kpi(morts, 'Morts', morts > 0 ? 'warn' : '', stillborn > 0 ? `Dont ${stillborn} mort-né${stillborn > 1 ? 's' : ''} + ${mortsRecords} décès enregistrés` : '')}
       </div>
 
       <!-- ── Activité mensuelle ── -->
@@ -292,8 +296,9 @@ function _renderConsumptionIndex(state) {
     </div>`;
 }
 
-function kpi(value, label, cls = '') {
-  return `<div class="stats-kpi${cls ? ' stats-kpi--' + cls : ''}">
+function kpi(value, label, cls = '', title = '') {
+  const t = title ? ` title="${escapeHTML(title)}"` : '';
+  return `<div class="stats-kpi${cls ? ' stats-kpi--' + cls : ''}"${t}>
     <div class="stats-kpi-n">${value}</div>
     <div class="stats-kpi-t">${label}</div>
   </div>`;

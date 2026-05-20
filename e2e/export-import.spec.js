@@ -59,8 +59,8 @@ test("export -> reset -> import restaure les données", async ({ page }, testInf
   await expect(page.locator("#rabbitList")).toContainText("CW-F001-K01");
   await expect(page.locator("#eventsPanel")).toContainText("Vaccin");
 
-  // Le lot — vérifié sur le panneau Lots.
+  // Le lot — vérifié sur le panneau Lots (2 lapereaux nés vivants → 2 vivants).
   await navigateTo(page, "lots");
   await expect(page.locator("#lotList")).toContainText("C-04");
-  await expect(page.locator("#lotList")).toContainText("6 sevrés");
+  await expect(page.locator("#lotList")).toContainText("2 vivants");
 });

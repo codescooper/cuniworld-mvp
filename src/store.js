@@ -24,7 +24,7 @@ function defaultState() {
     events: [],
     photos: [],
     usedNames: {},
-    lotStatuses: {},  // { [lotId]: "en_cours" | "vendu" | "termine" }
+    lotStatuses: {},  // { [lotId]: "maternite" | "sevre" | "loges" | "vendu" | "termine" } — override manuel du statut dérivé
     stock: [],        // inventory items
     stockMovements: [], // stock in/out/adjust history
     rounds: [],       // daily farm rounds
