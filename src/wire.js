@@ -556,6 +556,10 @@ function rabbitFormHTML(rabbit=null, state=null) {
   const forSale = !!r.forSale;
   const salePrice = r.salePrice ? String(r.salePrice) : "";
   const shopDescription = r.shopDescription || "";
+  const today = new Date().toISOString().slice(0, 10);
+  const causeOptions = Object.entries(DEATH_CAUSES)
+    .map(([k, v], i) => `<option value="${escapeAttr(k)}"${i === 0 ? " selected" : ""}>${escapeHTML(v)}</option>`)
+    .join("");
   return `
     <form id="rabbitForm" class="form">
       <div class="row2">
@@ -651,6 +655,25 @@ function rabbitFormHTML(rabbit=null, state=null) {
         </select>
       </div>
 
+      <!-- Précisions de statut : un changement vers Mort/Vendu crée l'événement
+           correspondant (cause / prix) pour que les statistiques restent justes. -->
+      <div id="statusMortFields" class="field" style="display:none;background:#fdeaea;border:1px solid #e6b8b8;border-radius:8px;padding:10px">
+        <div class="label">Cause du décès</div>
+        <select class="input" name="deathCause">${causeOptions}</select>
+        <div class="label" style="margin-top:6px">Conditions / détails (recommandé)</div>
+        <textarea class="input" name="deathCondition" rows="2" placeholder="Symptômes, circonstances observées…"></textarea>
+      </div>
+      <div id="statusVenteFields" style="display:none;background:#fff8e8;border:1px solid #f0d28a;border-radius:8px;padding:10px;margin-bottom:var(--space-3)">
+        <div class="row2">
+          <div class="field"><div class="label">Prix de vente</div><input class="input" name="saleEventPrice" type="number" min="0.01" step="0.01" placeholder="ex: 2500"></div>
+          <div class="field"><div class="label">Client (optionnel)</div><input class="input" name="saleEventClient" placeholder="ex: Jean Dupont"></div>
+        </div>
+      </div>
+      <div id="statusDateField" class="field" style="display:none">
+        <div class="label">Date de l'événement</div>
+        <input class="input" type="date" name="statusEventDate" value="${today}">
+      </div>
+
       <div class="field" style="background:#fff8e8;border:1px solid #f0d28a;border-radius:8px;padding:10px">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer">
           <input type="checkbox" name="forSale" id="forSaleToggle" ${forSale ? "checked" : ""}>
@@ -721,6 +744,22 @@ function wireRabbitForm(ctx, existingRabbit) {
   forSaleToggle?.addEventListener("change", () => {
     if (forSaleFields) forSaleFields.style.display = forSaleToggle.checked ? "block" : "none";
   });
+
+  // Précisions de statut : visibles seulement pour une transition actif → Mort/Vendu.
+  const statusSelect = form?.querySelector('select[name="status"]');
+  const oldStatusInit = existingRabbit?.status || "actif";
+  const refreshStatusFields = () => {
+    const v = statusSelect?.value;
+    const transition = oldStatusInit === "actif" && (v === "mort" || v === "vendu");
+    const mf = document.getElementById("statusMortFields");
+    const vf = document.getElementById("statusVenteFields");
+    const df = document.getElementById("statusDateField");
+    if (mf) mf.style.display = (transition && v === "mort") ? "" : "none";
+    if (vf) vf.style.display = (transition && v === "vendu") ? "" : "none";
+    if (df) df.style.display = transition ? "" : "none";
+  };
+  statusSelect?.addEventListener("change", refreshStatusFields);
+  refreshStatusFields();
 
   // ── Suggestion de nom ───────────────────────────────────────────────────────
   const nameInput  = document.getElementById("rabbitNameInput");
@@ -876,34 +915,82 @@ function wireRabbitForm(ctx, existingRabbit) {
       }
     }
 
+    // ── Transition de statut → route via événement (cause / prix) ──────────────
+    // Toute mise à « Mort » / « Vendu » depuis la fiche crée l'événement
+    // correspondant (avec précisions) afin que les statistiques restent justes,
+    // exactement comme via le formulaire d'événement ou le traitement par lot.
+    const oldStatus = existingRabbit?.status || "actif";
+    const newStatus = data.status;
+    const toTerminal   = oldStatus === "actif" && (newStatus === "mort" || newStatus === "vendu");
+    const reactivating = !!existingRabbit && (oldStatus === "mort" || oldStatus === "vendu") && newStatus === "actif";
+
+    const statusDate = (data.statusEventDate || new Date().toISOString().slice(0, 10)).toString();
+    let terminalType = null, terminalData = null, terminalNotes = "";
+    if (toTerminal && newStatus === "mort") {
+      terminalType = "décès";
+      const condition = (data.deathCondition || "").toString().trim();
+      terminalData = { cause: (data.deathCause || "inconnu").toString(), condition };
+      terminalNotes = condition;
+    } else if (toTerminal && newStatus === "vendu") {
+      const price = parseFloat(data.saleEventPrice);
+      if (!Number.isFinite(price) || price <= 0) {
+        showToast("Indique le prix de vente (> 0) pour passer ce lapin en « Vendu ».", "warn");
+        return;
+      }
+      terminalType = "vente";
+      terminalData = { price, client: (data.saleEventClient || "").toString().trim() };
+    }
+
+    // Champs de précision retirés du patch lapin (ne pas polluer l'objet).
+    delete data.deathCause; delete data.deathCondition;
+    delete data.saleEventPrice; delete data.saleEventClient; delete data.statusEventDate;
+
+    // L'événement fixera le statut terminal : on garde le lapin actif à l'écriture.
+    if (toTerminal) data.status = "actif";
+
     try {
+      let targetId;
       if (existingRabbit) {
-        updateRabbit(ctx, existingRabbit.id, data);
-        if (selectedPhotoData) {
-          try {
-            await addPhoto(ctx, existingRabbit.id, {
-              dataUrl: selectedPhotoData,
-              date: new Date().toISOString().slice(0, 10),
-              source: "profile",
-            });
-          } catch (photoErr) {
-            showToast("Lapin modifié, mais la photo n'a pas pu être sauvegardée : " + (photoErr?.message || photoErr), "warn");
-          }
+        if (reactivating) {
+          const evType = oldStatus === "mort" ? "décès" : "vente";
+          const ok = await showConfirm({
+            title: "Réactiver le lapin",
+            message: `Réactiver ${existingRabbit.name} (${existingRabbit.code}) ? L'événement « ${evType} » le plus récent sera supprimé pour garder les statistiques justes.`,
+            confirmLabel: "Réactiver", cancelLabel: "Annuler",
+          });
+          if (!ok) return;
+          const ev = ctx.state.events
+            .filter(e => e.rabbitId === existingRabbit.id && (e.type === evType || (evType === "décès" && e.type === "deces")))
+            .sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0];
+          if (ev) deleteEvent(ctx, ev.id);
         }
+        updateRabbit(ctx, existingRabbit.id, data);
+        targetId = existingRabbit.id;
       } else {
         addRabbit(ctx, data);
-        if (selectedPhotoData && ctx.selectedRabbitId) {
-          try {
-            await addPhoto(ctx, ctx.selectedRabbitId, {
-              dataUrl: selectedPhotoData,
-              date: new Date().toISOString().slice(0, 10),
-              source: "profile",
-            });
-          } catch (photoErr) {
-            showToast("Lapin créé, mais la photo n'a pas pu être sauvegardée : " + (photoErr?.message || photoErr), "warn");
-          }
+        targetId = ctx.selectedRabbitId;
+      }
+
+      if (selectedPhotoData && targetId) {
+        try {
+          await addPhoto(ctx, targetId, {
+            dataUrl: selectedPhotoData,
+            date: new Date().toISOString().slice(0, 10),
+            source: "profile",
+          });
+        } catch (photoErr) {
+          showToast("Lapin enregistré, mais la photo n'a pas pu être sauvegardée : " + (photoErr?.message || photoErr), "warn");
         }
       }
+
+      if (toTerminal && terminalType && targetId) {
+        const res = applyBulkEvent(ctx, [targetId], { type: terminalType, date: statusDate, notes: terminalNotes, data: terminalData });
+        if (!res.ok && res.failed.length) {
+          showToast("Statut non appliqué : " + res.failed[0].error, "error");
+          return;
+        }
+      }
+
       closeModal(ctx.el);
     } catch (err) {
       showToast(err?.message || String(err), "error");
@@ -1114,6 +1201,21 @@ function renderEventExtra(ctx, type) {
       </div>
     `;
   }
+  if (type === "décès") {
+    const causeOptions = Object.entries(DEATH_CAUSES)
+      .map(([k, v], i) => `<option value="${escapeAttr(k)}"${i === 0 ? " selected" : ""}>${escapeHTML(v)}</option>`)
+      .join("");
+    return `
+      <div class="field">
+        <div class="label">Cause</div>
+        <select class="input" name="cause">${causeOptions}</select>
+      </div>
+      <div class="field">
+        <div class="label">Conditions / détails (recommandé)</div>
+        <textarea class="input" name="condition" rows="2" placeholder="Symptômes, circonstances observées…"></textarea>
+      </div>
+    `;
+  }
   return "";
 }
 
@@ -1199,6 +1301,10 @@ function wireEventForm(ctx) {
     if (type === "vente") {
       evData.price = num(data.price);
       evData.client = (data.client || "").toString().trim();
+    }
+    if (type === "décès") {
+      evData.cause = (data.cause || "inconnu").toString();
+      evData.condition = (data.condition || "").toString().trim();
     }
 
 
