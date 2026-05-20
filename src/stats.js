@@ -2,6 +2,37 @@ import { daysBetween, escapeHTML } from './utils.js';
 import { getRabbitWeightHistory } from './weightService.js';
 import { rankFemales, rankMales } from './breederStats.js';
 import { computeConsumptionIndex } from './feedTracking.js';
+import { deathCauseLabel } from './lots.js';
+
+/**
+ * Agrège la mortalité par cause à partir des événements `décès` (data.cause)
+ * + les mort-nés (mise_bas : nés - nés vivants), regroupés sous une catégorie.
+ * @returns {{ rows: Array<{cause, label, count}>, total: number }}
+ */
+export function mortalityByCause(state) {
+  const counts = new Map();
+  for (const e of (state.events || [])) {
+    if (e.type !== 'décès' && e.type !== 'deces') continue;
+    const cause = e.data?.cause || 'inconnu';
+    counts.set(cause, (counts.get(cause) || 0) + 1);
+  }
+  let stillborn = 0;
+  for (const e of (state.events || [])) {
+    if (e.type !== 'mise_bas') continue;
+    stillborn += Math.max(0, (Number(e.data?.born) || 0) - (Number(e.data?.alive) || 0));
+  }
+  if (stillborn > 0) counts.set('__stillborn', stillborn);
+
+  const rows = [...counts.entries()]
+    .map(([cause, count]) => ({
+      cause,
+      label: cause === '__stillborn' ? 'Mort-né (naissance)' : deathCauseLabel(cause),
+      count,
+    }))
+    .sort((a, b) => b.count - a.count);
+  const total = rows.reduce((s, r) => s + r.count, 0);
+  return { rows, total };
+}
 
 export function renderStats(ctx) {
   const host = document.getElementById('statsDash');
@@ -211,11 +242,33 @@ export function renderStats(ctx) {
       </div>
       ` : ''}
 
+      ${_renderMortalityByCause(state)}
       ${_renderBreederRankings(state)}
       ${_renderConsumptionIndex(state)}
 
     </div>
   `;
+}
+
+// ── Mortalité par cause ──────────────────────────────────────────────────────
+function _renderMortalityByCause(state) {
+  const { rows, total } = mortalityByCause(state);
+  if (!rows.length) return '';
+  const max = rows[0].count;
+  return `
+    <div class="stats-card">
+      <div class="stats-card-title">💀 Mortalité par cause (${total})</div>
+      ${rows.map(r => {
+        const pct = total > 0 ? Math.round((r.count / total) * 100) : 0;
+        return `
+        <div class="stats-hbar-row">
+          <div class="stats-hbar-label">${escapeHTML(r.label)}</div>
+          <div class="stats-hbar-track"><div class="stats-hbar-fill fill-warn" style="width:${Math.round((r.count / max) * 100)}%"></div></div>
+          <div class="stats-hbar-val">${r.count}<span class="muted small"> · ${pct}%</span></div>
+        </div>`;
+      }).join('')}
+      <div class="stats-card-footer">Renseigne la cause à chaque déclaration de perte (lot ou fiche lapin) pour affiner ce suivi.</div>
+    </div>`;
 }
 
 // ── Classements reproducteurs (item roadmap 4.5) ────────────────────────────

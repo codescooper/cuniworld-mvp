@@ -889,7 +889,13 @@ textarea.input { min-height: 90px; resize: vertical }
 
 /* Stepper de cycle de vie */
 .lot-stepper { display: flex; align-items: center; margin: 14px 0; }
-.lot-step { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
+.lot-step {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0;
+  background: none; border: none; padding: 0; font: inherit; color: inherit; cursor: pointer;
+}
+.lot-step:hover .lot-step-dot { border-color: var(--color-primary, #4caf50); transform: scale(1.06); }
+.lot-step:focus-visible { outline: 2px solid var(--color-primary, #4caf50); outline-offset: 2px; border-radius: 8px; }
+.lot-step-dot { transition: transform 120ms ease, border-color 120ms ease; }
 .lot-step-dot {
   width: 34px; height: 34px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;

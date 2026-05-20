@@ -398,13 +398,7 @@ export function wireDynamic(ctx) {
   const lotStatusSelect = document.getElementById("lotStatusSelect");
   if (lotStatusSelect && ctx.selectedLotId) {
     lotStatusSelect.addEventListener("change", () => {
-      const lotId = ctx.selectedLotId;
-      const status = lotStatusSelect.value;
-      const fid = ctx.farmId || null;
-      ctx.state.lotStatuses = { ...(ctx.state.lotStatuses || {}), [lotId]: status };
-      ctx.state = ctx.Store.save(ctx.state);
-      if (fid) trackCloudWrite(ctx, DB.setLotStatus(fid, lotId, status), { type: 'setLotStatus', payload: { farmId: fid, lotId, status } });
-      ctx.render();
+      setLotStatus(ctx, ctx.selectedLotId, lotStatusSelect.value);
     });
   }
 
@@ -421,6 +415,20 @@ export function wireDynamic(ctx) {
   });
   document.getElementById("btnLotLodges")?.addEventListener("click", () => {
     const lot = _selectedLot(); if (lot) openLotLodgesModal(ctx, lot);
+  });
+
+  // Stepper cliquable : avance le lot dans son cycle de vie. Les transitions
+  // avec opération réelle (sevrage, répartition en loges) ouvrent leur modale
+  // pour capturer les précisions ; les autres posent le statut directement.
+  document.querySelectorAll("[data-lot-step]").forEach(node => {
+    node.addEventListener("click", () => {
+      const lot = _selectedLot();
+      if (!lot) return;
+      const step = node.dataset.lotStep;
+      if (step === "sevre" && lot.status === "maternite" && lot.aliveCount > 0) { openLotWeanModal(ctx, lot); return; }
+      if (step === "loges" && lot.aliveCount > 0) { openLotLodgesModal(ctx, lot); return; }
+      setLotStatus(ctx, lot.id, step === "fin" ? "termine" : step);
+    });
   });
 
   // Photo de profil depuis la fiche lapin
@@ -1672,6 +1680,15 @@ function openBulkEditModal(ctx, ids) {
 }
 
 /* -------- Modales de gestion de lot (portée) -------- */
+
+function setLotStatus(ctx, lotId, status) {
+  if (!lotId) return;
+  const fid = ctx.farmId || null;
+  ctx.state.lotStatuses = { ...(ctx.state.lotStatuses || {}), [lotId]: status };
+  ctx.state = ctx.Store.save(ctx.state);
+  if (fid) trackCloudWrite(ctx, DB.setLotStatus(fid, lotId, status), { type: 'setLotStatus', payload: { farmId: fid, lotId, status } });
+  ctx.render();
+}
 
 function _livingKitsOfLot(ctx, lot) {
   const ids = new Set(lot.aliveRabbitIds || []);

@@ -1004,16 +1004,16 @@ function _lotCardHTML(ctx, lot) {
 function _lotStepperHTML(lot) {
   const isTerminal = lot.status === "vendu" || lot.status === "termine";
   const steps = [
-    { icon: "🐣", label: "Maternité" },
-    { icon: "🐇", label: "Sevré" },
-    { icon: "🏠", label: "En loges" },
-    { icon: isTerminal ? LOT_STATUSES[lot.status].icon : "🏁", label: isTerminal ? LOT_STATUSES[lot.status].label : "Fin" },
+    { key: "maternite", icon: "🐣", label: "Maternité" },
+    { key: "sevre",     icon: "🐇", label: "Sevré" },
+    { key: "loges",     icon: "🏠", label: "En loges" },
+    { key: "fin",       icon: isTerminal ? LOT_STATUSES[lot.status].icon : "🏁", label: isTerminal ? LOT_STATUSES[lot.status].label : "Fin" },
   ];
   const order = ["maternite", "sevre", "loges"];
   const curIdx = isTerminal ? 3 : Math.max(0, order.indexOf(lot.status));
-  return `<div class="lot-stepper">${steps.map((s, i) => {
+  return `<div class="lot-stepper" role="group" aria-label="Cycle de vie du lot">${steps.map((s, i) => {
     const st = i < curIdx ? "done" : i === curIdx ? "current" : "todo";
-    return `<div class="lot-step ${st}"><div class="lot-step-dot">${s.icon}</div><div class="lot-step-label">${escapeHTML(s.label)}</div></div>`;
+    return `<button type="button" class="lot-step ${st}" data-lot-step="${s.key}" title="Avancer à : ${escapeAttr(s.label)}"><span class="lot-step-dot">${s.icon}</span><span class="lot-step-label">${escapeHTML(s.label)}</span></button>`;
   }).join('<div class="lot-step-line"></div>')}</div>`;
 }
 

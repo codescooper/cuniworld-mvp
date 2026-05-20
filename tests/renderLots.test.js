@@ -67,6 +67,8 @@ describe("renderLots — détail", () => {
     // boutons d'action présents
     expect(document.getElementById("btnLotLoss")).toBeTruthy();
     expect(document.getElementById("btnLotAddKits")).toBeTruthy();
+    // stepper cliquable : 4 étapes avec data-lot-step
+    expect(document.querySelectorAll("#lotDetails [data-lot-step]").length).toBe(4);
   });
 
   it("ajoute la classe lot-selected au panneau quand un lot est sélectionné", () => {
