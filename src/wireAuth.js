@@ -13,6 +13,35 @@ import { loadFarmSettings, DEFAULT_SETTINGS } from './settingsService.js';
 function escAttr(s) { return String(s).replace(/"/g, '&quot;'); }
 
 const SESSION_JOIN_KEY = 'cuniworld_pending_join';
+const LAST_FARM_KEY = 'cuniworld_last_farm';
+
+// Mémorise / récupère la dernière ferme ouverte, pour pouvoir mettre les
+// modifications en file d'attente même si l'app démarre hors-ligne (farmId inconnu).
+function _rememberFarm(farmId, farmName) {
+  try { localStorage.setItem(LAST_FARM_KEY, JSON.stringify({ farmId, farmName })); } catch (_) {}
+}
+function _recallFarm() {
+  try { const r = localStorage.getItem(LAST_FARM_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
+}
+function _forgetFarm() {
+  try { localStorage.removeItem(LAST_FARM_KEY); } catch (_) {}
+}
+
+// Déconnexion partagée (menu avatar + tuile « Actions »)
+async function _doLogout() {
+  const ok = await showConfirm({
+    title: 'Déconnexion',
+    message: 'Se déconnecter de CuniWorld ?',
+    confirmLabel: 'Déconnexion',
+    cancelLabel: 'Annuler',
+    danger: true,
+  });
+  if (!ok) return;
+  DB.unsubscribeAll();
+  _forgetFarm();
+  await Auth.signOut();
+  location.reload();
+}
 
 function _withTimeout(promise, ms, label) {
   return Promise.race([
@@ -79,6 +108,7 @@ export async function bootWithAuth(ctx, onReady, joinFarmId = null) {
   Auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') {
       DB.unsubscribeAll();
+      _forgetFarm();
       ctx.farmId = null;
       ctx.currentUser = null;
       sessionStorage.removeItem(SESSION_JOIN_KEY);
@@ -91,6 +121,16 @@ export async function bootWithAuth(ctx, onReady, joinFarmId = null) {
 function _goOffline(ctx, onReady) {
   const overlay = document.getElementById('authOverlay');
   if (overlay) { overlay.style.display = 'none'; overlay.innerHTML = ''; }
+  // Restaure la dernière ferme connue : sans farmId, les écritures ne seraient
+  // ni envoyées ni mises en file. Avec, les modifs hors-ligne sont enfilées et
+  // rejouées au retour du réseau (event « online ») ou au prochain chargement.
+  if (!ctx.farmId) {
+    const last = _recallFarm();
+    if (last?.farmId) {
+      ctx.farmId   = last.farmId;
+      ctx.farmName = last.farmName || null;
+    }
+  }
   onReady();
 }
 
@@ -99,6 +139,10 @@ function _showAuthScreen(ctx, onReady, joinFarmId = null) {
   const overlay = document.getElementById('authOverlay');
   overlay.classList.remove('hidden');
   overlay.innerHTML = _authShellHTML(joinFarmId);
+
+  // Masque le bouton de déconnexion du panneau « Actions » (pas de session)
+  const moreLogout = document.getElementById('moreLogout');
+  if (moreLogout) moreLogout.hidden = true;
 
   overlay.querySelectorAll('.auth-tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -180,7 +224,7 @@ async function _selectFarm(ctx, onReady, joinFarmId = null) {
     } catch (ex) {
       overlay.innerHTML = `
         <div class="auth-card">
-          <p class="auth-error">Impossible de rejoindre la ferme : ${escapeHTML(ex.message || 'Lien invalide ou ferme introuvable.')}</p>
+          <p class="auth-error">Impossible de rejoindre la ferme : ${escapeHTML(_friendlyError(ex))}</p>
           <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
             <button class="btn" id="btnRetryJoin" style="flex:1">Réessayer</button>
             <button class="btn secondary" id="btnSkipJoin" style="flex:1">Mes fermes</button>
@@ -202,7 +246,7 @@ async function _selectFarm(ctx, onReady, joinFarmId = null) {
   } catch (ex) {
     overlay.innerHTML = `
       <div class="auth-card">
-        <p class="auth-error">${escapeHTML(ex.message || 'Impossible de contacter le serveur.')}</p>
+        <p class="auth-error">${escapeHTML(_friendlyError(ex))}</p>
         <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
           <button class="btn" id="btnRetryFarm" style="flex:1">Réessayer</button>
           <button class="btn secondary" id="btnOfflineFallback" style="flex:1">Mode hors-ligne</button>
@@ -339,13 +383,14 @@ async function _loadFarm(farmId, farmName, ctx, onReady, isNew = false) {
 
     overlay.style.display = 'none';
     overlay.classList.add('hidden');
+    _rememberFarm(farmId, farmName);
     _updateTopbar(ctx, onReady);
     DB.subscribeToFarm(farmId, ctx);
     onReady();
   } catch (ex) {
     overlay.innerHTML = `
       <div class="auth-card">
-        <p class="auth-error">Erreur : ${escapeHTML(ex.message)}</p>
+        <p class="auth-error">${escapeHTML(_friendlyError(ex))}</p>
         <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
           <button class="btn" id="btnRetryLoad" style="flex:1">Réessayer</button>
           <button class="btn secondary" id="btnOfflineFallback2" style="flex:1">Mode hors-ligne</button>
@@ -649,15 +694,20 @@ function _updateTopbar(ctx, onReady) {
     await _selectFarm(ctx, onReady);
   });
 
-  // Logout
-  document.getElementById('ddLogout')?.addEventListener('click', async () => {
+  // Logout (menu avatar)
+  document.getElementById('ddLogout')?.addEventListener('click', () => {
     closeDropdown();
-    const ok = await showConfirm({ title: 'Déconnexion', message: 'Se déconnecter de CuniWorld ?', confirmLabel: 'Déconnexion', cancelLabel: 'Annuler', danger: true });
-    if (!ok) return;
-    DB.unsubscribeAll();
-    await Auth.signOut();
-    location.reload();
+    _doLogout();
   });
+
+  // Bouton de déconnexion visible dans le panneau « Actions » (desktop + mobile)
+  const moreLogout = document.getElementById('moreLogout');
+  if (moreLogout) {
+    moreLogout.hidden = false;
+    moreLogout.onclick = () => _doLogout();
+    const emailLabel = document.getElementById('logoutEmailLabel');
+    if (emailLabel && ctx.currentUser?.email) emailLabel.textContent = ctx.currentUser.email;
+  }
 
   _dropdownCleanup = () => {
     document.removeEventListener('click', onDocClick);
@@ -806,6 +856,28 @@ function _farmSelectorHTML(farms, email) {
 
 function _friendlyError(ex) {
   const msg = ex?.message || '';
+  const lower = msg.toLowerCase();
+
+  // Échecs réseau : le navigateur n'a pas réussi à joindre le serveur Supabase.
+  // Safari/iOS → « Load failed » · Chrome → « Failed to fetch » · Firefox → « NetworkError »
+  // _withTimeout → « Délai dépassé (...) »
+  if (
+    lower.includes('load failed') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('networkerror') ||
+    lower.includes('network request failed') ||
+    lower.includes('délai dépassé') ||
+    lower.includes('timeout')
+  ) {
+    return "Impossible de contacter le serveur. Vérifiez votre connexion Internet et réessayez. "
+         + "Si le problème persiste, le service est peut-être temporairement indisponible.";
+  }
+
+  // Configuration / clé API Supabase invalide
+  if (lower.includes('invalid api key') || lower.includes('no api key')) {
+    return "Configuration du serveur invalide. Contactez l'administrateur de l'application.";
+  }
+
   if (msg.includes('Invalid login')) return 'Email ou mot de passe incorrect.';
   if (msg.includes('Email not confirmed')) return 'Email non confirmé — vérifiez votre boîte mail.';
   if (msg.includes('already registered')) return 'Cet email est déjà utilisé.';
