@@ -9,6 +9,8 @@ import { fetchFarmMembers } from './membersService.js';
 import { getMyProfile, saveMyProfile } from './profileService.js';
 import { openModal, closeModal } from './modal.js';
 import { loadFarmSettings, DEFAULT_SETTINGS } from './settingsService.js';
+import { reconcileLocalToCloud, hasRecoverable } from './reconcile.js';
+import { enqueueMutation } from './mutationQueue.js';
 
 function escAttr(s) { return String(s).replace(/"/g, '&quot;'); }
 
@@ -124,9 +126,14 @@ function _goOffline(ctx, onReady) {
   // Restaure la dernière ferme connue : sans farmId, les écritures ne seraient
   // ni envoyées ni mises en file. Avec, les modifs hors-ligne sont enfilées et
   // rejouées au retour du réseau (event « online ») ou au prochain chargement.
+  // SÉCURITÉ multi-fermes : on ne restaure que si le blob local appartient bien
+  // à cette ferme (meta.farmId), pour ne jamais enfiler les données d'une ferme
+  // sous l'identifiant d'une autre. Si le blob n'est pas taggé / d'une autre
+  // ferme → vrai mode local (pas de file) ; la réconciliation rattrapera au
+  // prochain chargement en ligne.
   if (!ctx.farmId) {
     const last = _recallFarm();
-    if (last?.farmId) {
+    if (last?.farmId && ctx.state?.meta?.farmId === last.farmId) {
       ctx.farmId   = last.farmId;
       ctx.farmName = last.farmName || null;
     }
@@ -341,6 +348,22 @@ function _wireFarmSelector(overlay, ctx, onReady) {
   });
 }
 
+// Pousse vers le cloud les entrées locales récupérées par la réconciliation.
+// En ligne → upsert direct ; en cas d'échec → file d'attente (rejouée plus tard).
+function _pushRecovered(farmId, recovered) {
+  const push = (type, payload, fn) =>
+    Promise.resolve().then(fn).catch(err => { enqueueMutation(type, payload, err); });
+  for (const r of recovered.rabbits) {
+    push('upsertRabbit', { farmId, rabbit: r }, () => DB.upsertRabbit(farmId, r));
+  }
+  for (const e of recovered.events) {
+    push('upsertEvent', { farmId, event: e }, () => DB.upsertEvent(farmId, e));
+  }
+  for (const [name, rid] of Object.entries(recovered.usedNames)) {
+    push('setUsedName', { farmId, name, rabbitId: rid }, () => DB.setUsedName(farmId, name, rid));
+  }
+}
+
 async function _loadFarm(farmId, farmName, ctx, onReady, isNew = false) {
   const overlay = document.getElementById('authOverlay');
   overlay.style.display = '';
@@ -355,6 +378,35 @@ async function _loadFarm(farmId, farmName, ctx, onReady, isNew = false) {
     ctx.farmName = farmName;
     const farmState = await _withTimeout(DB.loadFarmState(farmId), 12000, 'loadFarmState');
     ctx.state = _mergeLocalFields(farmState, preLoadLocal);
+
+    // Marque l'appartenance du blob local à cette ferme (sécurité multi-fermes
+    // + base de la réconciliation au prochain chargement).
+    ctx.state.meta = { ...(ctx.state.meta || {}), farmId };
+
+    // RÉCONCILIATION : récupère les entrées locales non synchronisées (ex : une
+    // pesée faite hors-ligne) que le chargement cloud écraserait sinon. Ne
+    // s'applique pas au premier chargement d'une ferme (isNew) — géré par
+    // _offerMigration. Scopé par ferme pour ne rien pousser dans la mauvaise.
+    if (!isNew) {
+      const recovered = reconcileLocalToCloud(farmState, preLoadLocal, farmId);
+      if (hasRecoverable(recovered)) {
+        const rById = new Map(ctx.state.rabbits.map(r => [r.id, r]));
+        for (const r of recovered.rabbits) rById.set(r.id, r);
+        ctx.state.rabbits = [...rById.values()];
+        const evIds = new Set(ctx.state.events.map(e => e.id));
+        for (const e of recovered.events) if (!evIds.has(e.id)) ctx.state.events.push(e);
+        ctx.state.usedNames = { ...(ctx.state.usedNames || {}), ...recovered.usedNames };
+        ctx.state = Store.save(ctx.state); // persiste la fusion (+ meta.farmId)
+        _pushRecovered(farmId, recovered);  // renvoie vers le cloud
+        const n = recovered.rabbits.length + recovered.events.length;
+        if (n > 0) showToast(`${n} modification(s) locale(s) non synchronisée(s) récupérée(s) et renvoyée(s) au cloud.`, 'success');
+      } else {
+        ctx.state = Store.save(ctx.state); // persiste au moins meta.farmId
+      }
+    } else {
+      ctx.state = Store.save(ctx.state); // persiste meta.farmId
+    }
+
     await hydrateAndMigratePhotos(ctx.state, farmId);
 
     // Charge mon profil + la liste des membres + les paramètres ferme.
