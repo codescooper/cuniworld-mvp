@@ -6,7 +6,7 @@ const KEY = "cuniworld_mvp_state";
 const BACKUPS_KEY = "cuniworld_mvp_backups";
 const MAX_BACKUPS = 5;
 
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 function nowISO() {
   return new Date().toISOString();
@@ -32,7 +32,33 @@ function defaultState() {
     lodges: [],       // individual lodges (loges)
     lodgeDefects: [], // reported lodge/building defects
     lodgeEvents: [],  // lodge inspection/cleaning history
+    transactions: [],     // comptabilité : mouvements d'argent manuels { direction:'in'|'out', ... }
+    recurringCharges: [], // comptabilité : charges/recettes récurrentes dépliées à la lecture
   };
+}
+
+// Replie les anciennes dépenses (`state.expenses[]`) dans le journal unifié
+// `state.transactions[]` en tant que mouvements `out`. Idempotente : si
+// `expenses` est absent, renvoie l'état avec un `transactions` garanti. Définie
+// ici (et non importée de ledger.js) pour éviter un cycle d'imports au chargement.
+function migrateExpensesToTransactions(state) {
+  const transactions = Array.isArray(state.transactions) ? state.transactions : [];
+  if (!Array.isArray(state.expenses) || state.expenses.length === 0) {
+    const { expenses: _drop, ...rest } = state;
+    return { ...rest, transactions };
+  }
+  const migrated = state.expenses.map((e) => ({
+    id:          (typeof e.id === "string" && e.id) ? e.id : uid("tx"),
+    date:        e.date,
+    direction:   "out",
+    category:    e.category || "autre",
+    amount:      Number(e.amount) || 0,
+    currency:    e.currency || null,
+    description: (e.description || "").trim(),
+    createdAt:   e.createdAt || nowISO(),
+  }));
+  const { expenses: _drop, ...rest } = state;
+  return { ...rest, transactions: [...transactions, ...migrated] };
 }
 
 function listBackupsFromStorage() {
@@ -79,6 +105,14 @@ function migrate(state) {
   if (state.version === 5) {
     state = { ...state, buildings: [], lodges: [], lodgeDefects: [], lodgeEvents: [], version: 6 };
   }
+  // v6 → v7 : comptabilité — ajout recurringCharges + repli expenses → transactions
+  if (state.version === 6) {
+    state = { ...state, recurringCharges: state.recurringCharges || [], version: 7 };
+  }
+  // Repli one-shot des anciennes dépenses dans le journal (idempotent ; couvre
+  // aussi les états sans `version` ré-hydratés depuis defaultState).
+  state = migrateExpensesToTransactions(state);
+  if (!Array.isArray(state.recurringCharges)) state.recurringCharges = [];
   return state;
 }
 
@@ -113,6 +147,7 @@ function _validateImport(parsed) {
   const optionalArrays = [
     "photos", "stock", "stockMovements", "rounds",
     "buildings", "lodges", "lodgeDefects", "lodgeEvents",
+    "expenses", "transactions", "recurringCharges",
   ];
   for (const key of optionalArrays) {
     if (parsed[key] !== undefined && !Array.isArray(parsed[key])) {

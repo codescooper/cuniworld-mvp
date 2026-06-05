@@ -56,7 +56,7 @@ function _withTimeout(promise, ms, label) {
 
 // Fields now synced to Supabase. _mergeLocalFields uses local data only as a
 // fallback when the Supabase table returns null (SQL migration not run yet).
-const SYNCED_FIELDS = ['buildings', 'lodges', 'lodgeDefects', 'lodgeEvents', 'stock', 'stockMovements', 'rounds', 'lotStatuses'];
+const SYNCED_FIELDS = ['buildings', 'lodges', 'lodgeDefects', 'lodgeEvents', 'stock', 'stockMovements', 'rounds', 'lotStatuses', 'transactions', 'recurringCharges'];
 
 function _mergeLocalFields(farmState, localState) {
   const merged = { ...farmState, version: Store.helpers.SCHEMA_VERSION };
@@ -486,6 +486,8 @@ async function _autoMigrateLocalModules(ctx, freshCloud, localState) {
   needsArr(freshCloud.stock,          m.stock,          s => DB.upsertStockItem(fid, s));
   needsArr(freshCloud.stockMovements, m.stockMovements, mv => DB.upsertStockMovement(fid, mv));
   needsArr(freshCloud.rounds,         m.rounds,         r => DB.upsertRound(fid, r));
+  needsArr(freshCloud.transactions,     m.transactions,     t => DB.upsertTransaction(fid, t));
+  needsArr(freshCloud.recurringCharges, m.recurringCharges, r => DB.upsertRecurringCharge(fid, r));
 
   const cloudStatuses = freshCloud.lotStatuses;
   if (cloudStatuses !== null && Object.keys(cloudStatuses).length === 0) {
@@ -581,8 +583,17 @@ function _remapStateIds(local) {
     lotStatuses[m ? `lot_${eid(m[1])}` : lotId] = status;
   }
 
+  // Comptabilité : nouveaux id ; on remappe une éventuelle référence lapin.
+  const transactions = (local.transactions || []).map((t) => {
+    const d = { ...t, id: newId('tx') };
+    if (d.refType === 'rabbit' && d.refId) d.refId = rid(d.refId);
+    return d;
+  });
+  const recurringCharges = (local.recurringCharges || []).map((r) => ({ ...r, id: newId('rec') }));
+
   return { rabbits, events, photos, usedNames, buildings, lodges,
-           lodgeDefects, lodgeEvents, stock, stockMovements, rounds, lotStatuses };
+           lodgeDefects, lodgeEvents, stock, stockMovements, rounds, lotStatuses,
+           transactions, recurringCharges };
 }
 
 // ── Migration localStorage → Supabase ────────────────────────────

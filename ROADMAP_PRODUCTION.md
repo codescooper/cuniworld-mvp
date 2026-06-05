@@ -53,7 +53,7 @@
 
 ## Phase 4 — Fonctionnel manquant 🟠
 
-- [x] **4.1** Module **Comptabilité** : recettes (auto depuis ventes shop) + dépenses manuelles (aliments, véto, eau, électricité, main d'œuvre) → P&L mensuel — `src/accounting.js` + modal `renderAccounting.js` (tile 📊 dans Actions)
+- [x] **4.1** Module **Comptabilité exhaustif** (journal de trésorerie) : journal unifié de toutes les entrées/sorties — ventes (auto), achats d'animaux (événement `achat`), achats de stock avec coût (auto), recettes manuelles, **charges récurrentes** dépliées — + **P&L mensuel/annuel**, **trésorerie/solde**, **export CSV** et impression. **Panneau dédié** « 📊 Comptabilité » dans le menu. **Synchronisé cloud** (tables `transactions` + `recurring_charges`, migration `015_accounting.sql`, realtime + réconciliation, parité module Stock) — `src/ledger.js` (pur, `tests/ledger.test.js`) + `src/renderAccounting.js` (4 onglets). `src/accounting.js` conservé (legacy réutilisé). Migration auto `expenses[]` → `transactions[]` (schema v7).
 - [x] **4.2** **Carnet sanitaire PDF** imprimable par lapin (jsPDF ou print CSS) — pour le vétérinaire — `src/printable.js#printSanitaryRecord` via `window.print()` (pas de jsPDF)
 - [x] **4.3** **Facture PDF** pour chaque vente boutique (numérotée, devise, mentions légales du vendeur) — `src/printable.js#printInvoice`, bouton sur commandes livrées
 - [x] **4.4** **Suivi alimentation** : lier consommation stock aliments → lots/cages, calcul indice de consommation (kg aliment / kg vif produit) — `src/feedTracking.js`, affichage dans Stats

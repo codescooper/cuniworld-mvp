@@ -36,7 +36,7 @@ const _lazyShop       = () => import("./src/renderShop.js");
 
 const el = getEls();
 
-const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "batiments", "magasin", "stats", "orders", "actions", "settings", "aide"];
+const PANELS = ["dashboard", "rabbits", "lots", "genealogy", "batiments", "magasin", "comptabilite", "stats", "orders", "actions", "settings", "aide"];
 
 const ctx = {
   Store,
@@ -468,9 +468,8 @@ function wireExtra() {
 
   // Comptabilité : module chargé à la demande (jamais utilisé par tous les
   // élevages, et porte ses propres exports textuels lourds).
-  document.getElementById("moreAccounting")?.addEventListener("click", async () => {
-    const { openAccountingModal } = await import("./src/renderAccounting.js");
-    openAccountingModal(ctx);
+  document.getElementById("moreAccounting")?.addEventListener("click", () => {
+    ctx.navigate ? ctx.navigate("comptabilite") : (ctx.activePanel = "comptabilite", ctx.render());
   });
 
   // Ouvrir la boutique publique de la ferme dans un nouvel onglet

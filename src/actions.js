@@ -79,6 +79,23 @@ export function addRabbit(ctx, data) {
     if (fid(ctx)) trackCloudWrite(ctx, DB.upsertEvent(fid(ctx), ev), { type: "upsertEvent", payload: { farmId: fid(ctx), event: ev } });
   }
 
+  // Achat optionnel à l'inscription : enregistre la dépense via un événement
+  // `achat` (dérivé en dépense `achat_animal` par la comptabilité, cf. ledger.js).
+  const buyPrice = parseFloat(data.purchasePrice);
+  if (Number.isFinite(buyPrice) && buyPrice > 0) {
+    const ev = {
+      id:        uid("ev"),
+      rabbitId:  rabbit.id,
+      type:      "achat",
+      date:      (data.purchaseDate || new Date().toISOString().slice(0, 10)).toString(),
+      notes:     "Achat à l'inscription",
+      data:      { price: buyPrice },
+      createdAt: nowISO(),
+    };
+    ctx.state.events.unshift(ev);
+    if (fid(ctx)) trackCloudWrite(ctx, DB.upsertEvent(fid(ctx), ev), { type: "upsertEvent", payload: { farmId: fid(ctx), event: ev } });
+  }
+
   persist(ctx);
   if (fid(ctx)) trackCloudWrite(ctx, DB.upsertRabbit(fid(ctx), rabbit), { type: "upsertRabbit", payload: { farmId: fid(ctx), rabbit } });
   ctx.selectedRabbitId = rabbit.id;

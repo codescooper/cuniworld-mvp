@@ -712,6 +712,20 @@ function rabbitFormHTML(rabbit=null, state=null) {
         </div>
       </div>
 
+      ${rabbit ? "" : `
+      <div class="field" style="background:#eef6ee;border:1px solid #bcd9bc;border-radius:8px;padding:10px">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer">
+          <input type="checkbox" name="purchasedToggle" id="purchasedToggle">
+          🐇 Animal acheté (enregistre la dépense en comptabilité)
+        </label>
+        <div id="purchasedFields" style="margin-top:8px;display:none">
+          <div class="row2">
+            <div class="field"><div class="label">Prix d'achat</div><input class="input" name="purchasePrice" type="number" min="0.01" step="0.01" placeholder="ex: 12000"></div>
+            <div class="field"><div class="label">Date d'achat</div><input class="input" type="date" name="purchaseDate" value="${today}"></div>
+          </div>
+        </div>
+      </div>`}
+
       <div class="field">
         <div class="label">Notes</div>
         <textarea class="input" name="notes" placeholder="Observations...">${escapeHTML(r.notes || "")}</textarea>
@@ -764,6 +778,12 @@ function wireRabbitForm(ctx, existingRabbit) {
   const forSaleFields = document.getElementById("forSaleFields");
   forSaleToggle?.addEventListener("change", () => {
     if (forSaleFields) forSaleFields.style.display = forSaleToggle.checked ? "block" : "none";
+  });
+
+  const purchasedToggle = document.getElementById("purchasedToggle");
+  const purchasedFields = document.getElementById("purchasedFields");
+  purchasedToggle?.addEventListener("change", () => {
+    if (purchasedFields) purchasedFields.style.display = purchasedToggle.checked ? "block" : "none";
   });
 
   // Précisions de statut : visibles seulement pour une transition actif → Mort/Vendu.
@@ -1076,8 +1096,8 @@ function openShopQuickModal(ctx, rabbit) {
 
 function eventFormHTML(preType = "autre", ctx = null) {
   const today = new Date().toISOString().slice(0,10);
-  const types = ["saillie","mise_bas","sevrage","vaccin","traitement","pesée","vente","décès","autre"];
-  const labels = { saillie:"Saillie", mise_bas:"Mise-bas", sevrage:"Sevrage", vaccin:"Vaccin", traitement:"Traitement", "pesée":"Pesée", vente:"Vente", "décès":"Décès", autre:"Autre" };
+  const types = ["saillie","mise_bas","sevrage","vaccin","traitement","pesée","vente","achat","décès","autre"];
+  const labels = { saillie:"Saillie", mise_bas:"Mise-bas", sevrage:"Sevrage", vaccin:"Vaccin", traitement:"Traitement", "pesée":"Pesée", vente:"Vente", achat:"Achat", "décès":"Décès", autre:"Autre" };
   const options = types.map(t => `<option value="${t}" ${t === preType ? "selected" : ""}>${labels[t]}</option>`).join("");
   const actorHTML = ctx ? actorSelectHTML(ctx, null, "performedByUserId") : "";
   return `
@@ -1222,6 +1242,21 @@ function renderEventExtra(ctx, type) {
       </div>
     `;
   }
+  if (type === "achat") {
+    const cur = getSettings(ctx).currencySymbol || "FCFA";
+    return `
+      <div class="row2">
+        <div class="field">
+          <div class="label">Prix d'achat (${escapeHTML(cur)})</div>
+          <input class="input" name="price" type="number" min="0.01" step="0.01" placeholder="ex: 12000" required>
+        </div>
+        <div class="field">
+          <div class="label">Fournisseur (optionnel)</div>
+          <input class="input" name="client" placeholder="ex: Élevage Voisin">
+        </div>
+      </div>
+    `;
+  }
   if (type === "décès") {
     const causeOptions = Object.entries(DEATH_CAUSES)
       .map(([k, v], i) => `<option value="${escapeAttr(k)}"${i === 0 ? " selected" : ""}>${escapeHTML(v)}</option>`)
@@ -1320,6 +1355,10 @@ function wireEventForm(ctx) {
       evData.maleId = (data.maleId || "").toString().trim();
     }
     if (type === "vente") {
+      evData.price = num(data.price);
+      evData.client = (data.client || "").toString().trim();
+    }
+    if (type === "achat") {
       evData.price = num(data.price);
       evData.client = (data.client || "").toString().trim();
     }

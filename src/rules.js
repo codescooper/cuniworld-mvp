@@ -138,6 +138,15 @@ export function validateEvent(state, rabbitId, draft, opts = {}) {
     }
     return { ok: true };
   }
+  // Achat (entrée d'animal) : miroir de la vente, prix obligatoire. Aucun effet
+  // de bord sur le statut — l'animal acheté reste dans le cheptel.
+  if (type === "achat") {
+    const price = Number(draft?.data?.price ?? 0);
+    if (!Number.isFinite(price) || price <= 0) {
+      return { ok: false, error: "Achat : prix obligatoire et supérieur à 0." };
+    }
+    return { ok: true };
+  }
 
   // vaccin/traitement : nextDate si présent doit être >= date
   if (type === "vaccin" || type === "traitement") {

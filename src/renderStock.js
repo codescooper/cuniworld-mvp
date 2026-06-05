@@ -218,6 +218,11 @@ function _openMovementModal(ctx, itemId, type) {
       <div class="label">Date</div>
       <input id="mvDate" class="input" type="date" value="${today}" />
     </div>
+    ${type === 'entree' ? `
+    <div class="field">
+      <div class="label">Coût total <span class="muted">(optionnel — enregistre une dépense en comptabilité)</span></div>
+      <input id="mvCost" class="input" type="number" min="0" step="0.01" placeholder="ex: 18000" />
+    </div>` : ''}
     <div class="field">
       <div class="label">Notes <span class="muted">(optionnel)</span></div>
       <input id="mvNotes" class="input" type="text" maxlength="120" />
@@ -233,6 +238,8 @@ function _openMovementModal(ctx, itemId, type) {
     const qty   = parseFloat(document.getElementById('mvQty')?.value);
     const date  = document.getElementById('mvDate')?.value || today;
     const notes = document.getElementById('mvNotes')?.value?.trim() || '';
+    const costRaw = document.getElementById('mvCost')?.value;
+    const totalCost = costRaw != null && costRaw !== '' ? parseFloat(costRaw) : undefined;
     const errEl = document.getElementById('mvError');
 
     if (!Number.isFinite(qty) || qty <= 0) {
@@ -242,7 +249,7 @@ function _openMovementModal(ctx, itemId, type) {
     try {
       const fid = ctx.farmId || null;
       const prevMvIds = new Set((ctx.state.stockMovements || []).map(m => m.id));
-      ctx.state = Store.save(addStockMovement(ctx.state, { stockItemId: itemId, type, quantity: qty, date, notes }));
+      ctx.state = Store.save(addStockMovement(ctx.state, { stockItemId: itemId, type, quantity: qty, date, notes, totalCost }));
       if (fid) {
         for (const mv of (ctx.state.stockMovements || []).filter(m => !prevMvIds.has(m.id)))
           trackCloudWrite(ctx, DB.upsertStockMovement(fid, mv), { type: 'upsertStockMovement', payload: { farmId: fid, movement: mv } });

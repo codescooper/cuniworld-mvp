@@ -12,6 +12,7 @@ import { getPhotoHistory, getProfilePhoto, rabbitThumbHTML } from "./photos.js";
 import { getTodayFarmActions } from "./farmActionsService.js";
 import { renderStats } from "./stats.js";
 import { renderStock } from "./renderStock.js";
+import { renderAccounting } from "./renderAccounting.js";
 import { renderBuildings } from "./renderBuildings.js";
 import { getTodayRoundSummary } from "./roundService.js";
 import { formatPerformedBy } from "./membersService.js";
@@ -655,6 +656,9 @@ export function renderAll(ctx) {
   }
   if (active === 'magasin') {
     try { renderStock(ctx); } catch(e) { console.error("[renderStock]", e); }
+  }
+  if (active === 'comptabilite') {
+    try { renderAccounting(ctx); } catch(e) { console.error("[renderAccounting]", e); }
   }
   if (active === 'batiments') {
     try { renderBuildings(ctx); } catch(e) { console.error("[renderBuildings]", e); }

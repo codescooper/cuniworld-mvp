@@ -91,6 +91,11 @@
         <span class="nav-label">Magasin</span>
         <span class="nav-badge" id="badge-magasin"></span>
       </button>
+      <button class="nav-item" data-panel="comptabilite" data-testid="nav-comptabilite">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Comptabilité</span>
+        <span class="nav-badge" id="badge-comptabilite"></span>
+      </button>
       <button class="nav-item" data-panel="stats" data-testid="nav-stats">
         <span class="nav-icon">📈</span>
         <span class="nav-label">Statistiques</span>
@@ -288,6 +293,19 @@
         </div>
         <div class="panel-body">
           <div id="statsDash"></div>
+        </div>
+      </div>
+
+      <!-- Panneau : Comptabilité -->
+      <div class="section-panel" id="panel-comptabilite" data-panel="comptabilite">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-icon">📊</span>
+            <span class="panel-title">Comptabilité</span>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="accountingDash"></div>
         </div>
       </div>
 

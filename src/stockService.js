@@ -45,7 +45,7 @@ export function deleteStockItem(state, itemId) {
 
 // ── Stock movements ───────────────────────────────────────────────────────────
 
-export function addStockMovement(state, { stockItemId, type, quantity, date, notes = '' }) {
+export function addStockMovement(state, { stockItemId, type, quantity, date, notes = '', totalCost, unitCost }) {
   const item = (state.stock || []).find(x => x.id === stockItemId);
   if (!item) throw new Error('Article introuvable.');
   const qty = Number(quantity);
@@ -61,6 +61,18 @@ export function addStockMovement(state, { stockItemId, type, quantity, date, not
     notes:       notes.trim(),
     createdAt:   nowISO(),
   };
+
+  // Coût (entrée uniquement) : alimente la comptabilité (ledger.js dérive une
+  // dépense des mouvements `entree` portant un `totalCost > 0`). On accepte un
+  // coût total OU un coût unitaire (× quantité).
+  if (type === 'entree') {
+    let cost = Number(totalCost);
+    if (!(Number.isFinite(cost) && cost > 0)) {
+      const u = Number(unitCost);
+      cost = (Number.isFinite(u) && u > 0) ? u * qty : 0;
+    }
+    if (cost > 0) movement.totalCost = Math.round(cost * 100) / 100;
+  }
 
   let newQty;
   if (type === 'entree')     newQty = item.quantity + qty;

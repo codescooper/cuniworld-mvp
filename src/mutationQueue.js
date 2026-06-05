@@ -63,6 +63,11 @@ async function runMutation(m) {
     case 'deleteStockMovement':return DB.deleteStockMovement(p.farmId, p.movementId);
     // ── Tournées ──
     case 'upsertRound':        return DB.upsertRound(p.farmId, p.round);
+    // ── Comptabilité ──
+    case 'upsertTransaction':       return DB.upsertTransaction(p.farmId, p.transaction);
+    case 'deleteTransaction':       return DB.deleteTransaction(p.farmId, p.transactionId);
+    case 'upsertRecurringCharge':   return DB.upsertRecurringCharge(p.farmId, p.charge);
+    case 'deleteRecurringCharge':   return DB.deleteRecurringCharge(p.farmId, p.chargeId);
     // ── Statuts lots ──
     case 'setLotStatus':       return DB.setLotStatus(p.farmId, p.lotId, p.status);
     case 'deleteLotStatus':    return DB.deleteLotStatus(p.farmId, p.lotId);

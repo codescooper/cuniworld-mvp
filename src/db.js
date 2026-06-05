@@ -34,7 +34,7 @@ function _scheduleRender(ctx) {
 export const DB = {
   // ── Chargement complet de l'état d'une ferme ─────────────────────
   async loadFarmState(farmId) {
-    const [rRes, eRes, pRes, nRes, stRes, smRes, rdRes, bgRes, lgRes, ldRes, leRes, lsRes] = await Promise.all([
+    const [rRes, eRes, pRes, nRes, stRes, smRes, rdRes, bgRes, lgRes, ldRes, leRes, lsRes, txRes, rcRes] = await Promise.all([
       supabase.from('rabbits').select('id, data').eq('farm_id', farmId),
       supabase.from('events').select('id, rabbit_id, data').eq('farm_id', farmId),
       supabase.from('photos').select('id, rabbit_id, data').eq('farm_id', farmId),
@@ -47,6 +47,8 @@ export const DB = {
       supabase.from('lodge_defects').select('id, data').eq('farm_id', farmId),
       supabase.from('lodge_events').select('id, data').eq('farm_id', farmId),
       supabase.from('lot_statuses').select('lot_id, status').eq('farm_id', farmId),
+      supabase.from('transactions').select('id, data').eq('farm_id', farmId),
+      supabase.from('recurring_charges').select('id, data').eq('farm_id', farmId),
     ]);
 
     // Core tables: throw on error (always present)
@@ -64,6 +66,8 @@ export const DB = {
     const ldData       = _safeData(ldRes, 'lodge_defects');
     const leData       = _safeData(leRes, 'lodge_events');
     const lsData       = _safeData(lsRes, 'lot_statuses');
+    const txData       = _safeData(txRes, 'transactions');
+    const rcData       = _safeData(rcRes, 'recurring_charges');
 
     photoLog('loadFarmState.photos', { count: (pRes.data || []).length, sample: (pRes.data || []).slice(0, 1).map(p => ({ id: p.id, storagePath: p.data?.storagePath })) });
     return {
@@ -82,6 +86,8 @@ export const DB = {
       lodgeDefects:   ldData    !== null ? ldData.map(r => ({ id: r.id, ...r.data }))    : null,
       lodgeEvents:    leData    !== null ? leData.map(r => ({ id: r.id, ...r.data }))    : null,
       lotStatuses:    lsData    !== null ? Object.fromEntries(lsData.map(r => [r.lot_id, r.status])) : null,
+      transactions:     txData !== null ? txData.map(r => ({ id: r.id, ...r.data })) : null,
+      recurringCharges: rcData !== null ? rcData.map(r => ({ id: r.id, ...r.data })) : null,
     };
   },
 
@@ -166,6 +172,34 @@ export const DB = {
     const { error } = await supabase.from('stock_movements').delete()
       .eq('id', movementId).eq('farm_id', farmId);
     _throwIfError('deleteStockMovement', error);
+  },
+
+  // ── Comptabilité : transactions manuelles ─────────────────────────
+  async upsertTransaction(farmId, transaction) {
+    const { id, ...data } = transaction;
+    const { error } = await supabase.from('transactions')
+      .upsert({ id, farm_id: farmId, data }, { onConflict: 'id' });
+    _throwIfError('upsertTransaction', error);
+  },
+
+  async deleteTransaction(farmId, transactionId) {
+    const { error } = await supabase.from('transactions').delete()
+      .eq('id', transactionId).eq('farm_id', farmId);
+    _throwIfError('deleteTransaction', error);
+  },
+
+  // ── Comptabilité : charges récurrentes ────────────────────────────
+  async upsertRecurringCharge(farmId, charge) {
+    const { id, ...data } = charge;
+    const { error } = await supabase.from('recurring_charges')
+      .upsert({ id, farm_id: farmId, data }, { onConflict: 'id' });
+    _throwIfError('upsertRecurringCharge', error);
+  },
+
+  async deleteRecurringCharge(farmId, chargeId) {
+    const { error } = await supabase.from('recurring_charges').delete()
+      .eq('id', chargeId).eq('farm_id', farmId);
+    _throwIfError('deleteRecurringCharge', error);
   },
 
   // ── Tournées quotidiennes ─────────────────────────────────────────
@@ -262,6 +296,8 @@ export const DB = {
     if (!Array.isArray(ctx.state.stock))        ctx.state.stock        = [];
     if (!Array.isArray(ctx.state.stockMovements)) ctx.state.stockMovements = [];
     if (!Array.isArray(ctx.state.rounds))       ctx.state.rounds       = [];
+    if (!Array.isArray(ctx.state.transactions))     ctx.state.transactions     = [];
+    if (!Array.isArray(ctx.state.recurringCharges)) ctx.state.recurringCharges = [];
     if (!ctx.state.lotStatuses || typeof ctx.state.lotStatuses !== 'object') ctx.state.lotStatuses = {};
 
     _channel = supabase
@@ -365,6 +401,21 @@ export const DB = {
       }, payload => {
         if (!ctx.state.lotStatuses || typeof ctx.state.lotStatuses !== 'object') ctx.state.lotStatuses = {};
         _applyLotStatusChange(ctx.state.lotStatuses, payload);
+        _scheduleRender(ctx);
+      })
+      // ── Comptabilité ──
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'transactions', filter: `farm_id=eq.${farmId}`,
+      }, payload => {
+        if (!Array.isArray(ctx.state.transactions)) ctx.state.transactions = [];
+        _applyChange(ctx.state.transactions, payload, row => ({ id: row.id, ...row.data }));
+        _scheduleRender(ctx);
+      })
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'recurring_charges', filter: `farm_id=eq.${farmId}`,
+      }, payload => {
+        if (!Array.isArray(ctx.state.recurringCharges)) ctx.state.recurringCharges = [];
+        _applyChange(ctx.state.recurringCharges, payload, row => ({ id: row.id, ...row.data }));
         _scheduleRender(ctx);
       })
       .subscribe((status, err) => {
