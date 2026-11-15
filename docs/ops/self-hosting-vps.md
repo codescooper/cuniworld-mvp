@@ -49,3 +49,12 @@ Domaine et HTTPS activés et vérifiés, dialogue de connexion et page publique 
 
 
 Publication : 15 novembre 2026, CI réussie pour 1cb9cda. HTTPS valide, HTTP public et sitemap vérifiés ; requêtes simulant OAI-SearchBot et Googlebot en 200 (cela ne prouve pas leur passage réel). Données farm_members et rabbits vides pour un client anonyme. 31 contrôles API réels réussis. Confirmation SMTP encore attendue ; aucune restauration de données anciennes.
+
+
+## Contrôles finaux de passerelle
+
+Les 34 contrôles réels de `python3 scripts/verify-selfhost.py --public` passent à travers HTTPS, dont connexion par mot de passe, stockage et droits entre comptes. Le lien d’action généré sans envoyer de message pointe sur `/backend/auth/v1/verify`. Configurer les quatre variables MAILER_URLPATHS_CONFIRMATION, INVITE, RECOVERY et EMAIL_CHANGE sur ce chemin complet (l’ancien `/auth/v1/verify` serait hors passerelle).
+
+Nginx utilise le résolveur Docker et des upstreams résolus dynamiquement : un redémarrage de GoTrue ou Storage ne doit pas conserver une ancienne adresse IP. Configuration effective vérifiée avec nginx -t et les tests API publics. Les deux anciens frontends de recette sont conservés comme références ; le routeur public pointe sur awema-cuniworld-web-v2.
+
+Le script serveur `/opt/awema-cuniworld/backend/configure-gmail.py` demande le mot de passe d’application via getpass, vérifie STARTTLS et l’authentification Gmail sans envoyer de mail, puis met à jour la configuration root-only. Les inscriptions restent fermées en attendant la fin de cette configuration et la recette du compte propriétaire.

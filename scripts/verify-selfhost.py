@@ -8,7 +8,9 @@ import json
 import pathlib
 import secrets
 import subprocess
+import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 
@@ -23,8 +25,13 @@ def address(container, port):
 
 
 AUTH = address('cuniworld-auth', 9999)
+ADMIN_AUTH = AUTH
 REST = address('cuniworld-rest', 3000)
 STORAGE = address('cuniworld-storage', 5000)
+if '--public' in sys.argv:
+    AUTH = ENV['SUPABASE_PUBLIC_URL'] + '/auth/v1'
+    REST = ENV['SUPABASE_PUBLIC_URL'] + '/rest/v1'
+    STORAGE = ENV['SUPABASE_PUBLIC_URL'] + '/storage/v1'
 results = []
 users = []
 
@@ -61,7 +68,7 @@ try:
     for suffix in ['a', 'b']:
         email = 'cuni-qa-' + secrets.token_hex(8) + suffix + '@example.invalid'
         password = secrets.token_urlsafe(30)
-        status, account = call(AUTH, '/admin/users', 'POST',
+        status, account = call(ADMIN_AUTH, '/admin/users', 'POST',
                                {'email': email, 'password': password, 'email_confirm': True}, ENV['SERVICE_ROLE_KEY'])
         check('create disposable account ' + suffix, status in (200, 201))
         users.append(account['id'])
@@ -69,6 +76,17 @@ try:
         check('password login ' + suffix, status == 200 and bool(session.get('access_token')))
         tokens.append(session['access_token'])
     a, b = tokens
+    status, action = call(ADMIN_AUTH, '/admin/generate_link', 'POST',
+                          {'type': 'recovery', 'email': email,
+                           'redirect_to': 'https://cuniworld.awema.cloud/'}, ENV['SERVICE_ROLE_KEY'])
+    check('generate email action without sending mail', status == 200)
+    link = urllib.parse.urlparse(action['action_link'])
+    check('email verification path targets VPS gateway',
+          link.scheme == 'https' and link.netloc == 'cuniworld.awema.cloud'
+          and link.path == '/backend/auth/v1/verify')
+    if '--public' in sys.argv:
+        status, _ = call(AUTH, '/admin/users')
+        check('public auth administration route is blocked', status == 404)
     status, farm = call(REST, '/rpc/create_farm_with_owner', 'POST', {'farm_name': 'QA CuniWorld isolation'}, a)
     check('create farm with owner through RPC', status == 200 and bool(farm.get('id')))
     fid = farm['id']
@@ -107,7 +125,7 @@ try:
     check('existing invitation-by-farm-id flow still works as member', status == 201)
 finally:
     for uid in users:
-        status, _ = call(AUTH, '/admin/users/' + uid, 'DELETE', token=ENV['SERVICE_ROLE_KEY'])
+        status, _ = call(ADMIN_AUTH, '/admin/users/' + uid, 'DELETE', token=ENV['SERVICE_ROLE_KEY'])
         results.append({'check': 'cleanup own disposable user', 'passed': status == 200})
     (ROOT / 'verification.json').write_text(json.dumps(results, indent=2) + '\n')
     print(json.dumps(results, indent=2))
