@@ -6,6 +6,7 @@ test('la présentation publique est autonome et le sitemap ne liste pas la gesti
   expect(response.status()).toBe(200);
   await expect(page.getByRole('heading', {level:1})).toHaveCount(1);
   await expect(page.locator('link[rel=canonical]')).toHaveAttribute('href','https://cuniworld.vercel.app/decouvrir.html');
+  await expect(page.getByRole('link',{name:'Accéder à l’application',exact:true})).toHaveAttribute('href','https://cuniworld.vercel.app/');
   expect(await page.locator('script').count()).toBe(0);
   expect(await page.locator('form').count()).toBe(0);
   const sitemap = await request.get(publicBase + '/sitemap.xml');
