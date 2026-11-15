@@ -12,7 +12,8 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Playwright locked in this project supports Ubuntu 24.04, not ubuntu-latest 26.04.
+    runs-on: ubuntu-24.04
     env:
       GITHUB_PAGES: "true"
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
