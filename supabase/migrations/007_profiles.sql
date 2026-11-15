@@ -24,6 +24,8 @@ create policy profiles_self_write on public.profiles
 
 -- ── RPC mis à jour : retourne aussi first_name / last_name ───────────────────
 
+-- PostgreSQL cannot replace a function when its OUT columns change.
+drop function if exists public.get_farm_members(uuid);
 create or replace function public.get_farm_members(p_farm_id uuid)
 returns table(
   user_id    uuid,

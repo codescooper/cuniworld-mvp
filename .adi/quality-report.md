@@ -32,3 +32,8 @@ Installation npm ci en attente d'accord ADI, donc build et suites du projet non 
 ## Blocages, corrections et retests
 
 ## Décision de livraison et validations
+
+
+## 15 novembre — VPS
+
+Direction visuelle conservée. URL publiques adaptées, hébergeur décrit factuellement dans les pages légales. Tests unitaires 280 et navigateur 16 réussis ; confidentialité vérifiée sur backend neuf avec comptes de recette jetables. DNS/HTTPS, SMTP et recette depuis le domaine restent en attente : aucune livraison publique complète déclarée. Voir docs/ops/self-hosting-vps.md.

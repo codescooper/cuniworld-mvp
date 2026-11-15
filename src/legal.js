@@ -33,9 +33,9 @@ export const LEGAL_CONFIG = {
   editorPhone:       '',
   editorRegistration:'À COMPLÉTER — N° RCCM (Registre du Commerce et du Crédit Mobilier) + Compte Contribuable',
   publicationLead:   'Code Scooper',
-  hostingProvider:   'Vercel Inc.',
-  hostingAddress:    '440 N Barranca Ave #4133, Covina, CA 91723, USA',
-  hostingContact:    'https://vercel.com/contact',
+  hostingProvider:   'Hostinger — VPS KVM4',
+  hostingAddress:    'À COMPLÉTER — Adresse contractuelle et localisation du VPS',
+  hostingContact:    'https://www.hostinger.com/contact',
   dataController:    'Identique à l\'éditeur ci-dessus',
   dpoContact:        '',
   applicableLaw:     'Droit ivoirien — notamment la loi n° 2013-450 du 19 juin 2013 (protection des données), la loi n° 2016-410 du 15 juin 2016 (protection du consommateur) et les Actes uniformes OHADA (droit commercial). Les exigences du RGPD (UE 2016/679) sont par ailleurs respectées pour les utilisateurs résidant dans l\'Espace Économique Européen.',
@@ -282,10 +282,9 @@ function _buildPrivacy() {
         paramètres ferme, comptabilité.</li>
         <li><strong>Données de commande</strong> (boutique publique) : nom, téléphone,
         email, adresse de livraison, message libre de l'acheteur invité.</li>
-        <li><strong>Données techniques</strong> : journaux d'accès Vercel (IP
-        partiellement anonymisée, user-agent, URL, code retour, durée), version de build,
+        <li><strong>Données techniques</strong> : journaux d'accès du VPS (adresse IP, user-agent, URL, code retour), version de build,
         identifiants d'erreurs Sentry le cas échéant.</li>
-        <li><strong>Stockage local</strong> : copie chiffrée par le navigateur des données
+        <li><strong>Stockage local</strong> : copie locale dans le navigateur des données
         métier (localStorage, IndexedDB) pour le fonctionnement hors-ligne.</li>
       </ul>
       <p><strong>Aucun cookie publicitaire, traceur tiers ni profilage comportemental</strong>
@@ -321,9 +320,8 @@ function _buildPrivacy() {
       <ul>
         <li><strong>Sous-traitants ultimes</strong> :
           <ul>
-            <li>Supabase Inc. (USA, instance UE eu-west) — hébergement BDD, authentification, stockage objet ;</li>
-            <li>Vercel Inc. (USA) — hébergement front-end et journaux HTTP ;</li>
-            <li>Resend Inc. (USA) — envoi d'emails transactionnels, le cas échéant.</li>
+            <li>Hostinger — VPS hébergeant l’application, la base de données, l’authentification et les fichiers ;</li>
+            <li>Fournisseur d’email transactionnel : à confirmer avant activation.</li>
           </ul>
         </li>
         <li><strong>Membres de la ferme</strong> : les données métier sont visibles par les
@@ -335,13 +333,9 @@ function _buildPrivacy() {
     </section>
     <section>
       <h2>Transferts hors de Côte d'Ivoire</h2>
-      <p>Les données sont hébergées en région <strong>Union Européenne (eu-west)</strong>
-      par Supabase Inc. Les éventuels transferts vers les États-Unis (Vercel, Resend) sont
-      encadrés par les <strong>Clauses Contractuelles Types</strong> de la Commission
-      Européenne et, lorsque applicable, par le <strong>EU-US Data Privacy Framework</strong>.</p>
-      <p>Pour les utilisateurs résidant en Côte d'Ivoire, ces transferts sont considérés
-      comme appropriés au sens de la loi n° 2013-450, sous réserve d'éventuelles
-      instructions contraires de l'ARTCI.</p>
+      <p>L’application et les services Supabase sont auto-hébergés sur le VPS Hostinger.
+      La localisation contractuelle du serveur et les conditions des éventuels transferts
+      restent à confirmer par l’éditeur avant ouverture des inscriptions publiques.</p>
     </section>
     <section>
       <h2>Durée de conservation</h2>

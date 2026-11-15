@@ -112,3 +112,9 @@
 5. **Mettre à jour ce fichier** dans le même commit (cocher la case + ajouter ligne au tableau de suivi si besoin).
 6. **Si un item est trop gros** pour une session : marquer `[~]` et créer des sous-items.
 7. **Demander au user** seulement pour les décisions juridiques/produit (ex : raison sociale dans CGU, taux de TVA, fournisseur d'email).
+
+### Complément hors roadmap — hébergement VPS, 15 novembre 2026
+
+- [x] Backend CuniWorld indépendant sur KVM4 et tests API réels de confidentialité ; migrations compatibles installation neuve et durcissement des rôles/RPC.
+- [x] URL SEO adaptées à cuniworld.awema.cloud ; pipeline de validation sans publication GitHub Pages automatique.
+- [ ] Recette publique complète : DNS/HTTPS, email transactionnel et initialisation du compte propriétaire. Aucun ancien compte ni donnée restauré (aucune sauvegarde connue). Voir docs/ops/self-hosting-vps.md.

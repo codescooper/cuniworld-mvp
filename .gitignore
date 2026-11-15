@@ -4,5 +4,6 @@ test-results
 playwright-report
 .env
 .env.local
+.env.*.local
 supabase/.temp/
 _konoha_recovery.mjs

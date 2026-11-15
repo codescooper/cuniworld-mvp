@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Validate CuniWorld
 
 on:
   push:
@@ -7,15 +7,13 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 jobs:
   build:
     # Playwright locked in this project supports Ubuntu 24.04, not ubuntu-latest 26.04.
     runs-on: ubuntu-24.04
     env:
-      GITHUB_PAGES: "true"
+      GITHUB_PAGES: "false"
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
     steps:
@@ -40,21 +38,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload validated build
+        uses: actions/upload-artifact@v4
         with:
+          name: cuniworld-validated-build
           path: ./dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4

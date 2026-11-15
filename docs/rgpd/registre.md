@@ -1,5 +1,7 @@
 # Registre des traitements — CuniWorld
 
+> Mise à jour hébergement du 15 novembre 2026 : nouvelle installation sur VPS Hostinger ; Supabase est le logiciel auto-hébergé. Les références à Vercel et au cloud Supabase ci-dessous décrivent l’ancienne installation. Localisation contractuelle du VPS, fournisseur SMTP, durées opérationnelles et copie hors serveur sont à confirmer avant ouverture des inscriptions. Voir `../ops/self-hosting-vps.md`.
+
 > **Responsable du traitement** : Code Scooper — codescooper@gmail.com
 > **Établissement principal** : Abidjan, Côte d'Ivoire
 > **Sous-traitants ultimes** : Supabase Inc. (hébergement BDD + auth, instance UE eu-west) · Vercel Inc. (hébergement front + logs HTTP) · Resend Inc. (emails transactionnels, le cas échéant)
