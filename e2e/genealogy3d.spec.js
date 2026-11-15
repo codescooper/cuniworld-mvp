@@ -7,6 +7,8 @@ test.beforeEach(async ({ page }) => {
   await createRabbit(page, { code: "CW-F001", name: "Naya", sex: "F" });
   await createBuck(page, { code: "CW-M001", name: "Orion" });
   await navigateTo(page, "genealogy");
+  // Lignées opens on Pedigree; this suite explicitly exercises the overview.
+  await page.getByRole('tab', { name: "🌳 Vue d'ensemble", exact: true }).click();
 });
 
 test("affiche les nœuds 3D dans le panneau Généalogie", async ({ page }) => {
@@ -15,6 +17,16 @@ test("affiche les nœuds 3D dans le panneau Généalogie", async ({ page }) => {
   await expect(page.locator(".gene-node").first()).toBeVisible({ timeout: 5000 });
   const count = await page.locator(".gene-node").count();
   expect(count).toBeGreaterThanOrEqual(2);
+});
+
+test("la vue d'ensemble se réinitialise après un retour au pedigree", async ({ page }) => {
+  await expect(page.locator('.gene-node')).toHaveCount(2);
+  await page.getByRole('tab', { name: '📜 Pedigree', exact: true }).click();
+  await expect(page.locator('#geneGraph')).toHaveCount(0);
+  await page.getByRole('tab', { name: "🌳 Vue d'ensemble", exact: true }).click();
+  await expect(page.locator('.gene-node')).toHaveCount(2);
+  await page.locator('.gene-node').first().click();
+  await expect(page.locator('#geneSideCard')).toBeVisible();
 });
 
 test("survol d'un nœud affiche le tooltip", async ({ page }) => {

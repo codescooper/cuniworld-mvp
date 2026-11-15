@@ -641,13 +641,7 @@ export function renderAll(ctx) {
       .then(m => {
         try { m.renderGenealogyPanel(ctx); }
         catch (e) { console.error("[renderGenealogyPanel]", e); }
-        // Si l'onglet actif est "vue d'ensemble", on charge l'ancien moteur 3D
-        // après le rendu (les éléments geneGraph/geneQ ont alors été injectés).
-        if (m.getActiveTab() === 'overview') {
-          import("./genealogy3d.js")
-            .then(g => { try { g.renderGenealogy3D(ctx); } catch (e) { console.error("[renderGenealogy3D]", e); } })
-            .catch(e => console.error("[lazy genealogy3d]", e));
-        }
+        // The panel owns its overview lifecycle, including local tab changes.
       })
       .catch(e => console.error("[lazy renderGenealogy]", e));
   }

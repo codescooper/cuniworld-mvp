@@ -37,14 +37,17 @@ const TABS = [
 let _activeTab = 'pedigree'; // entrée par défaut : la tâche la plus fréquente
 let _selectedA = null;
 let _selectedB = null;
+let _overviewEngine = null;
 
 export function renderGenealogyPanel(ctx) {
   const root = document.getElementById('geneViews');
   if (!root) return;
+  if (_activeTab !== 'overview') _overviewEngine?.destroyGenealogy3D();
   const rabbits = (ctx.state?.rabbits || []).slice().sort((a, b) =>
     (a.code || '').localeCompare(b.code || '') || (a.name || '').localeCompare(b.name || '')
   );
   if (rabbits.length === 0) {
+    _overviewEngine?.destroyGenealogy3D();
     root.innerHTML = `<div class="muted" style="padding:32px;text-align:center">
       Aucun lapin enregistré. Créez votre premier reproducteur pour utiliser les vues lignée.
     </div>`;
@@ -75,6 +78,16 @@ export function renderGenealogyPanel(ctx) {
     <div class="gv-body">${bodyHTML}</div>`;
 
   _wireTabs(ctx);
+  if (_activeTab === 'overview') {
+    const stage = root.querySelector('#geneGraph');
+    import('./genealogy3d.js').then(engine => {
+      _overviewEngine = engine;
+      // A later tab/render may have replaced the stage while the module loaded.
+      if (_activeTab === 'overview' && document.getElementById('geneGraph') === stage) {
+        engine.renderGenealogy3D(ctx);
+      }
+    }).catch(error => console.error('[genealogy overview]', error));
+  }
   if      (_activeTab === 'pedigree') _wirePedigree(ctx);
   else if (_activeTab === 'descent')  _wireDescent(ctx);
   else if (_activeTab === 'compare')  _wireCompare(ctx);

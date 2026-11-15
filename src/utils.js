@@ -16,8 +16,9 @@ export function daysBetween(aISO, bISO) {
 }
 
 export function addDays(iso, days) {
-  const d = new Date(iso + "T00:00:00");
-  d.setDate(d.getDate() + days);
+  // Calendar dates have no local timezone: UTC avoids shifting a day on export.
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 

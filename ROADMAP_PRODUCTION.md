@@ -78,6 +78,10 @@
 
 ## Suivi des sessions
 
+### Complément hors roadmap — SEO/GEO, 14 novembre 2026
+
+- [x] Hors roadmap — SEO/GEO et correction des sept échecs : calcul calendaire indépendant du fuseau, initialisation de la généalogie lors des changements d'onglet, présentation publique distincte et gestion noindex. Validation : 280 tests unitaires, 16 scénarios navigateur en configuration GitHub Pages, build réussi et lint sans erreur. Publication autorisée par le propriétaire le 15 novembre ; preuves de déploiement dans le rapport opérateur. Voir `docs/seo-geo-2026-11-15.md`. Aucun changement du pourcentage métier historique ni ouverture des données de la bêta fermée.
+
 À mettre à jour à chaque session de finalisation :
 
 | Date | Commit | Items clôturés | % global estimé |

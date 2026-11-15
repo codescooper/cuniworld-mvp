@@ -1,7 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { daysBetween, getRabbitStage, rabbitStatusBadge } from "../src/utils.js";
+import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 
 describe("utils", () => {
+  it.each(['UTC', 'Europe/Paris', 'America/Los_Angeles', 'Pacific/Kiritimati'])(
+    'addDays keeps calendar dates across DST and month boundaries in %s', (timezone) => {
+      const moduleUrl = pathToFileURL(resolve('src/utils.js')).href;
+      const script = `import {addDays} from ${JSON.stringify(moduleUrl)}; console.log(JSON.stringify([
+        addDays('2026-01-01',28), addDays('2026-02-15',28),
+        addDays('2026-03-28',2), addDays('2026-10-24',2),
+        addDays('2024-02-28',1), addDays('2026-01-01',-1)
+      ]));`;
+      const result = execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+        env: {...process.env, TZ: timezone}, encoding: 'utf8',
+      });
+      expect(JSON.parse(result)).toEqual(['2026-01-29','2026-03-15','2026-03-30','2026-10-26','2024-02-29','2025-12-31']);
+    }
+  );
   it("daysBetween calcule correctement", () => {
     expect(daysBetween("2026-01-01", "2026-01-01")).toBe(0);
     expect(daysBetween("2026-01-01", "2026-01-02")).toBe(1);
