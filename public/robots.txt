@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /api/
+Disallow: /backend/
 
 Sitemap: https://cuniworld.awema.cloud/sitemap.xml

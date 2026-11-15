@@ -16,6 +16,7 @@ test('la présentation publique est autonome et le sitemap ne liste pas la gesti
   const robots = await request.get(publicBase + '/robots.txt');
   expect(robots.status()).toBe(200);
   expect(await robots.text()).toContain('Disallow: /api/');
+  expect(await robots.text()).toContain('Disallow: /backend/');
 });
 
 test('l’interface de gestion reste non indexable', async ({request}) => {

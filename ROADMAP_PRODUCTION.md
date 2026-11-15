@@ -117,4 +117,5 @@
 
 - [x] Backend CuniWorld indépendant sur KVM4 et tests API réels de confidentialité ; migrations compatibles installation neuve et durcissement des rôles/RPC.
 - [x] URL SEO adaptées à cuniworld.awema.cloud ; pipeline de validation sans publication GitHub Pages automatique.
-- [ ] Recette publique complète : DNS/HTTPS, email transactionnel et initialisation du compte propriétaire. Aucun ancien compte ni donnée restauré (aucune sauvegarde connue). Voir docs/ops/self-hosting-vps.md.
+- [x] Domaine cuniworld.awema.cloud et HTTPS activés ; présentation publique, dialogue de connexion et protections anonymes vérifiés.
+- [ ] Email transactionnel et initialisation du compte propriétaire. Aucun ancien compte ni donnée restauré (aucune sauvegarde connue). Voir docs/ops/self-hosting-vps.md.

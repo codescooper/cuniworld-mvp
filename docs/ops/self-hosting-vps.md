@@ -7,7 +7,9 @@ Décision du propriétaire : application et backend sur le VPS, origine https://
 - Front statique nginx non-root, lecture seule, sans port hôte publié ; réseaux coolify et cuniworld-backend.
 - Backend indépendant : PostgreSQL, GoTrue, PostgREST, Realtime, Storage et imgproxy. Pas de Studio public ni de port PostgreSQL publié.
 - /backend/auth/v1, /rest/v1, /storage/v1 et /realtime/v1 sont relayés sur la même origine ; /backend/auth/v1/admin est refusé par le frontal.
-- Backend : /opt/awema-cuniworld/backend/compose.yaml ; clés propres à CuniWorld dans .env (root, 0600). Seule la clé anon est destinée au client. Aucun service d’un autre business n’est réutilisé.
+- API sous /backend/ exclues aussi de robots.txt.
+
+Backend : /opt/awema-cuniworld/backend/compose.yaml ; clés propres à CuniWorld dans .env (root, 0600). Seule la clé anon est destinée au client. Aucun service d’un autre business n’est réutilisé.
 - Source officielle Docker fixée au commit indiqué par deploy/UPSTREAM_COMMIT. Images versionnées dans deploy/compose.yaml ; fichiers volumes/db issus de ce même commit. Ne jamais écraser un volume existant pour mettre à jour.
 - Les configurations deploy/ sont des références sans secrets. Les montages relatifs de compose.yaml sont résolus depuis le dossier backend du VPS.
 
@@ -43,4 +45,7 @@ Les données du backend restent dans backend/volumes et le volume db-config. Pou
 
 ## Restant avant recette publique complète
 
-DNS/HTTPS, SMTP et compte propriétaire à initialiser, validation de la connexion depuis le domaine, recette de synchronisation entre deux navigateurs. Les champs légaux incomplets restent affichés comme tels ; la localisation contractuelle du VPS est à confirmer. Aucun classement SEO ni citation IA garantis.
+Domaine et HTTPS activés et vérifiés, dialogue de connexion et page publique inspectés en navigateur. SMTP Gmail (codescooper@gmail.com) à configurer par saisie masquée du mot de passe d’application ; compte propriétaire à initialiser ensuite, puis recette de synchronisation entre deux navigateurs. Les champs légaux incomplets restent affichés comme tels ; la localisation contractuelle du VPS est à confirmer. Aucun classement SEO ni citation IA garantis.
+
+
+Publication : 15 novembre 2026, CI réussie pour 1cb9cda. HTTPS valide, HTTP public et sitemap vérifiés ; requêtes simulant OAI-SearchBot et Googlebot en 200 (cela ne prouve pas leur passage réel). Données farm_members et rabbits vides pour un client anonyme. 31 contrôles API réels réussis. Confirmation SMTP encore attendue ; aucune restauration de données anciennes.
